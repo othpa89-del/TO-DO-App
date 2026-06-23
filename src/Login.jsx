@@ -31,7 +31,7 @@ export default function Login({ supabase }) {
     <div style={S.wrap}>
       <div style={S.card}>
         <div style={S.brand}>TO DO APP</div>
-        <div style={S.sub}>CTC Aufgaben · Anmeldung</div>
+        <div style={S.sub}>Anmeldung</div>
         <input style={S.inp} type="email" placeholder="E-Mail" value={email}
           onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
         <input style={S.inp} type="password" placeholder="Passwort" value={pw}
