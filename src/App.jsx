@@ -891,10 +891,14 @@ export default function App() {
                       {sortedCompanies.map((c) => <option key={c} value={c}>{c}</option>)}
                     </select></div>
                 </div>
-                <div className="field"><label>Startdatum (optional)</label>
+                <div className="field">
+                  <div className="label-row"><label>Startdatum (optional)</label>
+                    {form.start && <button type="button" className="link sm" onClick={() => setForm({ ...form, start: "" })}>Löschen</button>}</div>
                   <input type="date" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} /></div>
                 <div className="row2">
-                  <div className="field"><label>Fällig am (optional)</label>
+                  <div className="field">
+                    <div className="label-row"><label>Fällig am (optional)</label>
+                      {form.due && <button type="button" className="link sm" onClick={() => setForm({ ...form, due: "" })}>Löschen</button>}</div>
                     <input type="date" value={form.due} onChange={(e) => setForm({ ...form, due: e.target.value })} /></div>
                   <div className="field"><label>Erinnerung</label>
                     <select value={form.remindLead} onChange={(e) => setForm({ ...form, remindLead: e.target.value })} disabled={!form.due}>
