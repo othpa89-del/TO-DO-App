@@ -4,6 +4,41 @@ Eurowings-gebrandete Aufgaben-App mit **Echtzeit-Synchronisation** über Supabas
 Dieselben Daten auf iPhone, iPad und Laptops – live und gleichzeitig.
 Läuft als installierbare Web-App (PWA).
 
+## 🚀 Live & Projekt-Infos
+
+| | |
+|---|---|
+| **Live-App** | https://othpa89-del.github.io/TO-DO-App/ |
+| **GitHub-Repo** | https://github.com/othpa89-del/To-Do-App (Branch `main`) |
+| **Deployment** | GitHub Actions → GitHub Pages (automatisch bei jedem Push auf `main`) |
+| **Supabase-URL** | `https://jgrupdbfsxinahflzogr.supabase.co` |
+| **Supabase Projekt-ID** | `jgrupdbfsxinahflzogr` |
+| **Schlüssel** | `SUPABASE_URL` & `SUPABASE_ANON_KEY` in `src/config.js` (anon-Key darf öffentlich sein) |
+
+### Tech-Stack
+- **Frontend:** React 18 + Vite 5
+- **PWA:** `vite-plugin-pwa` (installierbar, Offline-Shell, Auto-Update)
+- **Backend/Daten:** Supabase (Postgres-Tabelle `kv`) mit Row-Level-Security je `user_id`
+- **Echtzeit:** Supabase Realtime
+- **Icons / Export:** `lucide-react`, `xlsx`
+
+### Lokale Entwicklung
+```bash
+npm install      # Abhängigkeiten installieren
+npm run dev      # Dev-Server (http://localhost:5173)
+npm run build    # Produktions-Build nach dist/
+npm run preview  # Build lokal testen
+```
+
+### Projektstruktur
+```
+src/            App.jsx · main.jsx · Login.jsx · config.js
+public/         Icons (favicon, icon-192/512, apple-touch-icon)
+.github/workflows/deploy.yml   GitHub-Pages-Deploy
+index.html · vite.config.js · package.json
+supabase-setup.sql             Datenbank-Setup (einmalig im SQL-Editor)
+```
+
 ## Einrichtung – Teil 1: Supabase (einmalig, ~10 Min, kostenlos)
 
 1. Auf **supabase.com** kostenlos registrieren → **New project** anlegen
@@ -33,9 +68,13 @@ Zugriffsregeln in der Datenbank geschützt.)
 
 1. Alle Dateien dieses Projekts ins Repo laden (Inhalte direkt ins Hauptverzeichnis,
    Branch **main**).
-2. Repo → **Settings → Pages → Source: „GitHub Actions"**.
+2. Repo **öffentlich** stellen (kostenlose GitHub Pages) → **Settings → Pages →
+   Source: „GitHub Actions"**.
 3. Der Workflow baut automatisch (Reiter **Actions**). Danach live unter
    `https://<benutzername>.github.io/<repo-name>/`.
+
+> ✅ Für dieses Repo bereits eingerichtet – live unter
+> https://othpa89-del.github.io/TO-DO-App/
 
 ## Nutzung
 
