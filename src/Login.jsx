@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-export default function Login({ supabase, recovery = false, onDone }) {
+export default function Login({ supabase, recovery = false, onDone, notice = "" }) {
   // signin | signup | forgot | reset
   const [mode, setMode] = useState(recovery ? "reset" : "signin");
   const [email, setEmail] = useState("");
@@ -48,6 +48,8 @@ export default function Login({ supabase, recovery = false, onDone }) {
       <div style={S.card}>
         <div style={S.brand}>TO DO APP</div>
         <div style={S.sub}>{sub}</div>
+
+        {notice && <div style={S.err}>{notice}</div>}
 
         {mode !== "reset" && (
           <input style={S.inp} type="email" placeholder="E-Mail" value={email}

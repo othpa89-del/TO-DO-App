@@ -71,6 +71,7 @@ function unsubscribeRealtime() {
 function Root() {
   const [session, setSession] = useState(undefined); // undefined = lädt
   const [recovery, setRecovery] = useState(false);   // Passwort-Zurücksetzen-Flow
+  const [authNotice, setAuthNotice] = useState("");  // Fehler/Hinweis aus Reset-Link
 
   // WICHTIG: synchron im Render setzen. React führt die Effects von <App>
   // (Kind) VOR den Effects von Root (Eltern) aus – würde currentUserId erst
@@ -79,11 +80,34 @@ function Root() {
   currentUserId = session?.user?.id || null;
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
     const { data: sub } = supabase.auth.onAuthStateChange((e, s) => {
       if (e === "PASSWORD_RECOVERY") setRecovery(true);
       setSession(s);
     });
+
+    // Reset-Link auswerten: type=recovery, ?code=… (PKCE) und Fehler sichtbar machen
+    (async () => {
+      try {
+        const h = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "";
+        const hp = new URLSearchParams(h);
+        const qp = new URLSearchParams(window.location.search);
+        const errDesc = hp.get("error_description") || qp.get("error_description");
+        if (errDesc) setAuthNotice(decodeURIComponent(errDesc.replace(/\+/g, " ")));
+        if (hp.get("type") === "recovery" || qp.get("type") === "recovery") setRecovery(true);
+        const code = qp.get("code");
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
+          if (error) setAuthNotice(error.message);
+          else setRecovery(true);
+        }
+      } catch (e) {
+        setAuthNotice(e?.message || String(e));
+      } finally {
+        const { data } = await supabase.auth.getSession();
+        setSession(data.session);
+      }
+    })();
+
     return () => sub.subscription.unsubscribe();
   }, []);
 
@@ -95,8 +119,8 @@ function Root() {
   if (session === undefined) {
     return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Mulish, system-ui, sans-serif", color: "#787878" }}>Lädt …</div>;
   }
-  if (recovery) return <Login supabase={supabase} recovery onDone={() => setRecovery(false)} />;
-  if (!session) return <Login supabase={supabase} />;
+  if (recovery) return <Login supabase={supabase} recovery notice={authNotice} onDone={() => setRecovery(false)} />;
+  if (!session) return <Login supabase={supabase} notice={authNotice} />;
 
   // key = userId -> bei Anmeldung lädt App frisch aus der Cloud
   return (
