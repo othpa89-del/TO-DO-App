@@ -1,1 +1,66 @@
-# TO-DO-App
+# TO DO APP
+
+Eurowings-gebrandete Aufgaben-App mit **Echtzeit-Synchronisation** über Supabase.
+Dieselben Daten auf iPhone, iPad und Laptops – live und gleichzeitig.
+Läuft als installierbare Web-App (PWA).
+
+## Einrichtung – Teil 1: Supabase (einmalig, ~10 Min, kostenlos)
+
+1. Auf **supabase.com** kostenlos registrieren → **New project** anlegen
+   (Projektname frei, Region z. B. „Central EU (Frankfurt)", DB-Passwort vergeben).
+2. **Datenbank vorbereiten:** linkes Menü → **SQL Editor** → Inhalt der Datei
+   `supabase-setup.sql` einfügen → **RUN**.
+3. **Anmeldung vereinfachen (optional, empfohlen):** **Authentication → Providers →
+   Email** → „**Confirm email**" ausschalten. Dann funktioniert die Anmeldung
+   sofort ohne Bestätigungs-E-Mail.
+4. **Schlüssel holen:** **Project Settings → API**:
+   - **Project URL**  → später als `SUPABASE_URL`
+   - **anon public**  → später als `SUPABASE_ANON_KEY`
+
+## Einrichtung – Teil 2: Schlüssel eintragen
+
+Datei **`src/config.js`** öffnen und die zwei Platzhalter ersetzen:
+
+```js
+export const SUPABASE_URL = "https://deinprojekt.supabase.co";
+export const SUPABASE_ANON_KEY = "eyJhbGciOi...";
+```
+
+(Der anon-Key darf im Browser sichtbar sein – die Daten sind durch Anmeldung +
+Zugriffsregeln in der Datenbank geschützt.)
+
+## Einrichtung – Teil 3: Auf GitHub veröffentlichen
+
+1. Alle Dateien dieses Projekts ins Repo laden (Inhalte direkt ins Hauptverzeichnis,
+   Branch **main**).
+2. Repo → **Settings → Pages → Source: „GitHub Actions"**.
+3. Der Workflow baut automatisch (Reiter **Actions**). Danach live unter
+   `https://<benutzername>.github.io/<repo-name>/`.
+
+## Nutzung
+
+1. Seite öffnen → **Konto erstellen** (E-Mail + Passwort), dann **anmelden**.
+2. Auf **jedem Gerät dasselbe Konto** verwenden → überall dieselben Daten, live.
+3. Installieren:
+   - **iPhone/iPad (Safari):** Teilen → „Zum Home-Bildschirm".
+   - **Laptop (Chrome/Edge):** Installations-Symbol in der Adressleiste.
+4. **Abmelden:** Button unten rechts.
+
+## Team-Teilen
+
+Diese Version synchronisiert pro **Konto** (alle deine Geräte). Sollen Kolleginnen/
+Kollegen eine gemeinsame Team-Liste sehen, ist eine Erweiterung nötig (gemeinsamer
+Arbeitsbereich statt rein persönlicher Daten) – bei Bedarf melden.
+
+## Hinweise
+
+- **Online-Betrieb:** Lesen/Schreiben benötigt Internet. Eine Sicherung über
+  „Druck & Export → JSON-Backup" ist trotzdem empfehlenswert.
+- Bei Fehlern im **Actions**-Lauf: Log-Meldung schicken, dann wird's korrigiert.
+
+## Technisches
+
+- React + Vite, PWA via `vite-plugin-pwa`.
+- Daten: Supabase (Postgres) Tabelle `kv`, Zugriff per Row Level Security je `user_id`.
+- Live-Updates via Supabase Realtime → `src/main.jsx` verteilt Änderungen an die App.
+- Deployment: GitHub Actions → GitHub Pages (`base` wird automatisch gesetzt).
