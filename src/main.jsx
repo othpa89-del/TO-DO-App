@@ -5,11 +5,34 @@ import App from "./App.jsx";
 import Login from "./Login.jsx";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
 
+// "Angemeldet bleiben": Bei aktiviertem Flag wird die Session in localStorage
+// gespeichert (bleibt dauerhaft erhalten), sonst nur in sessionStorage (gilt bis
+// der Browser/Tab geschlossen wird). Das Flag setzt der Login-Bildschirm.
+export const REMEMBER_KEY = "ctc_remember";
+const rememberStorage = {
+  getItem(k) {
+    try { return window.localStorage.getItem(k) ?? window.sessionStorage.getItem(k); }
+    catch { return null; }
+  },
+  setItem(k, v) {
+    let remember = true;
+    try { remember = window.localStorage.getItem(REMEMBER_KEY) !== "0"; } catch {}
+    try {
+      if (remember) { window.localStorage.setItem(k, v); window.sessionStorage.removeItem(k); }
+      else { window.sessionStorage.setItem(k, v); window.localStorage.removeItem(k); }
+    } catch {}
+  },
+  removeItem(k) {
+    try { window.localStorage.removeItem(k); } catch {}
+    try { window.sessionStorage.removeItem(k); } catch {}
+  },
+};
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   // Implicit Flow: Reset-/Bestätigungslinks tragen die Sitzung im URL-Hash und
   // funktionieren so in JEDEM Browser (auch wenn die Mail-App einen anderen
   // Browser öffnet). PKCE würde denselben Browser wie beim Anfordern verlangen.
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: "implicit" },
+  auth: { storage: rememberStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: "implicit" },
 });
 
 // ---------------------------------------------------------------------------

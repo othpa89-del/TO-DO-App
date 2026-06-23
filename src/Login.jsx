@@ -1,6 +1,9 @@
 import React, { useState } from "react";
 import { Plane } from "lucide-react";
 
+// muss mit REMEMBER_KEY in main.jsx übereinstimmen
+const REMEMBER_KEY = "ctc_remember";
+
 export default function Login({ supabase, recovery = false, onDone, notice = "" }) {
   // signin | signup | forgot | reset
   const [mode, setMode] = useState(recovery ? "reset" : "signin");
@@ -10,6 +13,14 @@ export default function Login({ supabase, recovery = false, onDone, notice = "" 
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
+  const [remember, setRemember] = useState(() => {
+    try { return window.localStorage.getItem(REMEMBER_KEY) !== "0"; } catch { return true; }
+  });
+
+  function toggleRemember(val) {
+    setRemember(val);
+    try { window.localStorage.setItem(REMEMBER_KEY, val ? "1" : "0"); } catch {}
+  }
 
   async function submit() {
     setErr(""); setMsg(""); setBusy(true);
@@ -73,6 +84,14 @@ export default function Login({ supabase, recovery = false, onDone, notice = "" 
             onKeyDown={(e) => e.key === "Enter" && submit()} />
         )}
 
+        {(mode === "signin" || mode === "signup") && (
+          <label style={S.remember}>
+            <input type="checkbox" checked={remember} onChange={(e) => toggleRemember(e.target.checked)}
+              style={{ width: 16, height: 16, margin: 0, accentColor: "#AF1E65" }} />
+            Angemeldet bleiben
+          </label>
+        )}
+
         <button style={{ ...S.btn, opacity: busy ? 0.6 : 1 }} disabled={busy} onClick={submit}>
           {busy ? "…" : cta}
         </button>
@@ -109,6 +128,7 @@ const S = {
   sub: { fontSize: 13, color: "#787878", marginBottom: 6, marginTop: -6 },
   inp: { padding: "11px 12px", border: "1px solid #D7D7D7", borderRadius: 8, fontSize: 15, fontFamily: "inherit" },
   btn: { padding: "11px 12px", background: "#AF1E65", color: "#fff", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" },
+  remember: { display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#575757", fontWeight: 600, cursor: "pointer", marginTop: 2 },
   link: { background: "none", border: "none", color: "#871C54", fontSize: 13, fontWeight: 600, cursor: "pointer", marginTop: 4 },
   err: { color: "#D32F2F", fontSize: 13, fontWeight: 600 },
   msg: { color: "#1A7F45", fontSize: 13, fontWeight: 600 },
