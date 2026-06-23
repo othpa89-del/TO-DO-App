@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Plane } from "lucide-react";
 
 export default function Login({ supabase, recovery = false, onDone, notice = "" }) {
   // signin | signup | forgot | reset
@@ -46,7 +47,10 @@ export default function Login({ supabase, recovery = false, onDone, notice = "" 
   return (
     <div style={S.wrap}>
       <div style={S.card}>
-        <div style={S.brand}>TO DO APP</div>
+        <div style={S.brandRow}>
+          <Plane size={28} strokeWidth={2.2} color="#AF1E65" />
+          <span style={S.brand}>TO DO APP</span>
+        </div>
         <div style={S.sub}>{sub}</div>
 
         {notice && <div style={S.err}>{notice}</div>}
@@ -100,6 +104,7 @@ export default function Login({ supabase, recovery = false, onDone, notice = "" 
 const S = {
   wrap: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F8F9FA", fontFamily: "Mulish, system-ui, sans-serif", padding: 20 },
   card: { width: "100%", maxWidth: 360, background: "#fff", border: "1px solid #D7D7D7", borderRadius: 14, padding: 28, boxShadow: "0 8px 30px rgba(0,0,0,.06)", display: "flex", flexDirection: "column", gap: 12 },
+  brandRow: { display: "flex", alignItems: "center", gap: 10 },
   brand: { fontSize: 30, fontWeight: 900, color: "#AF1E65", letterSpacing: "-0.02em" },
   sub: { fontSize: 13, color: "#787878", marginBottom: 6, marginTop: -6 },
   inp: { padding: "11px 12px", border: "1px solid #D7D7D7", borderRadius: 8, fontSize: 15, fontFamily: "inherit" },

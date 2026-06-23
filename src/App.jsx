@@ -1086,7 +1086,7 @@ function PrintDoc({ items }) {
   return (
     <div className="printable">
       <div className="p-head">
-        <div className="p-mark" />
+        <Plane className="p-mark" strokeWidth={2.2} />
         <div className="p-titlewrap"><div className="p-title">TO DO APP</div><div className="p-sub">CTC · Eurowings</div></div>
         <div className="p-date">Erstellt: {now}<br />{items.length} Aufgabe(n)</div>
       </div>
@@ -1121,7 +1121,7 @@ function PersonsPrintDoc({ items, openCount }) {
   return (
     <div className="printable">
       <div className="p-head">
-        <div className="p-mark" />
+        <Plane className="p-mark" strokeWidth={2.2} />
         <div className="p-titlewrap"><div className="p-title">Ansprechpersonen</div><div className="p-sub">CTC · Eurowings</div></div>
         <div className="p-date">Erstellt: {now}<br />{items.length} Person(en)</div>
       </div>
@@ -1363,7 +1363,7 @@ aside.panel .card{position:sticky;top:16px;}
   .ctc-root{background:#fff;max-width:none;}
   @page{margin:14mm;}
   .p-head{display:flex;align-items:center;gap:12px;border-bottom:3px solid ${C.burgundy};padding-bottom:10px;margin-bottom:14px;}
-  .p-mark{width:30px;height:30px;border-radius:50% 50% 50% 4px;box-shadow:inset 0 0 0 6px ${C.burgundy};flex:none;}
+  .p-mark{width:28px;height:28px;color:${C.burgundy};flex:none;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   .p-title{font-size:20px;font-weight:900;color:${C.burgundyDark};letter-spacing:.04em;}
   .p-sub{font-size:11px;color:${C.grey};font-weight:600;}
   .p-date{margin-left:auto;text-align:right;font-size:10px;color:${C.cool};}
