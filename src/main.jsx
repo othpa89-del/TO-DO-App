@@ -71,6 +71,12 @@ function unsubscribeRealtime() {
 function Root() {
   const [session, setSession] = useState(undefined); // undefined = lädt
 
+  // WICHTIG: synchron im Render setzen. React führt die Effects von <App>
+  // (Kind) VOR den Effects von Root (Eltern) aus – würde currentUserId erst
+  // im Effect gesetzt, lädt App beim Öffnen mit user_id=null und die
+  // Cloud-Daten erscheinen "weg". Hier ist die id garantiert vorher gesetzt.
+  currentUserId = session?.user?.id || null;
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
@@ -78,7 +84,6 @@ function Root() {
   }, []);
 
   useEffect(() => {
-    currentUserId = session?.user?.id || null;
     if (session) subscribeRealtime(session.access_token);
     else unsubscribeRealtime();
   }, [session]);
@@ -93,7 +98,7 @@ function Root() {
     <div>
       <App key={currentUserId} />
       <button onClick={() => supabase.auth.signOut()}
-        style={{ position: "fixed", bottom: 12, right: 12, zIndex: 50, fontFamily: "Mulish, sans-serif", fontSize: 12, fontWeight: 700, color: "#575757", background: "#fff", border: "1px solid #D7D7D7", borderRadius: 8, padding: "6px 10px", cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,.08)" }}>
+        style={{ position: "fixed", bottom: "calc(12px + env(safe-area-inset-bottom))", right: "calc(12px + env(safe-area-inset-right))", zIndex: 50, fontFamily: "Mulish, sans-serif", fontSize: 12, fontWeight: 700, color: "#575757", background: "#fff", border: "1px solid #D7D7D7", borderRadius: 8, padding: "6px 10px", cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,.08)" }}>
         Abmelden
       </button>
     </div>

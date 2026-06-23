@@ -1333,9 +1333,17 @@ aside.panel .card{position:sticky;top:16px;}
 .exp-status{font-size:12px;font-weight:800;}
 
 @media(max-width:860px){
-  .grid{grid-template-columns:1fr;}
+  .grid{grid-template-columns:1fr;padding:16px 16px 40px;}
   aside.panel .card{position:static;}
   .hd-profile{display:none;}
+  .hd-inner{padding:16px;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));}
+  .hd h1{font-size:20px;}
+  .tabs{padding:0 8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab{padding:12px 12px;font-size:13px;white-space:nowrap;flex:none;}
+  .band{padding:14px 16px;}
+  .rgroup{min-width:140px;}
+  .toolbar{padding:10px 12px;}
   .tb-export{margin-left:0;}
   .search{max-width:none;}
   .exportwrap{padding:16px;}
