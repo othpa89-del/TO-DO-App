@@ -141,6 +141,7 @@ export function EventEditor({ t, ctx, draft, onSave, onDelete, onClose, canEdit,
           <div style={{ flex: "1 1 160px" }}>
             <Field t={t} label="Ersteller" required>
               <select style={sel} value={f.creatorId} onChange={(e) => set("creatorId", e.target.value)}>
+                <option value="">– bitte wählen –</option>
                 {ctx.users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             </Field>
@@ -148,6 +149,7 @@ export function EventEditor({ t, ctx, draft, onSave, onDelete, onClose, canEdit,
           <div style={{ flex: "1 1 160px" }}>
             <Field t={t} label="Bereich / Firma" required>
               <select style={sel} value={f.areaId} onChange={(e) => set("areaId", e.target.value)}>
+                <option value="">– bitte wählen –</option>
                 {activeAreas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
             </Field>
@@ -158,6 +160,7 @@ export function EventEditor({ t, ctx, draft, onSave, onDelete, onClose, canEdit,
           <div style={{ flex: "1 1 160px" }}>
             <Field t={t} label="Priorität" required>
               <select style={sel} value={f.priority} onChange={(e) => set("priority", e.target.value)}>
+                <option value="">– bitte wählen –</option>
                 {PRIORITIES.map((p) => <option key={p.id} value={p.id}>{p.dot} {p.name}</option>)}
               </select>
             </Field>
@@ -165,6 +168,7 @@ export function EventEditor({ t, ctx, draft, onSave, onDelete, onClose, canEdit,
           <div style={{ flex: "1 1 160px" }}>
             <Field t={t} label="Terminart" required>
               <select style={sel} value={f.typeId} onChange={(e) => set("typeId", e.target.value)}>
+                <option value="">– bitte wählen –</option>
                 {activeTypes.map((x) => <option key={x.id} value={x.id}>{x.icon} {x.name}</option>)}
               </select>
             </Field>
@@ -198,6 +202,7 @@ export function EventEditor({ t, ctx, draft, onSave, onDelete, onClose, canEdit,
                 <div style={{ flex: "1 1 120px" }}>
                   <Field t={t} label="Einheit">
                     <select style={sel} value={rec.unit || "day"} onChange={(e) => setRec("unit", e.target.value)}>
+                      <option value="">– bitte wählen –</option>
                       <option value="day">Tage</option>
                       <option value="week">Wochen</option>
                       <option value="month">Monate</option>

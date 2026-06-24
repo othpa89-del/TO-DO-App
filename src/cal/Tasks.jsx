@@ -57,6 +57,7 @@ export function Tasks({ t, ctx, tasks, setTasks }) {
           <div style={{ flex: "1 1 130px" }}>
             <Field t={t} label="Priorität">
               <select style={sel} value={f.priority} onChange={(e) => set("priority", e.target.value)}>
+                <option value="">– bitte wählen –</option>
                 {PRIORITIES.map((p) => <option key={p.id} value={p.id}>{p.dot} {p.name}</option>)}
               </select>
             </Field>
@@ -122,6 +123,6 @@ export function Tasks({ t, ctx, tasks, setTasks }) {
 }
 
 function blankTask(ctx) {
-  return { title: "", description: "", assigneeId: ctx.activeUserId || "", due: "", priority: "normal" };
+  return { title: "", description: "", assigneeId: "", due: "", priority: "" };
 }
 const iconBtn = (t) => ({ background: "none", border: "none", cursor: "pointer", fontSize: 15, padding: 3, borderRadius: 6 });
