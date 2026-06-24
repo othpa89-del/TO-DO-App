@@ -643,7 +643,7 @@ export default function App() {
             </div>
           </div>
           <nav className="tabs">
-            {["all", "personal", "team", "new", "persons", "export"].map((v) => (
+            {["new", "all", "personal", "team", "persons", "export"].map((v) => (
               <button key={v} className={"tab" + (view === v ? " on" : "")} onClick={() => setView(v)}>
                 {v === "all" ? "Alle" : v === "persons" ? "Persons" : v === "export" ? "Druck & Export" : v === "new" ? "Neue Aufgabe" : SCOPES[v].label}
               </button>
