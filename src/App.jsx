@@ -43,7 +43,7 @@ export default function App() {
   const [types, setTypes] = useState(DEFAULT_EVENT_TYPES);
   const [events, setEvents] = useState([]);
   const [tasks, setTasks] = useState([]);
-  const [settings, setSettings] = useState({ themeMode: "dark", activeUserId: "u_patrick" });
+  const [settings, setSettings] = useState({ themeMode: "light", activeUserId: "u_patrick" });
   const [loaded, setLoaded] = useState(false);
 
   const [view, setView] = useState("dashboard"); // dashboard|day|week|month|agenda|tasks

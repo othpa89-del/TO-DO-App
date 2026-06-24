@@ -15,7 +15,7 @@ export default defineConfig({
         short_name: "Kalender",
         description: "Gemeinsamer Familien- und Business-Kalender mit Terminen und Aufgaben",
         theme_color: "#16233F",
-        background_color: "#0B1426",
+        background_color: "#EEF2F8",
         display: "standalone",
         orientation: "any",
         icons: [
