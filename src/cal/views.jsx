@@ -5,7 +5,7 @@ import React from "react";
 import {
   WEEKDAYS, WEEKDAYS_LONG, MONTHS, PRIORITIES,
   toISODate, parseISODate, addDays, startOfWeek, monthGrid, todayISO,
-  timeToMin, fmtDateLong, priorityById,
+  timeToMin, fmtDateLong, priorityById, dayConflictSet,
 } from "./data.js";
 import { EventChip, MiniEvent, Dot, hexA, UserAvatar } from "./components.jsx";
 
@@ -19,17 +19,38 @@ function Empty({ t, text }) {
 }
 
 // Einfache Spuren-Berechnung für überlappende Termine (Tagesansicht)
-function packLanes(items) {
-  const sorted = items.slice().sort((a, b) => timeToMin(a.start) - timeToMin(b.start));
-  const lanes = []; // jede Spur: Endzeit des letzten Termins
+// Cluster-basiertes Layout: nur zusammenhängend überlappende Termine teilen
+// sich die Breite (jeweils eigene Spalte). Eigenständige Termine bleiben breit.
+// conflict = der Termin liegt in einem Cluster mit ≥2 Terminen (Überschneidung).
+function layoutDay(items) {
+  const sorted = items.slice().sort((a, b) =>
+    timeToMin(a.start) - timeToMin(b.start) || timeToMin(a.end) - timeToMin(b.end));
   const placed = [];
+  let cluster = [], clusterEnd = -1;
+
+  const flush = () => {
+    if (!cluster.length) return;
+    const lanes = []; // Endzeit je Spalte
+    const cols = [];
+    for (const ev of cluster) {
+      const s = timeToMin(ev.start), e = Math.max(timeToMin(ev.end), s + 15);
+      let lane = lanes.findIndex((end) => end <= s);
+      if (lane === -1) { lane = lanes.length; lanes.push(e); } else lanes[lane] = e;
+      cols.push({ ev, lane, s, e });
+    }
+    const colCount = Math.max(1, lanes.length);
+    const conflict = cluster.length > 1;
+    for (const c of cols) placed.push({ ...c, colCount, conflict });
+    cluster = []; clusterEnd = -1;
+  };
+
   for (const ev of sorted) {
     const s = timeToMin(ev.start), e = Math.max(timeToMin(ev.end), s + 15);
-    let lane = lanes.findIndex((end) => end <= s);
-    if (lane === -1) { lane = lanes.length; lanes.push(e); } else lanes[lane] = e;
-    placed.push({ ev, lane, s, e });
+    if (cluster.length && s < clusterEnd) { cluster.push(ev); clusterEnd = Math.max(clusterEnd, e); }
+    else { flush(); cluster = [ev]; clusterEnd = e; }
   }
-  return { placed, laneCount: Math.max(1, lanes.length) };
+  flush();
+  return placed;
 }
 
 // ---------------------------------------------------------------------
@@ -39,7 +60,8 @@ export function DayView({ t, ctx, dateISO, occ, onSelect }) {
   const dayItems = occ.filter((e) => e.date === dateISO);
   const HOUR = 52;
   const startHour = 0, endHour = 24;
-  const { placed, laneCount } = packLanes(dayItems);
+  const placed = layoutDay(dayItems);
+  const hasConflict = placed.some((p) => p.conflict);
   const nowMin = todayISO() === dateISO
     ? new Date().getHours() * 60 + new Date().getMinutes() : null;
 
@@ -50,6 +72,12 @@ export function DayView({ t, ctx, dateISO, occ, onSelect }) {
         <span style={{ fontWeight: 600, color: t.muted, fontSize: 13, marginLeft: 8 }}>
           {dayItems.length} {dayItems.length === 1 ? "Termin" : "Termine"}
         </span>
+        {hasConflict && (
+          <span style={{
+            marginLeft: 8, fontSize: 12, fontWeight: 800, color: "#fff", background: "#E53935",
+            borderRadius: 7, padding: "2px 8px", whiteSpace: "nowrap",
+          }}>⚠️ Überschneidung</span>
+        )}
       </div>
       {dayItems.length === 0 && <Empty t={t} text="Keine Termine an diesem Tag." />}
       <div style={{ position: "relative", borderTop: `1px solid ${t.border}` }}>
@@ -75,10 +103,10 @@ export function DayView({ t, ctx, dateISO, occ, onSelect }) {
         )}
         {/* Termine */}
         <div style={{ position: "absolute", left: 50, right: 2, top: 0, bottom: 0 }}>
-          {placed.map(({ ev, lane, s, e }, idx) => {
+          {placed.map(({ ev, lane, s, e, colCount, conflict }, idx) => {
             const top = (s / 60) * HOUR;
             const height = Math.max(((e - s) / 60) * HOUR - 3, 26);
-            const w = 100 / laneCount;
+            const w = 100 / colCount;
             const type = ctx.typeById(ev.typeId);
             const area = ctx.areaById(ev.areaId);
             const prio = priorityById(ev.priority);
@@ -87,12 +115,15 @@ export function DayView({ t, ctx, dateISO, occ, onSelect }) {
               <button key={ev.id + idx} onClick={() => onSelect(ev)} style={{
                 position: "absolute", top, height, left: `${lane * w}%`, width: `calc(${w}% - 4px)`,
                 background: area ? hexA(area.color, t.mode === "dark" ? 0.26 : 0.15) : t.chip,
-                borderLeft: `4px solid ${prio.color}`, border: `1px solid ${t.border}`,
+                borderLeft: `4px solid ${prio.color}`,
+                border: conflict ? "2px solid #E53935" : `1px solid ${t.border}`,
                 borderRadius: 8, padding: "4px 7px", cursor: "pointer", overflow: "hidden",
                 textAlign: "left", fontFamily: "inherit", color: t.text,
+                boxShadow: conflict ? "0 0 0 1px #E53935 inset" : "none",
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, fontWeight: 700 }}>
-                  <span>{type ? type.icon : "📌"}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12.5, fontWeight: 700 }}>
+                  {conflict && <span title="Überschneidung" style={{ fontSize: 11, flex: "none" }}>⚠️</span>}
+                  <span style={{ flex: "none" }}>{type ? type.icon : "📌"}</span>
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{ev.title}</span>
                   {ev.locked && <span style={{ fontSize: 10 }}>🔒</span>}
                   <UserAvatar user={creator} size={18} />
@@ -120,6 +151,7 @@ export function WeekView({ t, ctx, dateISO, occ, onSelect, onPickDay }) {
         {days.map((d) => {
           const iso = toISODate(d);
           const items = occ.filter((e) => e.date === iso);
+          const conflicts = dayConflictSet(items);
           const isToday = iso === today;
           return (
             <div key={iso} style={{
@@ -135,7 +167,7 @@ export function WeekView({ t, ctx, dateISO, occ, onSelect, onPickDay }) {
               </button>
               <div style={{ flex: 1, overflow: "hidden" }}>
                 {items.slice(0, 6).map((ev, i) => (
-                  <MiniEvent key={ev.id + i} t={t} ev={ev} ctx={ctx} onClick={() => onSelect(ev)} />
+                  <MiniEvent key={ev.id + i} t={t} ev={ev} ctx={ctx} conflict={conflicts.has(ev.id)} onClick={() => onSelect(ev)} />
                 ))}
                 {items.length > 6 && (
                   <button onClick={() => onPickDay(iso)} style={{
@@ -176,6 +208,7 @@ export function MonthView({ t, ctx, dateISO, occ, onSelect, onPickDay }) {
           const inMonth = d.getMonth() === month;
           const isToday = iso === today;
           const items = byDay[iso] || [];
+          const conflicts = dayConflictSet(items);
           return (
             <div key={iso} onClick={() => onPickDay(iso)} style={{
               background: isToday ? t.todayBg : inMonth ? t.surface : t.surface2,
@@ -188,7 +221,7 @@ export function MonthView({ t, ctx, dateISO, occ, onSelect, onPickDay }) {
                 color: isToday ? t.accent : t.text, textAlign: "right", marginBottom: 2,
               }}>{d.getDate()}</div>
               {items.slice(0, 3).map((ev, i) => (
-                <MiniEvent key={ev.id + i} t={t} ev={ev} ctx={ctx} onClick={(e) => { e.stopPropagation(); onSelect(ev); }} />
+                <MiniEvent key={ev.id + i} t={t} ev={ev} ctx={ctx} conflict={conflicts.has(ev.id)} onClick={(e) => { e.stopPropagation(); onSelect(ev); }} />
               ))}
               {items.length > 3 && (
                 <div style={{ fontSize: 9.5, color: t.muted, fontWeight: 700, paddingLeft: 2 }}>+{items.length - 3}</div>
@@ -222,11 +255,14 @@ export function AgendaView({ t, ctx, occ, onSelect }) {
               fontSize: 13, fontWeight: 800, color: d === todayISO() ? t.accent : t.text,
             }}>{fmtDateLong(d)}</span>
             {d === todayISO() && <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: t.accent, borderRadius: 6, padding: "1px 7px" }}>Heute</span>}
+            {dayConflictSet(groups[d]).size > 0 && (
+              <span style={{ fontSize: 11, fontWeight: 800, color: "#fff", background: "#E53935", borderRadius: 6, padding: "1px 7px" }}>⚠️ Überschneidung</span>
+            )}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {groups[d].map((ev, i) => (
-              <EventChip key={ev.id + i} t={t} ev={ev} ctx={ctx} onClick={() => onSelect(ev)} />
-            ))}
+            {(() => { const cf = dayConflictSet(groups[d]); return groups[d].map((ev, i) => (
+              <EventChip key={ev.id + i} t={t} ev={ev} ctx={ctx} conflict={cf.has(ev.id)} onClick={() => onSelect(ev)} />
+            )); })()}
           </div>
         </div>
       ))}

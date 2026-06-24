@@ -137,7 +137,7 @@ export function UserAvatar({ user, size = 22, title }) {
 // =====================================================================
 //  EventChip – kompakte Termin-Darstellung (in allen Ansichten genutzt)
 // =====================================================================
-export function EventChip({ t, ev, ctx, onClick, showDate, dense }) {
+export function EventChip({ t, ev, ctx, onClick, showDate, dense, conflict }) {
   const type = ctx.typeById(ev.typeId);
   const area = ctx.areaById(ev.areaId);
   const creator = ctx.userById(ev.creatorId);
@@ -145,13 +145,14 @@ export function EventChip({ t, ev, ctx, onClick, showDate, dense }) {
   return (
     <button onClick={onClick} style={{
       display: "flex", alignItems: "stretch", gap: 0, width: "100%", textAlign: "left",
-      background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10,
+      background: t.surface, border: conflict ? "1.5px solid #E53935" : `1px solid ${t.border}`, borderRadius: 10,
       cursor: "pointer", overflow: "hidden", fontFamily: "inherit", color: t.text,
       marginBottom: dense ? 4 : 0,
     }}>
       <span style={{ width: 5, background: area ? area.color : t.faint, flex: "none" }} />
       <span style={{ flex: 1, minWidth: 0, padding: dense ? "6px 9px" : "9px 11px" }}>
         <span style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+          {conflict && <span title="Überschneidung" style={{ flex: "none", fontSize: dense ? 12 : 13 }}>⚠️</span>}
           <span style={{ fontSize: dense ? 14 : 16, flex: "none" }}>{type ? type.icon : "📌"}</span>
           <span style={{
             fontWeight: 700, fontSize: dense ? 13 : 14, overflow: "hidden",
@@ -185,19 +186,21 @@ export function EventChip({ t, ev, ctx, onClick, showDate, dense }) {
 }
 
 // kompakter Balken für die Monatsansicht
-export function MiniEvent({ t, ev, ctx, onClick }) {
+export function MiniEvent({ t, ev, ctx, onClick, conflict }) {
   const type = ctx.typeById(ev.typeId);
   const area = ctx.areaById(ev.areaId);
   const prio = priorityById(ev.priority);
   const creator = ctx.userById(ev.creatorId);
   return (
-    <button onClick={onClick} title={`${ev.start} ${ev.title}${creator ? " · " + creator.name : ""}`} style={{
+    <button onClick={onClick} title={`${ev.start} ${ev.title}${creator ? " · " + creator.name : ""}${conflict ? " · ⚠️ Überschneidung" : ""}`} style={{
       display: "flex", alignItems: "center", gap: 3, width: "100%", textAlign: "left",
       background: area ? hexA(area.color, t.mode === "dark" ? 0.22 : 0.14) : t.chip,
       borderLeft: `3px solid ${prio.color}`, borderRadius: 4, padding: "2px 4px",
       cursor: "pointer", fontFamily: "inherit", color: t.text, fontSize: 10.5,
       overflow: "hidden", marginBottom: 2, lineHeight: 1.25,
+      outline: conflict ? "1.5px solid #E53935" : "none", outlineOffset: -1.5,
     }}>
+      {conflict && <span style={{ flex: "none", fontSize: 9 }}>⚠️</span>}
       <span style={{ flex: "none", fontSize: 10 }}>{type ? type.icon : "📌"}</span>
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
         {ev.title}

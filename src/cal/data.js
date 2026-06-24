@@ -287,6 +287,20 @@ export function findConflicts(candidate, events) {
   return conflicts;
 }
 
+// Liefert ein Set der IDs, die sich mit mind. einem anderen Termin in der
+// Liste zeitlich überschneiden (gleiche Liste = gleicher Tag erwartet).
+export function dayConflictSet(items) {
+  const set = new Set();
+  for (let i = 0; i < items.length; i++) {
+    const a = items[i], as = timeToMin(a.start), ae = Math.max(timeToMin(a.end), as + 1);
+    for (let j = i + 1; j < items.length; j++) {
+      const b = items[j], bs = timeToMin(b.start), be = Math.max(timeToMin(b.end), bs + 1);
+      if (as < be && bs < ae) { set.add(a.id); set.add(b.id); }
+    }
+  }
+  return set;
+}
+
 // =====================================================================
 //  Karten-Links
 // =====================================================================
