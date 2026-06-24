@@ -7,7 +7,7 @@ import {
   toISODate, parseISODate, addDays, startOfWeek, monthGrid, todayISO,
   timeToMin, fmtDateLong, priorityById, dayConflictSet,
 } from "./data.js";
-import { EventChip, MiniEvent, Dot, hexA, UserAvatar } from "./components.jsx";
+import { EventChip, MiniEvent, Dot, hexA, UserAvatar, ParticipantDots } from "./components.jsx";
 
 // Leeransicht
 function Empty({ t, text }) {
@@ -128,7 +128,10 @@ export function DayView({ t, ctx, dateISO, occ, onSelect }) {
                   {ev.locked && <span style={{ fontSize: 10 }}>🔒</span>}
                   <UserAvatar user={creator} size={18} />
                 </div>
-                <div style={{ fontSize: 10.5, color: t.muted, marginTop: 1 }}>{ev.start}–{ev.end}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10.5, color: t.muted, marginTop: 1 }}>
+                  <span>{ev.start}–{ev.end}</span>
+                  {ev.participants && ev.participants.length > 0 && <ParticipantDots ev={ev} ctx={ctx} size={9} />}
+                </div>
               </button>
             );
           })}

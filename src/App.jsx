@@ -31,7 +31,7 @@ function blankEvent(ctx) {
   return {
     id: null, title: "", date: todayISO(), start: "09:00", end: "10:00",
     creatorId: ctx.activeUserId || "", areaId: "",
-    priority: "", typeId: "", description: "", location: "",
+    priority: "", typeId: "", participants: [], description: "", location: "",
     address: "", notes: "", link: "", attachments: [], reminder: "none",
     locked: false, recurrence: { freq: "none", interval: 1 },
   };

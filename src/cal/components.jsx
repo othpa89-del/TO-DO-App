@@ -134,6 +134,26 @@ export function UserAvatar({ user, size = 22, title }) {
   );
 }
 
+// --- Teilnehmer-Punkte (wer muss dabei sein – farbige Punkte je Person) ---
+export function ParticipantDots({ ev, ctx, size = 11, max = 4 }) {
+  const ids = ev.participants || [];
+  if (!ids.length) return null;
+  const users = ids.map((id) => ctx.userById(id)).filter(Boolean).slice(0, max);
+  if (!users.length) return null;
+  return (
+    <span title={"Dabei: " + users.map((u) => u.name).join(", ")}
+      style={{ display: "inline-flex", alignItems: "center", gap: -2, flex: "none" }}>
+      {users.map((u, i) => (
+        <span key={u.id} style={{
+          display: "inline-block", width: size, height: size, borderRadius: "50%",
+          background: u.color, border: "1.5px solid rgba(255,255,255,.9)",
+          marginLeft: i === 0 ? 0 : -3, boxShadow: "0 1px 2px rgba(0,0,0,.3)",
+        }} />
+      ))}
+    </span>
+  );
+}
+
 // =====================================================================
 //  EventChip – kompakte Termin-Darstellung (in allen Ansichten genutzt)
 // =====================================================================
@@ -177,6 +197,11 @@ export function EventChip({ t, ev, ctx, onClick, showDate, dense, conflict }) {
             <span style={{
               display: "inline-block", width: 9, height: 9, borderRadius: "50%", background: creator.color,
             }} />{creator.name}</span>}
+          {ev.participants && ev.participants.length > 0 && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <span style={{ fontSize: 10 }}>👥</span><ParticipantDots ev={ev} ctx={ctx} size={12} />
+            </span>
+          )}
           {ev.recurrence && ev.recurrence.freq && ev.recurrence.freq !== "none" && <span title="Wiederkehrend">🔄</span>}
           {(ev.attachments && ev.attachments.length > 0) && <span title="Anhang">📎</span>}
         </span>
@@ -206,8 +231,11 @@ export function MiniEvent({ t, ev, ctx, onClick, conflict }) {
         {ev.title}
       </span>
       {ev.locked && <span style={{ flex: "none", fontSize: 9 }}>🔒</span>}
-      {/* Ersteller-Farbe (wer hat es eingetragen) */}
-      {creator && <span style={{ flex: "none", width: 8, height: 8, borderRadius: "50%", background: creator.color, border: "1px solid rgba(255,255,255,.7)" }} />}
+      {/* Teilnehmer (wer muss dabei sein) */}
+      {ev.participants && ev.participants.length > 0
+        ? <ParticipantDots ev={ev} ctx={ctx} size={8} />
+        : /* sonst Ersteller-Farbe (wer hat es eingetragen) */
+          (creator && <span style={{ flex: "none", width: 8, height: 8, borderRadius: "50%", background: creator.color, border: "1px solid rgba(255,255,255,.7)" }} />)}
     </button>
   );
 }

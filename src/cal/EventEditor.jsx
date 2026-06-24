@@ -175,6 +175,39 @@ export function EventEditor({ t, ctx, draft, onSave, onDelete, onClose, canEdit,
           </div>
         </div>
 
+        {/* Teilnehmer – wer muss dabei sein */}
+        <Field t={t} label="Teilnehmer – wer muss dabei sein?" hint="Markierte Personen müssen beim Termin dabei sein; erscheinen als farbige Punkte am Termin.">
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {ctx.users.map((u) => {
+              const on = (f.participants || []).includes(u.id);
+              return (
+                <button key={u.id} type="button" onClick={() => {
+                  const s = new Set(f.participants || []);
+                  s.has(u.id) ? s.delete(u.id) : s.add(u.id);
+                  set("participants", Array.from(s));
+                }} style={{
+                  display: "flex", alignItems: "center", gap: 7, padding: "7px 12px", borderRadius: 22,
+                  cursor: "pointer", fontFamily: "inherit", fontSize: 13.5, fontWeight: 700,
+                  background: on ? u.color : t.chip, color: on ? "#fff" : t.text,
+                  border: `1.5px solid ${on ? u.color : t.border}`,
+                }}>
+                  <span style={{ width: 12, height: 12, borderRadius: "50%", background: u.color, border: "1.5px solid rgba(255,255,255,.9)" }} />
+                  {u.name}{on ? " ✓" : ""}
+                </button>
+              );
+            })}
+            {ctx.users.length > 1 && (() => {
+              const all = ctx.users.every((u) => (f.participants || []).includes(u.id));
+              return (
+                <button type="button" onClick={() => set("participants", all ? [] : ctx.users.map((u) => u.id))} style={{
+                  padding: "7px 12px", borderRadius: 22, cursor: "pointer", fontFamily: "inherit",
+                  fontSize: 13.5, fontWeight: 800, background: t.surface2, color: t.text, border: `1.5px solid ${t.borderSoft}`,
+                }}>{all ? "Keine" : "Alle / Beide"}</button>
+              );
+            })()}
+          </div>
+        </Field>
+
         {/* Änderbarkeit */}
         <Field t={t} label="Änderbarkeit">
           <label style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 14, color: t.text, cursor: "pointer" }}>
