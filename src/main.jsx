@@ -70,6 +70,16 @@ window.storage = {
     const { data } = await supabase.from("kv").select("key").eq("user_id", currentUserId);
     return { keys: (data || []).map((r) => r.key).filter((k) => k.startsWith(prefix)) };
   },
+  // Alle Zeilen mit gemeinsamem Präfix in EINER Abfrage (für Sammlungen, die
+  // pro Element als eigene Zeile gespeichert werden -> robuste Mehrgeräte-Sync).
+  async getAll(prefix = "") {
+    if (!currentUserId) return { items: [] };
+    let q = supabase.from("kv").select("key,value").eq("user_id", currentUserId);
+    if (prefix) q = q.like("key", `${prefix}%`);
+    const { data, error } = await q;
+    if (error) throw error;
+    return { items: (data || []).map((r) => ({ key: r.key, value: r.value })) };
+  },
 };
 
 // --- Realtime: Änderungen -> App benachrichtigen (entprellt) ---

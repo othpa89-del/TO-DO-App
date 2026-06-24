@@ -11,11 +11,11 @@ export default defineConfig({
       injectRegister: "auto",
       includeAssets: ["apple-touch-icon.png", "favicon.ico"],
       manifest: {
-        name: "TO DO APP",
-        short_name: "TO DO APP",
-        description: "Aufgaben – Training, Standardisierung, Qualität, Safety",
-        theme_color: "#AF1E65",
-        background_color: "#ffffff",
+        name: "Kalender – Familie & Business",
+        short_name: "Kalender",
+        description: "Gemeinsamer Familien- und Business-Kalender mit Terminen und Aufgaben",
+        theme_color: "#16233F",
+        background_color: "#EEF2F8",
         display: "standalone",
         orientation: "any",
         icons: [

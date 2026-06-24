@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Plane } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 
 // muss mit REMEMBER_KEY in main.jsx übereinstimmen
 const REMEMBER_KEY = "ctc_remember";
@@ -59,8 +59,8 @@ export default function Login({ supabase, recovery = false, onDone, notice = "" 
     <div style={S.wrap}>
       <div style={S.card}>
         <div style={S.brandRow}>
-          <Plane size={28} strokeWidth={2.2} color="#AF1E65" />
-          <span style={S.brand}>TO DO APP</span>
+          <CalendarDays size={28} strokeWidth={2.2} color="#FFFFFF" />
+          <span style={S.brand}>Kalender</span>
         </div>
         <div style={S.sub}>{sub}</div>
 
@@ -87,7 +87,7 @@ export default function Login({ supabase, recovery = false, onDone, notice = "" 
         {(mode === "signin" || mode === "signup") && (
           <label style={S.remember}>
             <input type="checkbox" checked={remember} onChange={(e) => toggleRemember(e.target.checked)}
-              style={{ width: 16, height: 16, margin: 0, accentColor: "#AF1E65" }} />
+              style={{ width: 16, height: 16, margin: 0, accentColor: "#2E5BFF" }} />
             Angemeldet bleiben
           </label>
         )}
@@ -121,15 +121,15 @@ export default function Login({ supabase, recovery = false, onDone, notice = "" 
 }
 
 const S = {
-  wrap: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F8F9FA", fontFamily: "Mulish, system-ui, sans-serif", padding: 20 },
-  card: { width: "100%", maxWidth: 360, background: "#fff", border: "1px solid #D7D7D7", borderRadius: 14, padding: 28, boxShadow: "0 8px 30px rgba(0,0,0,.06)", display: "flex", flexDirection: "column", gap: 12 },
+  wrap: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0B1426", fontFamily: "Mulish, system-ui, sans-serif", padding: 20 },
+  card: { width: "100%", maxWidth: 360, background: "#15233F", border: "1px solid #2A3C5E", borderRadius: 14, padding: 28, boxShadow: "0 12px 40px rgba(0,0,0,.45)", display: "flex", flexDirection: "column", gap: 12 },
   brandRow: { display: "flex", alignItems: "center", gap: 10 },
-  brand: { fontSize: 30, fontWeight: 900, color: "#AF1E65", letterSpacing: "-0.02em" },
-  sub: { fontSize: 13, color: "#787878", marginBottom: 6, marginTop: -6 },
-  inp: { padding: "11px 12px", border: "1px solid #D7D7D7", borderRadius: 8, fontSize: 15, fontFamily: "inherit" },
-  btn: { padding: "11px 12px", background: "#AF1E65", color: "#fff", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" },
-  remember: { display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#575757", fontWeight: 600, cursor: "pointer", marginTop: 2 },
-  link: { background: "none", border: "none", color: "#871C54", fontSize: 13, fontWeight: 600, cursor: "pointer", marginTop: 4 },
-  err: { color: "#D32F2F", fontSize: 13, fontWeight: 600 },
-  msg: { color: "#1A7F45", fontSize: 13, fontWeight: 600 },
+  brand: { fontSize: 30, fontWeight: 900, color: "#FFFFFF", letterSpacing: "-0.02em" },
+  sub: { fontSize: 13, color: "#9DB0CE", marginBottom: 6, marginTop: -6 },
+  inp: { padding: "11px 12px", border: "1px solid #2A3C5E", borderRadius: 8, fontSize: 15, fontFamily: "inherit", background: "#0F1C33", color: "#E8EDF6" },
+  btn: { padding: "11px 12px", background: "#2E5BFF", color: "#fff", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" },
+  remember: { display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#9DB0CE", fontWeight: 600, cursor: "pointer", marginTop: 2 },
+  link: { background: "none", border: "none", color: "#7FA0FF", fontSize: 13, fontWeight: 600, cursor: "pointer", marginTop: 4 },
+  err: { color: "#FF6B6B", fontSize: 13, fontWeight: 600 },
+  msg: { color: "#5BD68A", fontSize: 13, fontWeight: 600 },
 };

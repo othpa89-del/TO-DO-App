@@ -1,8 +1,38 @@
-# TO DO APP
+# Kalender – Familie & Business
 
-Aufgaben-App mit **Echtzeit-Synchronisation** über Supabase.
+Gemeinsamer **Familien- und Business-Kalender** mit Terminen und Aufgaben und
+**Echtzeit-Synchronisation** über Supabase.
 Dieselben Daten auf iPhone, iPad und Laptops – live und gleichzeitig.
-Läuft als installierbare Web-App (PWA).
+Läuft als installierbare Web-App (PWA) auf iOS, Android und im Browser.
+
+## ✨ Funktionen
+
+- **Benutzer** Patrick (Administrator) & Katharina (Benutzer) – Namen, Farben und
+  Rollen frei änderbar; oben wird der aktive Benutzer (Ersteller) gewählt.
+- **Ansichten:** Tag, Woche, Monat, Agenda und ein Dashboard mit Schnellstatistik.
+- **Termine** mit Pflichtfeldern (Titel, Datum, Start/Ende, Ersteller, Bereich,
+  Priorität, Terminart) und optionalen Feldern (Beschreibung, Ort, Adresse,
+  Notizen, Link, Anhänge, Erinnerung).
+- **Bereiche/Firmen** (Firma A/B/C, Privat) mit frei wählbaren Farben – anlegen,
+  bearbeiten, löschen, aktiv/inaktiv.
+- **Prioritäten** Kritisch/Hoch/Normal/Niedrig mit Farbcodierung und Filter.
+- **Terminarten mit Icons** inkl. Aviation-Kategorien (Flight, Simulator,
+  Examiner, Instructor, Line Training, Check Flight, Recurrent, Medical, Layover …);
+  eigene Terminarten mit eigenen Icons erstellen/deaktivieren.
+- **Schnellanlage**-Buttons (Flight, Simulator, Meeting, Arzt, Urlaub, Auto).
+- **Sperren** einzelner Termine (🔒) – nur Ersteller oder Administrator dürfen ändern.
+- **Wiederkehrende Termine** (täglich/wöchentlich/monatlich/jährlich/benutzerdefiniert).
+- **Aufgaben-/To-do-Modul** mit Verantwortlichem, Fälligkeit, Priorität, erledigt.
+- **Anhänge & Links**, **Standortnavigation** (Google/Apple Maps), **Konflikterkennung**
+  bei Überschneidungen, **Filter & Volltextsuche**.
+- **Benachrichtigungen** (1 Tag / 1 Stunde / 15 Min vorher) über Browser-Push.
+- **Kalender-Export** als ICS (Outlook / Google / Apple) und JSON-Backup.
+- **Dark Mode** standardmäßig, optionaler Light Mode; Hauptfarbe Dunkelblau.
+
+> Hinweis: Echte Zwei-Wege-Synchronisation mit Outlook/Google/Apple sowie native
+> System-Push-Mitteilungen erfordern zusätzliche Server-/Dienst-Anbindung. In dieser
+> Web-App sind ICS-Export/-Abo und Browser-Benachrichtigungen (bei geöffneter App)
+> umgesetzt.
 
 ## 🚀 Live & Projekt-Infos
 
@@ -33,6 +63,7 @@ npm run preview  # Build lokal testen
 ### Projektstruktur
 ```
 src/            App.jsx · main.jsx · Login.jsx · config.js
+src/cal/        data.js (Logik/Daten) · components.jsx · views.jsx · EventEditor.jsx · Admin.jsx · Tasks.jsx
 public/         Icons (favicon, icon-192/512, apple-touch-icon)
 .github/workflows/deploy.yml   GitHub-Pages-Deploy
 index.html · vite.config.js · package.json
