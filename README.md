@@ -1,6 +1,6 @@
 # TO DO APP
 
-Eurowings-gebrandete Aufgaben-App mit **Echtzeit-Synchronisation** über Supabase.
+Aufgaben-App mit **Echtzeit-Synchronisation** über Supabase.
 Dieselben Daten auf iPhone, iPad und Laptops – live und gleichzeitig.
 Läuft als installierbare Web-App (PWA).
 

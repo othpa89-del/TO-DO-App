@@ -1,5 +1,5 @@
 -- ===========================================================================
---  CTC TO DO – Datenbank-Setup für Supabase
+--  TO DO APP – Datenbank-Setup für Supabase
 --  Supabase-Projekt -> SQL Editor -> dieses Skript einfügen -> RUN
 -- ===========================================================================
 

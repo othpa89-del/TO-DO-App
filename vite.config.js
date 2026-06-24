@@ -13,7 +13,7 @@ export default defineConfig({
       manifest: {
         name: "TO DO APP",
         short_name: "TO DO APP",
-        description: "CTC Aufgaben – Training, Standardisierung, Qualität, Safety",
+        description: "Aufgaben – Training, Standardisierung, Qualität, Safety",
         theme_color: "#AF1E65",
         background_color: "#ffffff",
         display: "standalone",

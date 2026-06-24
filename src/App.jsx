@@ -6,7 +6,7 @@ import {
   MessageSquare, ChevronUp, ChevronDown, Plane,
 } from "lucide-react";
 
-// --- Eurowings-Markentokens (offizielles Farbchapter) ---
+// --- Markenfarben (Farbchapter) ---
 const C = {
   burgundy: "#AF1E65", burgundyDark: "#871C54", burgundyLight: "#D41370", burgundyDarker: "#701745",
   sky: "#00A6CF", skyLight: "#6BCCE0", skyPale: "#E6F5F9", ink: "#212529", body: "#333333",
@@ -351,8 +351,8 @@ export default function App() {
 
   // Daten
   function doBackup() {
-    const payload = { app: "CTC TO DO", version: 2, exportedAt: new Date().toISOString(), categories, companies, persons, tasks: { personal: tasks.personal, team: tasks.team } };
-    downloadBlob(JSON.stringify(payload, null, 2), `CTC-TODO_Sicherung_${new Date().toISOString().slice(0, 10)}.json`, "application/json");
+    const payload = { app: "TO DO APP", version: 2, exportedAt: new Date().toISOString(), categories, companies, persons, tasks: { personal: tasks.personal, team: tasks.team } };
+    downloadBlob(JSON.stringify(payload, null, 2), `TODO_Sicherung_${new Date().toISOString().slice(0, 10)}.json`, "application/json");
     flash("Sicherung erstellt.");
   }
   function onRestoreFile(e) {
@@ -487,7 +487,7 @@ export default function App() {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "TO DO");
       const out = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-      downloadBlob(out, `CTC-TODO_${new Date().toISOString().slice(0, 10)}.xlsx`, "application/octet-stream");
+      downloadBlob(out, `TODO_${new Date().toISOString().slice(0, 10)}.xlsx`, "application/octet-stream");
       flash("Excel-Datei erstellt.");
     } catch { flash("Excel-Export fehlgeschlagen."); }
   }
@@ -511,7 +511,7 @@ export default function App() {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Personen");
       const out = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-      downloadBlob(out, `CTC-Personen_${new Date().toISOString().slice(0, 10)}.xlsx`, "application/octet-stream");
+      downloadBlob(out, `Personen_${new Date().toISOString().slice(0, 10)}.xlsx`, "application/octet-stream");
       flash("Excel-Datei erstellt.");
     } catch { flash("Excel-Export fehlgeschlagen."); }
   }
@@ -1102,7 +1102,7 @@ function PrintDoc({ items }) {
     <div className="printable">
       <div className="p-head">
         <Plane className="p-mark" strokeWidth={2.2} />
-        <div className="p-titlewrap"><div className="p-title">TO DO APP</div><div className="p-sub">CTC · Eurowings</div></div>
+        <div className="p-titlewrap"><div className="p-title">TO DO APP</div></div>
         <div className="p-date">Erstellt: {now}<br />{items.length} Aufgabe(n)</div>
       </div>
       <table className="p-table">
@@ -1126,7 +1126,7 @@ function PrintDoc({ items }) {
           ))}
         </tbody>
       </table>
-      <div className="p-foot">Eurowings · CTC · zur internen Verwendung</div>
+      <div className="p-foot">Zur internen Verwendung</div>
     </div>
   );
 }
@@ -1137,7 +1137,7 @@ function PersonsPrintDoc({ items, openCount }) {
     <div className="printable">
       <div className="p-head">
         <Plane className="p-mark" strokeWidth={2.2} />
-        <div className="p-titlewrap"><div className="p-title">Ansprechpersonen</div><div className="p-sub">CTC · Eurowings</div></div>
+        <div className="p-titlewrap"><div className="p-title">Ansprechpersonen</div></div>
         <div className="p-date">Erstellt: {now}<br />{items.length} Person(en)</div>
       </div>
       <table className="p-table">
@@ -1156,7 +1156,7 @@ function PersonsPrintDoc({ items, openCount }) {
           ))}
         </tbody>
       </table>
-      <div className="p-foot">Eurowings · CTC · zur internen Verwendung</div>
+      <div className="p-foot">Zur internen Verwendung</div>
     </div>
   );
 }
