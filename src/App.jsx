@@ -56,6 +56,7 @@ export default function App() {
   const [fArea, setFArea] = useState("all");
   const [fPrio, setFPrio] = useState("all");
   const [fType, setFType] = useState("all");
+  const [fPart, setFPart] = useState("all"); // Teilnehmer: all | userId | "both"
 
   const [editor, setEditor] = useState(null); // {draft, isNew}
   const [adminOpen, setAdminOpen] = useState(false);
@@ -150,13 +151,16 @@ export default function App() {
       if (fArea !== "all" && ev.areaId !== fArea) return false;
       if (fPrio !== "all" && ev.priority !== fPrio) return false;
       if (fType !== "all" && ev.typeId !== fType) return false;
+      if (fPart === "both") {
+        if (!users.every((u) => (ev.participants || []).includes(u.id))) return false;
+      } else if (fPart !== "all" && !(ev.participants || []).includes(fPart)) return false;
       if (q) {
         const hay = `${ev.title} ${ev.description || ""} ${ev.location || ""} ${ev.address || ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [events, fUser, fArea, fPrio, fType, search]);
+  }, [events, fUser, fArea, fPrio, fType, fPart, search, users]);
 
   // ---------- sichtbarer Zeitraum ----------
   const range = useMemo(() => {
@@ -384,8 +388,10 @@ export default function App() {
                   options={[["all", "Alle"], ...PRIORITIES.map((p) => [p.id, p.name])]} />
                 <FilterSelect t={t} label="Terminart" value={fType} onChange={setFType}
                   options={[["all", "Alle"], ...types.filter((x) => x.active !== false).map((x) => [x.id, `${x.icon} ${x.name}`])]} />
-                {(fUser !== "all" || fArea !== "all" || fPrio !== "all" || fType !== "all") && (
-                  <button onClick={() => { setFUser("all"); setFArea("all"); setFPrio("all"); setFType("all"); }}
+                <FilterSelect t={t} label="Dabei" value={fPart} onChange={setFPart}
+                  options={[["all", "Alle"], ["both", "Beide dabei"], ...users.map((u) => [u.id, `${u.name} dabei`])]} />
+                {(fUser !== "all" || fArea !== "all" || fPrio !== "all" || fType !== "all" || fPart !== "all") && (
+                  <button onClick={() => { setFUser("all"); setFArea("all"); setFPrio("all"); setFType("all"); setFPart("all"); }}
                     style={{ alignSelf: "flex-end", background: "none", border: "none", color: t.accent, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
                     Zurücksetzen
                   </button>
