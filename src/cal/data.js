@@ -14,7 +14,7 @@ export function uid(prefix = "id") {
 // --- Standard-Benutzer -------------------------------------------------
 export const DEFAULT_USERS = [
   { id: "u_patrick", name: "Patrick", role: "admin", color: "#2E9E5B", avatar: "" },
-  { id: "u_katharina", name: "Katharina", role: "user", color: "#EC6FA4", avatar: "" },
+  { id: "u_katharina", name: "Nadja", role: "user", color: "#EC6FA4", avatar: "" },
 ];
 
 // --- Standard-Bereiche / Firmen ---------------------------------------

@@ -7,7 +7,7 @@ import {
   toISODate, parseISODate, addDays, startOfWeek, monthGrid, todayISO,
   timeToMin, fmtDateLong, priorityById,
 } from "./data.js";
-import { EventChip, MiniEvent, Dot, hexA } from "./components.jsx";
+import { EventChip, MiniEvent, Dot, hexA, UserAvatar } from "./components.jsx";
 
 // Leeransicht
 function Empty({ t, text }) {
@@ -82,6 +82,7 @@ export function DayView({ t, ctx, dateISO, occ, onSelect }) {
             const type = ctx.typeById(ev.typeId);
             const area = ctx.areaById(ev.areaId);
             const prio = priorityById(ev.priority);
+            const creator = ctx.userById(ev.creatorId);
             return (
               <button key={ev.id + idx} onClick={() => onSelect(ev)} style={{
                 position: "absolute", top, height, left: `${lane * w}%`, width: `calc(${w}% - 4px)`,
@@ -92,8 +93,9 @@ export function DayView({ t, ctx, dateISO, occ, onSelect }) {
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, fontWeight: 700 }}>
                   <span>{type ? type.icon : "📌"}</span>
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.title}</span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{ev.title}</span>
                   {ev.locked && <span style={{ fontSize: 10 }}>🔒</span>}
+                  <UserAvatar user={creator} size={18} />
                 </div>
                 <div style={{ fontSize: 10.5, color: t.muted, marginTop: 1 }}>{ev.start}–{ev.end}</div>
               </button>

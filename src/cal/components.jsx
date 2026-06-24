@@ -115,6 +115,25 @@ export function Dot({ color, size = 10 }) {
   return <span style={{ display: "inline-block", width: size, height: size, borderRadius: "50%", background: color, flex: "none" }} />;
 }
 
+// --- Benutzer-Avatar (farbiger Kreis mit Initiale = wer hat es eingetragen) ---
+export function initials(name) {
+  const parts = (name || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  return (parts[0][0] + (parts[1] ? parts[1][0] : "")).toUpperCase();
+}
+export function UserAvatar({ user, size = 22, title }) {
+  if (!user) return null;
+  return (
+    <span title={title || `Erstellt von ${user.name}`} style={{
+      display: "inline-flex", alignItems: "center", justifyContent: "center",
+      width: size, height: size, borderRadius: "50%", background: user.color,
+      color: "#fff", fontSize: Math.round(size * 0.46), fontWeight: 800,
+      flex: "none", border: "1.5px solid rgba(255,255,255,.85)", lineHeight: 1,
+      boxShadow: "0 1px 3px rgba(0,0,0,.35)",
+    }}>{user.avatar ? user.avatar : initials(user.name)}</span>
+  );
+}
+
 // =====================================================================
 //  EventChip – kompakte Termin-Darstellung (in allen Ansichten genutzt)
 // =====================================================================
@@ -140,6 +159,7 @@ export function EventChip({ t, ev, ctx, onClick, showDate, dense }) {
           }}>{ev.title || "(ohne Titel)"}</span>
           {ev.locked && <span title="Gesperrt" style={{ flex: "none" }}>🔒</span>}
           <span title={prio.name} style={{ flex: "none", fontSize: 11 }}>{prio.dot}</span>
+          <UserAvatar user={creator} size={dense ? 20 : 24} />
         </span>
         <span style={{
           display: "flex", alignItems: "center", gap: 8, marginTop: 4, flexWrap: "wrap",
@@ -169,8 +189,9 @@ export function MiniEvent({ t, ev, ctx, onClick }) {
   const type = ctx.typeById(ev.typeId);
   const area = ctx.areaById(ev.areaId);
   const prio = priorityById(ev.priority);
+  const creator = ctx.userById(ev.creatorId);
   return (
-    <button onClick={onClick} title={`${ev.start} ${ev.title}`} style={{
+    <button onClick={onClick} title={`${ev.start} ${ev.title}${creator ? " · " + creator.name : ""}`} style={{
       display: "flex", alignItems: "center", gap: 3, width: "100%", textAlign: "left",
       background: area ? hexA(area.color, t.mode === "dark" ? 0.22 : 0.14) : t.chip,
       borderLeft: `3px solid ${prio.color}`, borderRadius: 4, padding: "2px 4px",
@@ -182,6 +203,8 @@ export function MiniEvent({ t, ev, ctx, onClick }) {
         {ev.title}
       </span>
       {ev.locked && <span style={{ flex: "none", fontSize: 9 }}>🔒</span>}
+      {/* Ersteller-Farbe (wer hat es eingetragen) */}
+      {creator && <span style={{ flex: "none", width: 8, height: 8, borderRadius: "50%", background: creator.color, border: "1px solid rgba(255,255,255,.7)" }} />}
     </button>
   );
 }
