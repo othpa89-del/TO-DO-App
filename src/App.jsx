@@ -322,11 +322,6 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
   function cancelEdit() { setEditId(null); setEditScope(null); setForm(blank); setView(returnView); }
-  function newTask() {
-    const scope = (view === "personal" || view === "team") ? view : "personal";
-    setEditId(null); setEditScope(null); setForm({ ...blank, scope });
-    setReturnView(isTaskView ? view : "all"); setView("new"); window.scrollTo({ top: 0 });
-  }
 
   // Persons handlers
   function submitPerson() {
@@ -759,7 +754,7 @@ export default function App() {
                           {pTasks.length === 0 && <div className="pdrill-empty">Keine Aufgaben zugeordnet.</div>}
                           {pTasks.sort((a, b) => (isDone(a) === isDone(b) ? 0 : isDone(a) ? 1 : -1)).map((t) => (
                             <div key={keyOf(t)} className={"pdrill-row" + (isDone(t) ? " done" : "")} style={{ borderLeftColor: companyColor(t.company) }}
-                              onClick={() => { startEdit(t._scope, t); setView("all"); }} title="Zur Aufgabe">
+                              onClick={() => startEdit(t._scope, t)} title="Zur Aufgabe">
                               <span className="pdrill-title">{t.title}</span>
                               <span className="pdrill-meta">
                                 <span style={{ color: (STATUS[t.status] || STATUS.offen).color, fontWeight: 800 }}>{(STATUS[t.status] || STATUS.offen).label || "—"}</span>
@@ -1189,7 +1184,6 @@ const css = `
 .grid{display:grid;grid-template-columns:340px 1fr;gap:20px;padding:20px 24px 40px;align-items:start;}
 .formwrap{max-width:660px;margin:0 auto;padding:20px 24px 48px;}
 .listwrap{padding:20px 24px 40px;}
-.tb-new{margin-right:auto;}
 .panel{min-width:0;}
 aside.panel .card{position:sticky;top:16px;}
 .card{background:${C.white};border:1px solid ${C.line};border-radius:12px;padding:18px;}
@@ -1355,7 +1349,6 @@ aside.panel .card{position:sticky;top:16px;}
 @media(max-width:860px){
   .grid{grid-template-columns:1fr;padding:16px 16px 40px;}
   .formwrap,.listwrap{padding:16px 16px 40px;}
-  .tb-new{width:100%;justify-content:center;margin-right:0;}
   aside.panel .card{position:static;}
   .hd-profile{display:none;}
   .hd-inner{padding:16px;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));}
