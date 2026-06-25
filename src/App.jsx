@@ -1001,7 +1001,7 @@ export default function App() {
               {!loaded && <div className="empty">Aufgaben werden geladen …</div>}
               {loaded && list.length === 0 && (
                 <div className="empty">
-                  {search ? "Keine Treffer." : filterStatus === "erledigt" ? "Noch nichts erledigt." : "Keine Aufgaben in dieser Ansicht. Über den Tab „Neue Aufgabe" anlegen."}
+                  {search ? "Keine Treffer." : filterStatus === "erledigt" ? "Noch nichts erledigt." : "Keine Aufgaben in dieser Ansicht. Über den Tab „Neue Aufgabe“ anlegen."}
                 </div>
               )}
 
