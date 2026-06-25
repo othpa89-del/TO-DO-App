@@ -26,6 +26,8 @@ jobs:
         run: npm install
       - name: Build (base = repo name)
         run: npm run build -- --base=/${{ github.event.repository.name }}/
+      - name: Include standalone PM Cockpit
+        run: cp mockup.html dist/mockup.html
       - uses: actions/configure-pages@v5
         with:
           enablement: true

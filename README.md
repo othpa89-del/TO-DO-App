@@ -47,12 +47,30 @@ multi‑project tool** that works for any kind of project.
   way to move data between devices (laptop ↔ iPad).
 - **Responsive** for 15"/17" laptops and iPad (landscape & portrait), with touch scrolling.
 
-### Data & persistence
+### Cloud sync — one login, all devices (automatic)
 
-Data is stored **locally in the browser** (`localStorage`) — it is **not** synced
-automatically between devices or browsers. Use **Backup (JSON)** / **Restore** to transfer
-a portfolio. The seed data (three demo training programmes) is sample content; use
-**↺ Demo** to reset, or just delete/replace it.
+Open the app and **sign in** (email + password) to sync your portfolio **automatically and
+in real time** across all your devices — laptop and iPad — under a single account.
+
+- Uses the project's existing **Supabase** backend (same project as the PWA below); the whole
+  portfolio is stored as one row in the `kv` table, protected by Row‑Level Security per user.
+- Changes are pushed automatically (debounced) and pulled live via Supabase Realtime; the nav
+  shows a **sync status** (⟳ Syncing… / ✓ Synced / ⚠ Offline).
+- **Offline / local-only:** if there is no internet (or you click *Continue offline*), the app
+  works fully on that device using a `localStorage` cache and syncs again once signed in online.
+- **Setup (once):** the Supabase `kv` table and policies from `supabase-setup.sql` must exist
+  (already set up for this project), and in Supabase **Authentication → Providers → Email** turn
+  off *Confirm email* so accounts work immediately. The URL/anon key are embedded in `mockup.html`.
+
+To use it on several devices, open the **same hosted URL** on each (the deploy copies
+`mockup.html` to GitHub Pages → `https://<username>.github.io/<repo>/mockup.html`) and sign in
+with the same account.
+
+### Data & persistence (without login)
+
+Without signing in, data is stored **locally in the browser** (`localStorage`) and does **not**
+sync between devices — use **Backup (JSON)** / **Restore** to transfer a portfolio. The seed data
+(three demo training programmes) is sample content; use **↺ Demo** to reset, or delete/replace it.
 
 ### Quick start
 

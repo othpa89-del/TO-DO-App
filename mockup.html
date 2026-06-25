@@ -219,6 +219,24 @@
   .rep-table{width:100%;min-width:0;border-collapse:collapse;font-size:11px}
   .rep-table th{background:var(--ew-magenta-dark);color:#fff;text-align:left;padding:6px 8px;font-size:10px;white-space:nowrap}
   .rep-table td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+  /* Auth gate */
+  .auth-overlay{position:fixed;inset:0;background:linear-gradient(135deg,var(--ew-magenta),var(--ew-magenta-dark));display:none;align-items:center;justify-content:center;z-index:2000;padding:20px}
+  .auth-card{background:#fff;border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.35);width:min(380px,94vw);padding:24px;display:flex;flex-direction:column;gap:12px}
+  .auth-head{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+  .auth-head b{font-size:15px;color:var(--ink)} .auth-head span{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+  .auth-card input{padding:11px 13px;border:1px solid var(--line);border-radius:10px;font-size:14px}
+  .auth-card input:focus{outline:none;border-color:var(--ew-magenta);box-shadow:0 0 0 3px var(--ew-magenta-soft)}
+  .auth-actions{display:flex;gap:10px} .auth-actions .btn{flex:1;justify-content:center;text-align:center}
+  .auth-msg{font-size:12.5px;color:var(--muted);min-height:16px}
+  .auth-link{background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;text-decoration:underline;padding:4px}
+  .auth-link:hover{color:var(--ew-magenta)}
+  .syncbadge{font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:20px;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.18);color:#fff}
+  .syncbadge.s-ok{background:rgba(30,158,99,.22)} .syncbadge.s-syncing{background:rgba(255,255,255,.22)}
+  .syncbadge.s-err{background:rgba(210,59,59,.25)} .syncbadge.s-off{background:rgba(255,255,255,.14)}
+  #nav .syncbadge{background:#eef1f6;color:var(--muted)}
+  #nav .syncbadge.s-ok{background:#e3f6ec;color:var(--green)} #nav .syncbadge.s-syncing{background:#e7f0ff;color:var(--blue)}
+  #nav .syncbadge.s-err{background:#fde7e7;color:var(--red)} #nav .syncbadge.s-off{background:#eef0f4;color:var(--muted)}
+  .acct{font-size:12px;color:var(--muted)} .acct b{color:var(--ink)}
   /* Import dialog */
   .imp-overlay{position:fixed;inset:0;background:rgba(20,25,40,.5);display:none;align-items:center;justify-content:center;z-index:1000;padding:20px}
   .imp-card{background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:min(980px,96vw);max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
@@ -282,8 +300,24 @@
     *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
+<!-- Login gate (cloud sync) -->
+<div id="authGate" class="auth-overlay" style="display:none">
+  <div class="auth-card">
+    <div class="auth-head"><div class="logo">EW</div>
+      <div><b>Eurowings · Training Portfolio</b><span>Sign in to sync across your devices</span></div></div>
+    <input id="authEmail" type="email" autocomplete="username" placeholder="Email" />
+    <input id="authPw" type="password" autocomplete="current-password" placeholder="Password" />
+    <div id="authMsg" class="auth-msg"></div>
+    <div class="auth-actions">
+      <button class="btn" onclick="doSignIn()">Sign in</button>
+      <button class="btn ghost" onclick="doSignUp()">Create account</button>
+    </div>
+    <button class="auth-link" onclick="useOffline()">Continue offline on this device only</button>
+  </div>
+</div>
 <header>
   <div class="brand">
     <div class="logo">EW</div>
@@ -318,6 +352,7 @@
     <div class="tab" data-tab="gantt">📅 Gantt</div>
     <div class="tab" data-tab="report">📄 Report</div>
     <span style="flex:1"></span>
+    <span id="syncBadge" class="syncbadge s-off" title="Sync status"></span>
     <button class="btn ghost" onclick="window.print()">🖨 Print this page / PDF</button>
   </div>
 
@@ -336,8 +371,11 @@
       <button class="btn ghost" onclick="document.getElementById('importFile').click()">⤒ Restore</button>
       <button class="btn ghost" onclick="exportXLSXPortfolio()">⬇︎ Excel (all projects)</button>
       <button class="btn" onclick="document.getElementById('importXlsx').click()">📥 Import Excel/CSV</button>
-      <span class="note" style="margin:0">Backup = save/transfer the whole portfolio · Import = bring existing Excel lists in as a project.</span>
+      <span style="flex:1"></span>
+      <span class="acct" id="acctInfo"></span>
+      <button class="btn ghost" id="signOutBtn" style="display:none" onclick="doSignOut()">Sign out</button>
     </div>
+    <div class="note" style="margin:-6px 0 16px">Backup = save/transfer the whole portfolio · Import = bring existing Excel lists in as a project. When signed in, changes sync automatically across your devices.</div>
     <div class="kpis" id="portfolioKpis"></div>
     <div class="pgrid" id="portfolioGrid"></div>
   </section>
@@ -684,7 +722,8 @@ function criticalPath(tasks){
 }
 function setActive(i){ ACTIVE=Math.max(0,Math.min(i,PROJECTS.length-1)); DATA=PROJECTS[ACTIVE].tasks;
   UID=DATA.reduce((m,d)=>Math.max(m,d.uid),-1)+1; recompute(); }
-function save(){ try{ localStorage.setItem(KEY, JSON.stringify({active:PROJECTS[ACTIVE]&&PROJECTS[ACTIVE].id,projects:PROJECTS})); }catch(e){} }
+function saveLocal(){ try{ localStorage.setItem(KEY, JSON.stringify({active:PROJECTS[ACTIVE]&&PROJECTS[ACTIVE].id,projects:PROJECTS})); }catch(e){} }
+function save(){ saveLocal(); scheduleCloudSave(); }
 function load(){
   let s=null; try{ s=localStorage.getItem(KEY); }catch(e){}
   if(s){ try{ const o=JSON.parse(s); if(o&&o.projects&&o.projects.length){ PROJECTS=o.projects; PROJECTS.forEach(recomputeProject);
@@ -1571,11 +1610,121 @@ document.querySelector("header").addEventListener("change",e=>{
   const f=e.target.dataset.pfield; if(f&&e.target.tagName==="INPUT"){ PROJECTS[ACTIVE][f]=e.target.value; save(); markSaved(); }
 });
 
+/* ---------- CLOUD SYNC (Supabase: one login, auto-sync across devices) ---------- */
+const SB_URL = "https://jgrupdbfsxinahflzogr.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpncnVwZGJmc3hpbmFoZmx6b2dyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyNDEyODksImV4cCI6MjA5NzgxNzI4OX0.OwCkkiTC3QNCOJ2Kipa4lbwdJXf5TLZKE2tDsbBMTXI";
+const SYNC_KEY = "pm_portfolio";
+const CLIENT_ID = "c"+Math.random().toString(36).slice(2)+Date.now().toString(36);
+let sb=null, USER=null, chan=null, applyingRemote=false, cloudTimer=null, booted=false;
+
+const $=id=>document.getElementById(id);
+function syncStatus(state){ const b=$("syncBadge"); if(!b) return;
+  const map={syncing:["s-syncing","⟳ Syncing…"],synced:["s-ok","✓ Synced"],error:["s-err","⚠ Offline – will retry"],
+    local:["s-off","Local only (this device)"],"":["s-off",""]};
+  const [cls,txt]=map[state]||map[""]; b.className="syncbadge "+cls; b.textContent=txt; }
+function setAccountUI(email){ const a=$("acctInfo"), s=$("signOutBtn");
+  if(email){ if(a) a.innerHTML="Signed in as <b>"+h(email)+"</b>"; if(s) s.style.display=""; }
+  else { if(a) a.textContent=""; if(s) s.style.display="none"; } }
+function authMsg(m,err){ const e=$("authMsg"); if(e){ e.textContent=m||""; e.style.color=err?"var(--red)":"var(--muted)"; } }
+function showAuthGate(){ $("authGate").style.display="flex"; }
+function hideAuthGate(){ $("authGate").style.display="none"; }
+
+function bootApp(){ rebuildProjSel(); rebuildAll(); showView("portfolio"); }
+
+function initSupabase(){
+  try{ if(window.supabase&&window.supabase.createClient){ sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true}}); return true; } }catch(e){}
+  return false;
+}
+async function startAuth(){
+  if(!initSupabase()){ useOffline(true); return; }      // CDN/library unavailable -> offline mode
+  try{
+    sb.auth.onAuthStateChange((event,session)=>handleSession(session));
+    const {data}=await sb.auth.getSession();
+    handleSession(data&&data.session);
+  }catch(e){ useOffline(true); }
+}
+function useOffline(silent){
+  // Local-only mode (no cloud). The app still works fully on this device.
+  hideAuthGate(); if(!booted){ booted=true; load(); bootApp(); } syncStatus("local"); setAccountUI(null);
+}
+async function handleSession(session){
+  if(session&&session.user){
+    USER=session.user; hideAuthGate(); setAccountUI(USER.email);
+    try{ if(session.access_token&&sb.realtime) sb.realtime.setAuth(session.access_token); }catch(e){}
+    if(!booted){ booted=true; await cloudInit(); } else { subscribeRealtime(); }
+  } else {
+    USER=null; unsubscribeRealtime(); setAccountUI(null);
+    if(!booted) showAuthGate();   // first load, not signed in
+  }
+}
+async function cloudInit(){
+  syncStatus("syncing");
+  try{
+    const {data,error}=await sb.from("kv").select("value").eq("key",SYNC_KEY).maybeSingle();
+    if(error) throw error;
+    if(data&&data.value){ applyCloud(data.value,true); bootApp(); syncStatus("synced"); }
+    else { load(); bootApp(); await cloudSaveNow(); }   // migrate current local data to cloud
+    subscribeRealtime();
+  }catch(e){ load(); bootApp(); syncStatus("error"); }
+}
+function applyCloud(valueStr, initial){
+  try{
+    const o=JSON.parse(valueStr); if(o.origin===CLIENT_ID && !initial) return;   // ignore our own echo
+    const payload=o.data||o; if(!payload.projects||!payload.projects.length) return;
+    applyingRemote=true;
+    PROJECTS=payload.projects; PROJECTS.forEach(recomputeProject);
+    const idx=PROJECTS.findIndex(p=>p.id===payload.active); setActive(idx>=0?idx:0);
+    saveLocal();
+    if(!initial){ rebuildProjSel(); rebuildAll(); syncStatus("synced"); }
+    applyingRemote=false;
+  }catch(e){ applyingRemote=false; }
+}
+function scheduleCloudSave(){ if(!sb||!USER||applyingRemote) return; syncStatus("syncing");
+  clearTimeout(cloudTimer); cloudTimer=setTimeout(cloudSaveNow,800); }
+async function cloudSaveNow(){
+  if(!sb||!USER) return;
+  const value=JSON.stringify({origin:CLIENT_ID,ts:Date.now(),data:{projects:PROJECTS,active:PROJECTS[ACTIVE]&&PROJECTS[ACTIVE].id}});
+  try{ const {error}=await sb.from("kv").upsert({user_id:USER.id,key:SYNC_KEY,value,updated_at:new Date().toISOString()},{onConflict:"user_id,key"});
+    if(error) throw error; syncStatus("synced"); }
+  catch(e){ syncStatus("error"); }
+}
+function subscribeRealtime(){
+  if(!sb||!USER||chan) return;
+  try{
+    chan=sb.channel("pm-sync-"+USER.id)
+      .on("postgres_changes",{event:"*",schema:"public",table:"kv",filter:`user_id=eq.${USER.id}`},async payload=>{
+        const row=payload.new; if(!row||row.key!==SYNC_KEY) return;
+        let v=row.value;
+        if(v==null){ try{ const {data}=await sb.from("kv").select("value").eq("key",SYNC_KEY).maybeSingle(); v=data&&data.value; }catch(e){} }
+        if(v!=null) applyCloud(v,false);
+      }).subscribe();
+  }catch(e){}
+}
+function unsubscribeRealtime(){ if(chan){ try{ sb.removeChannel(chan); }catch(e){} chan=null; } }
+async function doSignIn(){
+  const email=$("authEmail").value.trim(), pw=$("authPw").value;
+  if(!email||!pw){ authMsg("Please enter email and password.",true); return; }
+  authMsg("Signing in…");
+  const {error}=await sb.auth.signInWithPassword({email,password:pw});
+  if(error) authMsg(error.message,true);
+}
+async function doSignUp(){
+  const email=$("authEmail").value.trim(), pw=$("authPw").value;
+  if(!email||!pw){ authMsg("Please enter email and password.",true); return; }
+  if(pw.length<6){ authMsg("Password must be at least 6 characters.",true); return; }
+  authMsg("Creating account…");
+  const {data,error}=await sb.auth.signUp({email,password:pw});
+  if(error){ authMsg(error.message,true); return; }
+  authMsg(data&&data.session?"Account created.":"Account created. Please confirm via the email we sent, then sign in.");
+}
+async function doSignOut(){ try{ if(sb) await sb.auth.signOut(); }catch(e){} location.reload(); }
+// flush a pending cloud save before the tab closes
+window.addEventListener("beforeunload",()=>{ if(sb&&USER&&cloudTimer){ try{ navigator.sendBeacon; cloudSaveNow(); }catch(e){} } });
+// allow Enter to submit the login form
+document.addEventListener("keydown",e=>{ if(e.key==="Enter"&&$("authGate")&&$("authGate").style.display==="flex") doSignIn(); });
+
 /* ---------- INIT ---------- */
-load();
-rebuildProjSel();
-rebuildAll();
-showView("portfolio");
+startAuth();
 </script>
 </body>
 </html>
