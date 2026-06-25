@@ -895,7 +895,7 @@ export default function App() {
                 <div className="row2">
                   <div className="field"><label>Ansprechperson</label>
                     <input list="personnames" value={form.contact} onChange={(e) => onContactChange(e.target.value)} placeholder="Name / Funktion" />
-                    <datalist id="personnames">{persons.map((p) => <option key={p.id} value={p.name} />)}</datalist></div>
+                    <datalist id="personnames">{persons.slice().sort((a, b) => (a.name || "").localeCompare(b.name || "", "de")).map((p) => <option key={p.id} value={p.name} />)}</datalist></div>
                   <div className="field">
                     <div className="label-row"><label>Company</label>
                       <button className="link sm" onClick={() => setCmgrOpen(true)}><Settings size={13} /> Verwalten</button></div>

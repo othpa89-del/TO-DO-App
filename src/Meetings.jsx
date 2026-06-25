@@ -214,7 +214,7 @@ export default function Meetings({ persons = [], categories = [], profile = "", 
           </div>
           <div className="mm-fg"><span>Typ</span>
             <select value={fType} onChange={(e) => setFType(e.target.value)}>
-              <option value="all">Alle Typen</option>{types.map((t) => <option key={t} value={t}>{t}</option>)}
+              <option value="all">Alle Typen</option>{types.slice().sort((a, b) => a.localeCompare(b, "de")).map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
             <button className="mm-gear" onClick={() => setMgrOpen(true)} title="Typen verwalten"><Settings size={13} /></button>
           </div>
@@ -394,7 +394,7 @@ function MeetingEditor({ meeting, persons, categories, profile, types = MEETING_
           <F label="Meeting-Typ" action={onManageTypes && <button type="button" className="mm-link" onClick={onManageTypes}><Settings size={12} /> Verwalten</button>}>
             <select value={m.type} onChange={(e) => set("type", e.target.value)}>
               {!types.includes(m.type) && m.type && <option value={m.type}>{m.type}</option>}
-              {types.map((t) => <option key={t} value={t}>{t}</option>)}
+              {types.slice().sort((a, b) => a.localeCompare(b, "de")).map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </F>
           <F label="Status"><select value={m.status} onChange={(e) => set("status", e.target.value)}>{MEETING_STATUS.map((s) => <option key={s} value={s}>{s}</option>)}</select></F>
@@ -465,7 +465,7 @@ function MeetingEditor({ meeting, persons, categories, profile, types = MEETING_
             <button className="mm-ic abs" onClick={() => delDecision(d.id)}><X size={15} /></button>
           </div>
         ))}
-        <datalist id="mm-people">{persons.map((p) => <option key={p.id} value={p.name} />)}</datalist>
+        <datalist id="mm-people">{persons.slice().sort((a, b) => (a.name || "").localeCompare(b.name || "", "de")).map((p) => <option key={p.id} value={p.name} />)}</datalist>
       </Section>
 
       {/* Action Items */}
@@ -567,7 +567,7 @@ function TypeManager({ types, onChange, onClose }) {
           <button className="mm-btn primary" onClick={add}><Plus size={14} /> Hinzufügen</button>
         </div>
         <div className="mm-taglist">
-          {types.map((t) => (
+          {types.slice().sort((a, b) => a.localeCompare(b, "de")).map((t) => (
             <span key={t} className="mm-tagchip">{t}<button onClick={() => onChange(types.filter((x) => x !== t))} title="Entfernen"><X size={13} /></button></span>
           ))}
           {types.length === 0 && <span className="mm-hint">Keine Typen – füge oben einen hinzu.</span>}
