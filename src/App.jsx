@@ -1362,6 +1362,15 @@ aside.panel .card{position:sticky;top:16px;}
   .exp-row{flex-wrap:wrap;}
   .exp-title{white-space:normal;flex:1 1 100%;}
 }
+/* Laptop & iPad (quer): Breite nutzen – Aufgabenliste zweispaltig */
+@media(min-width:1024px){
+  .ctc-root{max-width:1240px;}
+  .tasks{display:grid;grid-template-columns:1fr 1fr;gap:9px;align-items:start;}
+  .grp .tasks{grid-template-columns:1fr 1fr;}
+}
+@media(min-width:1480px){
+  .tasks{grid-template-columns:1fr 1fr 1fr;}
+}
 @media print{
   .screen{display:none !important;}
   .printable{display:block !important;}

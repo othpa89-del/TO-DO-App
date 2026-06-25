@@ -844,4 +844,10 @@ const css = `
   .mm-grid,.mm-grid2{grid-template-columns:1fr;}
   .mm-pp-head{flex-wrap:wrap;} .mm-pp-head select{max-width:none;width:100%;}
 }
+/* Laptop & iPad (quer): Breite nutzen */
+@media(min-width:1024px){
+  .mm-wrap{max-width:1180px;}
+  .mm-list{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .mm-editor{max-width:1000px;}
+}
 `;
