@@ -319,7 +319,7 @@ export default function App() {
     if (willDone && !isDone(t) && t.recurrence && t.recurrence !== "none" && t.due) {
       const nd = shiftDate(t.due, t.recurrence);
       if (nd) {
-        const next = normalizeTask({ ...t, id: uid(), status: "offen", due: nd, completedAt: null, completedBy: "", createdAt: new Date().toISOString() });
+        const next = normalizeTask({ ...t, id: uid(), status: "offen", due: nd, completedAt: null, completedBy: "", log: [], updatedAt: new Date().toISOString().slice(0, 10), createdAt: new Date().toISOString() });
         arr = [next, ...arr]; flash("Folgetermin angelegt: " + fmtDate(nd));
       }
     }
@@ -563,8 +563,8 @@ export default function App() {
               onChange={(e) => changeStatus(t._scope, t.id, e.target.value)}>
               {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
-            {t.priority && <span className="dot" style={{ background: PRIORITIES[t.priority].color }} />}
-            {t.priority && <span className="prio-label">{PRIORITIES[t.priority].label}</span>}
+            {t.priority && <span className="dot" style={{ background: (PRIORITIES[t.priority] || PRIORITIES[""]).color }} />}
+            {t.priority && <span className="prio-label">{(PRIORITIES[t.priority] || PRIORITIES[""]).label}</span>}
             {t.start && <span className="due muted">Start: {fmtDate(t.start)}</span>}
             {t.due && (
               <span className="due" style={u === "overdue" ? { color: C.burgundyDarker, fontWeight: 700 } : u === "today" ? { color: C.burgundy, fontWeight: 700 } : {}}>

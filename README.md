@@ -9,7 +9,7 @@ Läuft als installierbare Web-App (PWA).
 | | |
 |---|---|
 | **Live-App** | https://othpa89-del.github.io/TO-DO-App/ |
-| **GitHub-Repo** | https://github.com/othpa89-del/To-Do-App (Branch `main`) |
+| **GitHub-Repo** | https://github.com/othpa89-del/TO-DO-App (Branch `main`) |
 | **Deployment** | GitHub Actions → GitHub Pages (automatisch bei jedem Push auf `main`) |
 | **Supabase-URL** | `https://jgrupdbfsxinahflzogr.supabase.co` |
 | **Supabase Projekt-ID** | `jgrupdbfsxinahflzogr` |
@@ -30,9 +30,15 @@ npm run build    # Produktions-Build nach dist/
 npm run preview  # Build lokal testen
 ```
 
+### Funktionen
+- **Aufgaben:** anlegen (eigener Tab „Neue Aufgabe"), Liste mit Suche/Filter/Sortierung, Status, Priorität, Fälligkeit, Wiederholung, Ansprechperson, Company, Verlauf
+- **Meeting Minutes:** professionelles Besprechungsprotokoll – Übersicht (Liste/Karten, Suche, Filter, Favoriten, Archiv), Agenda mit Mitschrift (Rich-Text), Entscheidungen, Action Items → Aufgaben, Teilnehmer aus Kontakten, Anhänge/Bilder/Sprachmemos, Export (PDF/Druck, Word, Markdown, TXT)
+- **Persons:** Kontaktverwaltung (Name, Firma, Rolle, Telefon, E-Mail, Themen)
+- **Druck & Export:** PDF/Druck und Excel für Aufgaben und Personen, JSON-Backup/Restore
+
 ### Projektstruktur
 ```
-src/            App.jsx · main.jsx · Login.jsx · config.js
+src/            App.jsx · main.jsx · Login.jsx · Meetings.jsx · config.js
 public/         Icons (favicon, icon-192/512, apple-touch-icon)
 .github/workflows/deploy.yml   GitHub-Pages-Deploy
 index.html · vite.config.js · package.json

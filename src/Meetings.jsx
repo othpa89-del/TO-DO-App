@@ -89,6 +89,15 @@ function htmlToPlain(html) {
   const ta = document.createElement("textarea"); ta.innerHTML = s;
   return ta.value.replace(/\n{3,}/g, "\n\n").trim();
 }
+// Entfernt potenziell gefährliches HTML vor dem Export/Druck (Self-XSS vermeiden)
+function sanitizeHtml(html) {
+  if (!html) return "";
+  return String(html)
+    .replace(/<\s*script[\s\S]*?<\s*\/\s*script\s*>/gi, "")
+    .replace(/<\s*(iframe|object|embed|link|meta|style)[\s\S]*?>/gi, "")
+    .replace(/\son\w+\s*=\s*"[^"]*"/gi, "").replace(/\son\w+\s*=\s*'[^']*'/gi, "").replace(/\son\w+\s*=\s*[^\s>]+/gi, "")
+    .replace(/(href|src)\s*=\s*("|')\s*javascript:[^"']*\2/gi, '$1="#"');
+}
 
 // --- Lightweight Rich-Text-Editor (contenteditable) -------------------------
 function RichText({ value, onChange, placeholder }) {
@@ -147,18 +156,28 @@ export default function Meetings({ persons = [], categories = [], profile = "", 
 
   function persistTypes(next) { setTypes(next); saveTypes(next); }
 
-  function flash(m) { setToast(m); clearTimeout(flash._t); flash._t = setTimeout(() => setToast(""), 2200); }
-  function persist(next) { setMeetings(next); saveMeetings(next); }
+  function flash(m) { setToast(m); clearTimeout(flash._t); flash._t = setTimeout(() => setToast(""), 2600); }
+  // Funktionaler Updater + Persistenz auf Basis des AKTUELLEN States (race-sicher);
+  // Speicher-Fehler werden gemeldet statt still verschluckt (z. B. zu große Anhänge).
+  function mutate(fn) {
+    setMeetings((prev) => {
+      const next = fn(prev);
+      saveMeetings(next).then((ok) => { if (!ok) flash("Speichern fehlgeschlagen – evtl. zu große Anhänge."); });
+      return next;
+    });
+  }
   function saveMeeting(m) {
     const now = new Date().toISOString();
-    const exists = meetings.some((x) => x.id === m.id);
-    const updated = { ...m, archived: m.status === "Archiviert" ? true : m.archived, updatedAt: now };
-    const next = exists ? meetings.map((x) => (x.id === m.id ? updated : x)) : [{ ...updated, createdAt: now }, ...meetings];
-    persist(next); setEditing(null); flash("Meeting gespeichert.");
+    mutate((prev) => {
+      const exists = prev.some((x) => x.id === m.id);
+      const updated = { ...m, archived: m.status === "Archiviert" ? true : m.archived, updatedAt: now };
+      return exists ? prev.map((x) => (x.id === m.id ? updated : x)) : [{ ...updated, createdAt: now }, ...prev];
+    });
+    setEditing(null); flash("Meeting gespeichert.");
   }
-  function removeMeeting(id) { persist(meetings.filter((x) => x.id !== id)); setConfirmDel(null); flash("Meeting gelöscht."); }
-  function toggleFav(id) { persist(meetings.map((x) => (x.id === id ? { ...x, favorite: !x.favorite } : x))); }
-  function toggleArchive(id) { persist(meetings.map((x) => (x.id === id ? { ...x, archived: !x.archived } : x))); }
+  function removeMeeting(id) { mutate((prev) => prev.filter((x) => x.id !== id)); setConfirmDel(null); flash("Meeting gelöscht."); }
+  function toggleFav(id) { mutate((prev) => prev.map((x) => (x.id === id ? { ...x, favorite: !x.favorite } : x))); }
+  function toggleArchive(id) { mutate((prev) => prev.map((x) => (x.id === id ? { ...x, archived: !x.archived } : x))); }
 
   const filtered = useMemo(() => {
     let arr = meetings.filter((m) => !!m.archived === showArchive);
@@ -313,20 +332,24 @@ function MeetingEditor({ meeting, persons, categories, profile, types = MEETING_
   // ---- Dateien / Bilder / Audio ----
   async function onFiles(e) {
     const files = Array.from(e.target.files || []); e.target.value = "";
+    let added = 0;
     for (const f of files) {
       if (f.size > 3 * 1024 * 1024) { flash(`„${f.name}“ > 3 MB – übersprungen.`); continue; }
       const dataUrl = await fileToDataUrl(f);
       setM((p) => ({ ...p, attachments: [...(p.attachments || []), { id: uid(), name: f.name, type: f.type, size: f.size, dataUrl }] }));
+      added++;
     }
-    flash("Anhang hinzugefügt.");
+    if (added) flash(added + (added === 1 ? " Anhang" : " Anhänge") + " hinzugefügt.");
   }
   async function onImages(e) {
     const files = Array.from(e.target.files || []); e.target.value = "";
+    let added = 0;
     for (const f of files) {
       const dataUrl = await compressImage(f);
-      if (dataUrl) setM((p) => ({ ...p, images: [...(p.images || []), { id: uid(), name: f.name, dataUrl }] }));
+      if (dataUrl) { setM((p) => ({ ...p, images: [...(p.images || []), { id: uid(), name: f.name, dataUrl }] })); added++; }
+      else flash(`„${f.name}“ konnte nicht verarbeitet werden.`);
     }
-    flash("Bild gespeichert.");
+    if (added) flash(added + (added === 1 ? " Bild" : " Bilder") + " gespeichert.");
   }
   function removeAtt(field, id) { set(field, (m[field] || []).filter((x) => x.id !== id)); }
 
@@ -626,13 +649,17 @@ function meetingToText(m) { return meetingToMarkdown(m).replace(/[#*>`]/g, "").r
 
 function meetingHTML(m, forWord) {
   const esc = (s) => (s == null ? "" : String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"));
-  const meta = meetingMetaRows(m).map(([k, v]) => `<tr><td class="k">${esc(k)}</td><td>${esc(v)}</td></tr>`).join("");
+  const meta = meetingMetaRows(m).map(([k, v]) => {
+    const isLink = (k === "Online" || k === "Online-Link") && /^https?:\/\//i.test(v || "");
+    const cell = isLink ? `<a href="${esc(v)}">${esc(v)}</a>` : esc(v);
+    return `<tr><td class="k">${esc(k)}</td><td>${cell}</td></tr>`;
+  }).join("");
   const parts = (m.participants || []).map((p) => `<li><b>${esc(p.name)}</b>${p.company ? " – " + esc(p.company) : ""}${p.role ? ", " + esc(p.role) : ""}${p.phone ? " · " + esc(p.phone) : ""}${p.email ? " · " + esc(p.email) : ""}</li>`).join("");
   const absent = (m.absentees || []).map((p) => `<li>${esc(p.name)}</li>`).join("");
   const agenda = (m.agenda || []).map((a, i) => `
     <div class="ag"><h3>${i + 1}. ${esc(a.title)}${a.done ? " ✓" : ""}</h3>
     ${a.desc ? `<p class="muted">${esc(a.desc)}</p>` : ""}
-    ${a.notesHtml ? `<div class="notes">${a.notesHtml}</div>` : ""}
+    ${a.notesHtml ? `<div class="notes">${sanitizeHtml(a.notesHtml)}</div>` : ""}
     ${[["Entscheidungen", a.decisions], ["Diskussion", a.discussion], ["Risiken", a.risks], ["Offene Fragen", a.openQuestions]].filter((x) => x[1]).map(([k, v]) => `<p><b>${k}:</b> ${esc(v)}</p>`).join("")}
     </div>`).join("");
   const decisions = (m.decisions || []).map((d) => `<tr><td>${esc(d.title)}</td><td>${esc(d.owner)}</td><td>${esc(fmtDay(d.date))}</td><td>${esc(d.status)}</td></tr>`).join("");
