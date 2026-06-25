@@ -179,6 +179,16 @@
   .hdr-edit:hover{border-color:rgba(255,255,255,.35)}
   .hdr-edit:focus{box-shadow:0 0 0 2px rgba(255,255,255,.5);background:rgba(255,255,255,.14)}
   .meta input[type=date]{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:6px;font-size:12px;padding:2px 5px}
+  /* Critical path & dependencies */
+  #gantt .gantt{position:relative}
+  tr.critrow td.tid{box-shadow:inset 3px 0 0 var(--red)}
+  .critflag{color:var(--red);font-weight:800;margin-right:2px;cursor:help}
+  .gbar.crit{outline:2px solid #d23b3b;outline-offset:1px}
+  .gdiamond.crit{border-color:var(--red);box-shadow:0 0 0 2px rgba(210,59,59,.45)}
+  .cpchain{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+  .cpchip{background:#fde7e7;color:#b32a2a;border:1px solid #f3b4b4;border-radius:8px;padding:3px 8px;font-size:11px;font-weight:700;white-space:nowrap}
+  .cparrow{color:var(--red);font-weight:800;font-size:12px}
+  .depsvg{position:absolute;top:0;left:0;pointer-events:none;z-index:3}
   /* Print-only branding */
   .print-header,.print-footer{display:none}
   @media print{
@@ -202,6 +212,7 @@
     table{min-width:0;font-size:8.5px} .gtable{min-width:0;font-size:8px}
     thead th{position:static}
     .pgrid{grid-template-columns:repeat(2,1fr)}
+    .depsvg{display:none!important}
     .kpi,.card,.pcard,.ms,.wsrow,tr{break-inside:avoid}
     *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   }
@@ -268,8 +279,9 @@
         <div class="note">Ampel basiert auf Task-Status: Grün = Completed, Blau = In Progress, Gelb = Not Started (geplant), Rot = Delayed / kritisch.</div>
       </div>
     </div>
+    <div class="card" id="cpCard"></div>
     <div class="card">
-      <h3><span class="dot"></span>Meilenstein-Tracking (10 Programm-Milestones)</h3>
+      <h3><span class="dot"></span>Meilenstein-Tracking (Programm-Milestones)</h3>
       <div id="milestones"></div>
     </div>
   </section>
@@ -285,6 +297,7 @@
       <select id="fPrio"><option value="">Alle Prioritäten</option><option>High</option><option>Medium</option><option>Low</option></select>
       <input id="fSearch" placeholder="🔍 Suche Aufgabe / Verantwortlicher…" style="min-width:240px"/>
       <label style="font-size:12.5px;color:var(--muted)"><input type="checkbox" id="fMs"/> nur Milestones</label>
+      <label style="font-size:12.5px;color:var(--muted)"><input type="checkbox" id="fCp"/> nur kritischer Pfad</label>
       <button class="btn" onclick="addRow()">➕ Zeile hinzufügen</button>
       <span id="savedTag" class="saved" style="opacity:0">✓ gespeichert</span>
       <span style="flex:1"></span>
@@ -314,6 +327,11 @@
       <span><i style="background:linear-gradient(90deg,var(--red),#ef6b6b)"></i> Delayed</span>
       <span><i style="transform:rotate(45deg);background:var(--amber);width:12px;height:12px"></i> Milestone</span>
       <span><i style="background:var(--blue);width:3px;height:14px"></i> Heute (25.06.2026)</span>
+      <span><i style="outline:2px solid #d23b3b;background:transparent;width:14px;height:8px"></i> Kritischer Pfad</span>
+      <span style="margin-left:auto;display:inline-flex;gap:6px;align-items:center">Abhängigkeitspfeile:
+        <select id="depMode" class="navsel" style="padding:4px 8px;max-width:170px">
+          <option value="crit">Nur kritischer Pfad</option><option value="all">Alle</option><option value="off">Aus</option>
+        </select></span>
     </div>
     <div class="gantt"><table class="gtable" id="gtbl"></table></div>
     <div class="note">Vereinfachte Monats-Timeline. Balkenlänge & -position aus Start-/Due-Datum berechnet. In der finalen App: zoombar (Tag/Woche/Monat), mit Abhängigkeitspfeilen.</div>
@@ -505,6 +523,7 @@ const T_E2 = [
 const WSNAME = Object.fromEntries(WS.map(w=>[w[1],w[0]]));
 const COLS = ["ws","sub","no","task","desc","resp","support","start","due","prio","status","pct","ms","deps","risk","upd","comment"];
 const TODAY = new Date("2026-06-25");
+const TODAY_ISO = "2026-06-25";
 const KEY = "ew_pm_portfolio_v1";
 const STATUSES = ["Not Started","In Progress","Completed","Delayed"];
 const PRIOS = ["High","Medium","Low"];
@@ -524,17 +543,45 @@ const wsOpt = v => WS.map(([n,a])=>`<option value="${a}" ${a===v?"selected":""}>
 
 /* ---------- data model + persistence ---------- */
 function mkTasks(arr){ return arr.map((r,i)=>{ const o={}; COLS.forEach((c,j)=>o[c]=r[j]); o.uid=i; return o; }); }
-function recomputeProject(p){ p.tasks.forEach(d=>{ d.tid=d.ws+"-"+pad(d.no); d.dur=days(d.start,d.due); }); }
+// Status-Automatik: überfällige, nicht abgeschlossene Tasks -> Delayed (und zurück, wenn Termin wieder in der Zukunft liegt)
+function autoStatus(d){
+  if(d.status==="Completed") return;
+  if(new Date(d.due) < TODAY) d.status="Delayed";
+  else if(d.status==="Delayed") d.status = (d.pct>0 ? "In Progress" : "Not Started");
+}
+function recomputeProject(p){ p.tasks.forEach(d=>{ d.tid=d.ws+"-"+pad(d.no); d.dur=days(d.start,d.due); autoStatus(d); }); }
 function recompute(){ recomputeProject(PROJECTS[ACTIVE]); }
-function seedDelay(tasks){ tasks.forEach(d=>{ if(d.status!=="Completed" && new Date(d.due)<TODAY) d.status="Delayed"; }); }
 function seedPortfolio(){
   PROJECTS = [
     {id:"p-b737max",name:"Boeing 737 MAX – Type Rating Program",fleet:"Boeing 737-8 MAX",lead:"Chief Training Captain",phase:"Execution",eis:"2027-06-15",tasks:mkTasks(T)},
     {id:"p-a320neo",name:"Airbus A320neo – CEO→NEO Differences",fleet:"Airbus A320neo",lead:"Fleet Captain A320",phase:"Execution",eis:"2027-02-15",tasks:mkTasks(T_A320)},
     {id:"p-e195e2",name:"Embraer E195-E2 – New Type Introduction",fleet:"Embraer E195-E2",lead:"Project Captain E2",phase:"Planning",eis:"2027-11-01",tasks:mkTasks(T_E2)},
   ];
-  PROJECTS.forEach(p=>{ seedDelay(p.tasks); recomputeProject(p); });
+  PROJECTS.forEach(recomputeProject);
   ACTIVE = 0;
+}
+/* ---------- critical path ----------
+   Task-IDs werden angezeigt als REG-01, in Abhängigkeiten aber als REG-1 gepflegt
+   -> normId() vereinheitlicht beide Schreibweisen für den Abgleich.
+   Rückwärtspass vom spätesten Meilenstein über die jeweils zuletzt endende
+   Vorgänger-Abhängigkeit = bindende Kette bis EIS. */
+const normId = s => String(s==null?"":s).trim().replace(/-0*(\d)/,"-$1");
+function criticalPath(tasks){
+  const map={}; tasks.forEach(t=>map[normId(t.tid)]=t);
+  const depsOf = t => String(t.deps||"").split(",").map(s=>normId(s)).filter(x=>x&&x!=="-"&&map[x]);
+  let end=null,endD=-Infinity;
+  tasks.forEach(t=>{ if(t.ms==="Ja"){ const d=+new Date(t.due); if(d>endD){endD=d;end=normId(t.tid);} }});
+  if(!end) tasks.forEach(t=>{ const d=+new Date(t.due); if(d>endD){endD=d;end=normId(t.tid);} });
+  const order=[], seen=new Set(); let cur=end,g=0;
+  while(cur&&!seen.has(cur)&&g++<4000){
+    seen.add(cur); order.unshift(cur);
+    const t=map[cur]; if(!t) break;
+    const deps=depsOf(t); if(!deps.length) break;
+    let best=null,bd=-Infinity;
+    deps.forEach(dp=>{ const d=+new Date(map[dp].due); if(d>bd){bd=d;best=dp;} });
+    cur=best;
+  }
+  return {set:new Set(order), order, endTid:end, length:order.length};
 }
 function setActive(i){ ACTIVE=Math.max(0,Math.min(i,PROJECTS.length-1)); DATA=PROJECTS[ACTIVE].tasks;
   UID=DATA.reduce((m,d)=>Math.max(m,d.uid),-1)+1; recompute(); }
@@ -567,6 +614,7 @@ function showView(v){
   document.querySelectorAll("#nav .tab").forEach(x=>x.classList.toggle("active",x.dataset.tab===v));
   ["portfolio","dash","table","gantt"].forEach(id=>document.getElementById(id).classList.toggle("active",id===v));
   if(v==="portfolio") renderPortfolio();
+  if(v==="gantt") requestAnimationFrame(()=>{ try{drawDeps();}catch(e){} });
   updateHeader();
   window.scrollTo(0,0);
 }
@@ -706,6 +754,17 @@ function buildDashboard(){
         <div class="mtxt"><b>${m.task}</b><small>${WSNAME[m.ws]} · Ziel: ${de(m.due)} · ${m.tid}</small></div>
         <span class="badge ${c}">${st}</span></div>`;
     }).join("");
+
+  // critical path
+  const cp=criticalPath(DATA);
+  const cmap=Object.fromEntries(DATA.map(t=>[normId(t.tid),t]));
+  const endTask=cmap[cp.endTid];
+  document.getElementById("cpCard").innerHTML = `
+    <h3><span class="dot" style="background:var(--red)"></span>Kritischer Pfad
+      <span style="font-weight:500;color:var(--muted);font-size:12px">· ${cp.order.length} Aufgaben · Endpunkt ${endTask?de(endTask.due):"-"}</span></h3>
+    <div class="cpchain">${cp.order.map((tid,i)=>{const t=cmap[tid];
+      return (i?'<span class="cparrow">→</span>':'')+`<span class="cpchip" title="${h(t?t.task:'')}">${t?t.tid:tid}</span>`;}).join("")||'<span class="note">Keine Abhängigkeiten definiert.</span>'}</div>
+    <div class="note">Längste Abhängigkeitskette (nach Dauer) bis zum spätesten Endpunkt. Verzögerungen auf diesem Pfad verschieben das Projektende unmittelbar.</div>`;
 }
 function kpi(lbl,val,foot,color){
   const vc = color==="red" ? "style='color:var(--red)'":"";
@@ -715,22 +774,23 @@ function kpi(lbl,val,foot,color){
 /* ---------- TABLE ---------- */
 const fWs=document.getElementById("fWs");
 WS.forEach(([n,a])=>fWs.insertAdjacentHTML("beforeend",`<option value="${a}">${n}</option>`));
-["fWs","fStatus","fPrio","fSearch","fMs"].forEach(id=>document.getElementById(id).addEventListener("input",renderTable));
+["fWs","fStatus","fPrio","fSearch","fMs","fCp"].forEach(id=>document.getElementById(id).addEventListener("input",renderTable));
 
 function currentRows(){
   const ws=fWs.value, st=document.getElementById("fStatus").value, pr=document.getElementById("fPrio").value;
   const q=document.getElementById("fSearch").value.toLowerCase(), onlyMs=document.getElementById("fMs").checked;
+  const onlyCp=document.getElementById("fCp").checked, cp=onlyCp?criticalPath(DATA).set:null;
   return DATA.filter(d=>(!ws||d.ws===ws)&&(!st||d.status===st)&&(!pr||d.prio===pr)
-    &&(!onlyMs||d.ms==="Ja")
+    &&(!onlyMs||d.ms==="Ja")&&(!onlyCp||cp.has(normId(d.tid)))
     &&(!q||(d.task+d.resp+d.desc+d.tid).toLowerCase().includes(q)));
 }
 function renderTable(){
-  const rows=currentRows();
+  const rows=currentRows(), cp=criticalPath(DATA).set;
   document.getElementById("tbody").innerHTML = rows.map(d=>`
-    <tr class="${d.ms==="Ja"?"msrow":""}" data-uid="${d.uid}">
+    <tr class="${d.ms==="Ja"?"msrow":""} ${cp.has(normId(d.tid))?"critrow":""}" data-uid="${d.uid}">
       <td><select class="cell-input wsedit" data-field="ws">${wsOpt(d.ws)}</select></td>
       <td><div class="ce" contenteditable data-field="sub">${h(d.sub)}</div></td>
-      <td class="tid">${d.tid}</td>
+      <td class="tid">${cp.has(normId(d.tid))?'<span class="critflag" title="Kritischer Pfad">⚠</span>':''}${d.tid}</td>
       <td class="tk"><div class="ce" contenteditable data-field="task">${h(d.task)}</div></td>
       <td class="desc"><div class="ce" contenteditable data-field="desc">${h(d.desc)}</div></td>
       <td><div class="ce" contenteditable data-field="resp">${h(d.resp)}</div></td>
@@ -781,6 +841,7 @@ function buildGantt(){
 
   let html=`<thead><tr><th class="gname">Workstream / Aufgabe</th>${months.map(m=>`<th class="gm">${mLbl(m)}</th>`).join("")}</tr></thead><tbody>`;
   const todayPct=((TODAY-g0)/span)*100;
+  const CP=criticalPath(DATA).set;
 
   WS.forEach(([name,abbr])=>{
     html+=`<tr class="gws"><td class="gname">${name}</td><td class="gcell" colspan="${months.length}" style="position:relative">
@@ -789,16 +850,57 @@ function buildGantt(){
       const s=new Date(d.start), e=new Date(d.due);
       const left=((s-g0)/span)*100, width=Math.max(((e-s)/span)*100,0.8);
       const cls = d.status==="Completed"?"done": d.status==="Delayed"?"delay":"";
+      const cr = CP.has(normId(d.tid))?"crit":"";
       const bar = d.ms==="Ja"
-        ? `<div class="gdiamond" style="left:${left+width/2}%" title="${d.task} – ${de(d.due)}"></div>`
-        : `<div class="gbar ${cls}" style="left:${left}%;width:${width}%" title="${d.task}\n${de(d.start)} → ${de(d.due)} (${d.pct}%)"></div>`;
-      html+=`<tr><td class="gname" style="font-weight:500;font-size:11px">${d.tid} · ${d.task}</td>
+        ? `<div class="gdiamond ${cr}" data-tid="${normId(d.tid)}" style="left:${left+width/2}%" title="${d.task} – ${de(d.due)}"></div>`
+        : `<div class="gbar ${cls} ${cr}" data-tid="${normId(d.tid)}" style="left:${left}%;width:${width}%" title="${d.task}\n${de(d.start)} → ${de(d.due)} (${d.pct}%)"></div>`;
+      html+=`<tr><td class="gname" style="font-weight:500;font-size:11px">${cr?'<span class="critflag">⚠</span>':''}${d.tid} · ${d.task}</td>
         <td class="gcell" colspan="${months.length}" style="position:relative">
           <div class="today" style="left:${todayPct}%"></div>${bar}</td></tr>`;
     });
   });
   html+="</tbody>";
   document.getElementById("gtbl").innerHTML=html;
+  if(document.getElementById("gantt").classList.contains("active")) requestAnimationFrame(()=>{ try{drawDeps();}catch(e){} });
+}
+
+/* ---------- dependency arrows (SVG overlay over the Gantt) ---------- */
+function drawDeps(){
+  const gantt=document.querySelector("#gantt .gantt"); if(!gantt) return;
+  const old=gantt.querySelector("svg.depsvg"); if(old) old.remove();
+  const sel=document.getElementById("depMode"); const mode=sel?sel.value:"crit";
+  if(mode==="off") return;
+  if(!gantt.clientWidth) return;
+  const bars={}; gantt.querySelectorAll("[data-tid]").forEach(el=>bars[el.dataset.tid]=el);
+  const cp=criticalPath(DATA).set;
+  const grect=gantt.getBoundingClientRect();
+  const NS="http://www.w3.org/2000/svg";
+  const svg=document.createElementNS(NS,"svg");
+  svg.setAttribute("class","depsvg");
+  svg.setAttribute("width",gantt.scrollWidth); svg.setAttribute("height",gantt.scrollHeight);
+  const pos=el=>{ const r=el.getBoundingClientRect(); return {
+    l:r.left-grect.left+gantt.scrollLeft, r:r.right-grect.left+gantt.scrollLeft,
+    m:(r.top+r.bottom)/2-grect.top+gantt.scrollTop }; };
+  DATA.forEach(t=>{
+    const tid=normId(t.tid), succ=bars[tid]; if(!succ) return;
+    String(t.deps||"").split(",").map(s=>normId(s)).forEach(dp=>{
+      if(!dp||dp==="-"||!bars[dp]) return;
+      const isCrit=cp.has(tid)&&cp.has(dp);
+      if(mode==="crit"&&!isCrit) return;
+      const a=pos(bars[dp]), b=pos(succ);
+      const sx=a.r, sy=a.m, ex=b.l, ey=b.m, col=isCrit?"#d23b3b":"#9aa3b1";
+      const p=document.createElementNS(NS,"path");
+      p.setAttribute("d",`M${sx},${sy} L${sx+9},${sy} L${sx+9},${ey} L${ex-5},${ey}`);
+      p.setAttribute("fill","none"); p.setAttribute("stroke",col);
+      p.setAttribute("stroke-width",isCrit?"1.7":"1"); p.setAttribute("opacity",isCrit?"0.95":"0.45");
+      svg.appendChild(p);
+      const ah=document.createElementNS(NS,"path");
+      ah.setAttribute("d",`M${ex-5},${ey} l-6,-3.2 l0,6.4 z`); ah.setAttribute("fill",col);
+      ah.setAttribute("opacity",isCrit?"0.95":"0.5");
+      svg.appendChild(ah);
+    });
+  });
+  gantt.appendChild(svg);
 }
 
 /* ---------- EDITING, ADD/DELETE, PERSISTENCE ---------- */
@@ -814,11 +916,12 @@ const byUid = u => DATA.find(x=>String(x.uid)===String(u));
 const nextNo = ws => { const ns=DATA.filter(x=>x.ws===ws).map(x=>x.no); return ns.length?Math.max(...ns)+1:1; };
 
 // Free-text fields: update live, persist, no re-render (keeps caret) — they don't affect stats
+function touchUpd(d,tr){ d.upd=TODAY_ISO; const u=tr.querySelector('input[data-field=upd]'); if(u) u.value=TODAY_ISO; }
 tbody.addEventListener("input", e=>{
   const el=e.target, tr=el.closest("tr"); if(!tr) return; const d=byUid(tr.dataset.uid); if(!d) return;
-  if(el.dataset.field && el.isContentEditable){ d[el.dataset.field]=el.textContent; markSaved(); saveDebounced(); }
+  if(el.dataset.field && el.isContentEditable){ d[el.dataset.field]=el.textContent; touchUpd(d,tr); markSaved(); saveDebounced(); }
   else if(el.dataset.field==="pct"){ const v=Math.max(0,Math.min(100,parseInt(el.value,10)||0)); d.pct=v;
-    const b=tr.querySelector(".mini i"); if(b) b.style.width=v+"%"; markSaved(); saveDebounced(); refreshStatsDebounced(); }
+    const b=tr.querySelector(".mini i"); if(b) b.style.width=v+"%"; touchUpd(d,tr); markSaved(); saveDebounced(); refreshStatsDebounced(); }
 });
 // Selects / dates: update model, recompute, persist, re-render + refresh stats
 tbody.addEventListener("change", e=>{
@@ -827,6 +930,7 @@ tbody.addEventListener("change", e=>{
   if(f==="ws"){ if(el.value!==d.ws){ d.ws=el.value; d.no=nextNo(d.ws); } }
   else if(f==="pct"){ d.pct=Math.max(0,Math.min(100,parseInt(el.value,10)||0)); }
   else { d[f]=el.value; }
+  if(f!=="upd") d.upd=TODAY_ISO;
   recompute(); save(); renderTable(); refreshStats(); markSaved();
 });
 // Row actions: duplicate / delete
@@ -856,6 +960,8 @@ function resetDemo(){
 /* ---------- NAV + HEADER WIRING ---------- */
 document.querySelectorAll("#nav .tab").forEach(t=>t.onclick=()=>showView(t.dataset.tab));
 document.getElementById("projSel").onchange=function(){ openProject(this.value); };
+document.getElementById("depMode").addEventListener("change",()=>{ try{drawDeps();}catch(e){} });
+window.addEventListener("resize",()=>{ if(document.getElementById("gantt").classList.contains("active")){ try{drawDeps();}catch(e){} } });
 // edit project meta from the header (name / lead / phase via contenteditable, EIS via date input)
 document.querySelector("header").addEventListener("input",e=>{
   const f=e.target.dataset.pfield; if(!f||e.target.tagName==="INPUT") return;
