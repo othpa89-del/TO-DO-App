@@ -5,6 +5,7 @@ import {
   Bell, Settings, Search, ExternalLink, Repeat, Download, Upload, Database, Plus, Mail, Phone,
   MessageSquare, ChevronUp, ChevronDown, Plane,
 } from "lucide-react";
+import Meetings from "./Meetings.jsx";
 
 // --- Markenfarben (Farbchapter) ---
 const C = {
@@ -231,6 +232,19 @@ export default function App() {
   async function persist(scope, arr) {
     setTasks((prev) => ({ ...prev, [scope]: arr }));
     try { await saveScope(scope, arr); } catch { flash("Speichern fehlgeschlagen – bitte erneut versuchen."); }
+  }
+  // Aufgabe aus einem Meeting-Action-Item erzeugen (für Meetings-Modul)
+  function addExternalTask(partial = {}) {
+    const task = normalizeTask({
+      id: uid(), title: (partial.title || "Aufgabe").slice(0, 200), notes: partial.notes || "",
+      category: partial.category || "", priority: "", status: "offen",
+      start: "", due: partial.due || "", remindLead: 3, contact: partial.contact || "",
+      company: partial.company || "", link: partial.link || "", recurrence: "none", escalation: "",
+      updatedAt: new Date().toISOString().slice(0, 10), createdAt: new Date().toISOString(), createdBy: "", completedAt: null,
+    });
+    persist("personal", [task, ...tasks.personal]);
+    flash("Aufgabe aus Meeting erstellt.");
+    return task.id;
   }
   async function saveProfile(name) { setProfile(name); try { await window.storage.set("profile", JSON.stringify(name), false); } catch {} }
   async function persistCategories(arr) { try { await window.storage.set("categories", JSON.stringify(arr), true); } catch { flash("Speichern fehlgeschlagen."); } }
@@ -639,9 +653,9 @@ export default function App() {
             </div>
           </div>
           <nav className="tabs">
-            {["new", "all", "persons", "export"].map((v) => (
+            {["new", "all", "meetings", "persons", "export"].map((v) => (
               <button key={v} className={"tab" + (view === v ? " on" : "")} onClick={() => setView(v)}>
-                {v === "all" ? "Aufgaben" : v === "persons" ? "Persons" : v === "export" ? "Druck & Export" : "Neue Aufgabe"}
+                {v === "all" ? "Aufgaben" : v === "meetings" ? "Meeting Minutes" : v === "persons" ? "Persons" : v === "export" ? "Druck & Export" : "Neue Aufgabe"}
               </button>
             ))}
             {isTaskView && <span className="tab-count">{openCount} offen · {doneCount} erledigt</span>}
@@ -656,8 +670,11 @@ export default function App() {
           </section>
         )}
 
-        {/* ===================== PERSONS ===================== */}
-        {view === "persons" ? (
+        {/* ===================== MEETINGS ===================== */}
+        {view === "meetings" ? (
+          <Meetings persons={persons} categories={sortedCats} profile={profile}
+            companyColor={companyColor} onCreateTask={addExternalTask} />
+        ) : view === "persons" ? (
           <div className="grid">
             <aside className="panel">
               <div className="card">
