@@ -189,6 +189,36 @@
   .cpchip{background:#fde7e7;color:#b32a2a;border:1px solid #f3b4b4;border-radius:8px;padding:3px 8px;font-size:11px;font-weight:700;white-space:nowrap}
   .cparrow{color:var(--red);font-weight:800;font-size:12px}
   .depsvg{position:absolute;top:0;left:0;pointer-events:none;z-index:3}
+  /* Status report */
+  .rep-actions{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+  .report-doc{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;max-width:1120px;margin:0 auto}
+  .rep-band{background:linear-gradient(110deg,var(--ew-magenta),var(--ew-magenta-dark));color:#fff;padding:15px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .rep-band .rb-l{display:flex;align-items:center;gap:12px}
+  .rep-band h2{margin:0;font-size:17px}
+  .rep-band .rb-sub{font-size:11.5px;opacity:.9;margin-top:2px}
+  .rep-band .rb-r{text-align:right;font-size:11.5px;opacity:.95;line-height:1.5}
+  .rep-band .rb-r b{font-size:15px}
+  .rep-pad{padding:18px 22px}
+  .rep-summary{display:flex;gap:18px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:16px}
+  .rep-kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:10px;flex:1}
+  .rep-kv .b{background:#fafbfc;border:1px solid var(--line);border-radius:10px;padding:8px 11px}
+  .rep-kv .b span{font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;display:block;margin-bottom:2px}
+  .rep-kv .b b{font-size:18px;font-weight:800}
+  .rep-cols{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  @media(max-width:780px){.rep-cols{grid-template-columns:1fr}}
+  .rep-sec h4{margin:0 0 9px;font-size:12.5px;color:var(--ew-magenta-dark);border-bottom:2px solid var(--ew-magenta-soft);padding-bottom:5px}
+  .repws{display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:6px}
+  .repws span{width:150px;flex-shrink:0}
+  .rtrack{flex:1;height:9px;background:#eef1f6;border-radius:5px;overflow:hidden}
+  .rtrack i{display:block;height:100%;background:linear-gradient(90deg,var(--ew-magenta),#d8447f)}
+  .repws b{width:34px;text-align:right;color:var(--muted)}
+  .rep-ms{font-size:11px;display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px dashed var(--line)}
+  .rdot{width:18px;height:18px;border-radius:50%;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0}
+  .rep-risk{font-size:11px;display:flex;gap:8px;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--line)}
+  .rdate{color:var(--muted);font-size:10.5px;white-space:nowrap}
+  .rep-table{width:100%;min-width:0;border-collapse:collapse;font-size:11px}
+  .rep-table th{background:var(--ew-magenta-dark);color:#fff;text-align:left;padding:6px 8px;font-size:10px;white-space:nowrap}
+  .rep-table td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
   /* Print-only branding */
   .print-header,.print-footer{display:none}
   @media print{
@@ -213,7 +243,11 @@
     thead th{position:static}
     .pgrid{grid-template-columns:repeat(2,1fr)}
     .depsvg{display:none!important}
-    .kpi,.card,.pcard,.ms,.wsrow,tr{break-inside:avoid}
+    .no-print{display:none!important}
+    .rep-band{display:none!important}
+    .report-doc{box-shadow:none;border:none;max-width:none}
+    .rep-pad{padding:0}
+    .kpi,.card,.pcard,.ms,.wsrow,tr,.rep-sec{break-inside:avoid}
     *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   }
 </style>
@@ -251,15 +285,19 @@
     <div class="tab" data-tab="dash">📊 Dashboard</div>
     <div class="tab" data-tab="table">📋 Tasks</div>
     <div class="tab" data-tab="gantt">📅 Gantt</div>
+    <div class="tab" data-tab="report">📄 Bericht</div>
     <span style="flex:1"></span>
     <button class="btn ghost" onclick="window.print()">🖨 Diese Seite drucken / PDF</button>
   </div>
 
   <!-- PORTFOLIO (Startseite: alle Projekte) -->
   <section class="panel active" id="portfolio">
-    <div class="portfolio-head">
-      <h2>Trainings-Portfolio</h2>
-      <p>Alle Flotteneinführungs- &amp; Trainingsprojekte im Überblick · jedes Projekt ist unabhängig steuerbar</p>
+    <div class="portfolio-head" style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px">
+      <div>
+        <h2>Trainings-Portfolio</h2>
+        <p>Alle Flotteneinführungs- &amp; Trainingsprojekte im Überblick · jedes Projekt ist unabhängig steuerbar</p>
+      </div>
+      <button class="btn" style="white-space:nowrap" onclick="showReport('portfolio')">📄 Portfolio-Statusbericht</button>
     </div>
     <div class="kpis" id="portfolioKpis"></div>
     <div class="pgrid" id="portfolioGrid"></div>
@@ -336,6 +374,9 @@
     <div class="gantt"><table class="gtable" id="gtbl"></table></div>
     <div class="note">Vereinfachte Monats-Timeline. Balkenlänge & -position aus Start-/Due-Datum berechnet. In der finalen App: zoombar (Tag/Woche/Monat), mit Abhängigkeitspfeilen.</div>
   </section>
+
+  <!-- STATUSBERICHT (1-Seiten-PDF) -->
+  <section class="panel" id="report"></section>
 
   <footer id="screenFooter">Mockup · Eurowings Flight Training · Multi-Projekt PM Cockpit · Datenwerte sind Platzhalter zur Konzept-Demonstration · erzeugt für Chief Training Captain</footer>
   <div class="print-footer" id="pfFoot"></div>
@@ -527,9 +568,9 @@ const TODAY_ISO = "2026-06-25";
 const KEY = "ew_pm_portfolio_v1";
 const STATUSES = ["Not Started","In Progress","Completed","Delayed"];
 const PRIOS = ["High","Medium","Low"];
-const VIEWLBL = {portfolio:"Portfolio-Übersicht",dash:"Dashboard",table:"Master Task List",gantt:"Gantt / Timeline"};
+const VIEWLBL = {portfolio:"Portfolio-Übersicht",dash:"Dashboard",table:"Master Task List",gantt:"Gantt / Timeline",report:"Statusbericht"};
 
-let PROJECTS = [], ACTIVE = 0, DATA = [], UID = 0, VIEW = "portfolio";
+let PROJECTS = [], ACTIVE = 0, DATA = [], UID = 0, VIEW = "portfolio", REPORTTYPE = "project";
 
 /* ---------- helpers ---------- */
 const pad = n => String(n).padStart(2,"0");
@@ -612,15 +653,20 @@ function projStats(p){
 function showView(v){
   VIEW=v;
   document.querySelectorAll("#nav .tab").forEach(x=>x.classList.toggle("active",x.dataset.tab===v));
-  ["portfolio","dash","table","gantt"].forEach(id=>document.getElementById(id).classList.toggle("active",id===v));
+  ["portfolio","dash","table","gantt","report"].forEach(id=>document.getElementById(id).classList.toggle("active",id===v));
   if(v==="portfolio") renderPortfolio();
   if(v==="gantt") requestAnimationFrame(()=>{ try{drawDeps();}catch(e){} });
   updateHeader();
   window.scrollTo(0,0);
 }
+function showReport(type){ REPORTTYPE=type; buildReport(); showView("report"); }
+function buildReport(){
+  document.getElementById("report").innerHTML = REPORTTYPE==="portfolio" ? portfolioReportHTML() : projectReportHTML(PROJECTS[ACTIVE]);
+}
 function updateHeader(){
   const p=PROJECTS[ACTIVE], t=document.getElementById("hdrTitle"), meta=document.getElementById("hdrMeta");
-  if(VIEW==="portfolio"){
+  const portfolioCtx = (VIEW==="portfolio") || (VIEW==="report" && REPORTTYPE==="portfolio");
+  if(portfolioCtx){
     t.textContent="Eurowings · Trainings-Portfolio"; t.removeAttribute("contenteditable"); meta.style.display="none";
   } else {
     t.setAttribute("contenteditable",""); t.classList.add("hdr-edit"); t.dataset.pfield="name"; t.textContent=p.name;
@@ -629,9 +675,116 @@ function updateHeader(){
     document.getElementById("hdrPhase").textContent=p.phase;
     document.getElementById("hdrEis").value=p.eis;
   }
-  document.getElementById("phProject").textContent = VIEW==="portfolio" ? "Programm-Portfolio · alle Trainingsprojekte" : (p.fleet+" · "+p.name);
+  document.getElementById("phProject").textContent = portfolioCtx ? "Programm-Portfolio · alle Trainingsprojekte" : (p.fleet+" · "+p.name);
   document.getElementById("phView").textContent = VIEWLBL[VIEW];
-  document.getElementById("pfFoot").textContent = "Eurowings Flight Training · PM Cockpit · "+(VIEW==="portfolio"?"Portfolio-Übersicht":p.name)+" · Vertraulich / Mockup";
+  document.getElementById("pfFoot").textContent = "Eurowings Flight Training · PM Cockpit · "+(portfolioCtx?"Portfolio":p.name)+" · Vertraulich / Mockup";
+}
+
+/* ---------- STATUS REPORT (1-Seiten-PDF) ---------- */
+function projectReportHTML(p){
+  const s=projStats(p), cp=criticalPath(p.tasks);
+  const cmap=Object.fromEntries(p.tasks.map(t=>[normId(t.tid),t]));
+  const hc={g:"var(--green)",a:"var(--amber)",r:"var(--red)"}[s.health];
+  const ht={g:"On Track",a:"At Risk",r:"Kritisch"}[s.health];
+  const wsRows=WS.map(([name,abbr])=>{ const items=p.tasks.filter(d=>d.ws===abbr); if(!items.length) return "";
+    const pr=Math.round(items.reduce((a,d)=>a+d.pct,0)/items.length);
+    return `<div class="repws"><span title="${name}">${name}</span><div class="rtrack"><i style="width:${pr}%"></i></div><b>${pr}%</b></div>`; }).join("");
+  const ms=p.tasks.filter(d=>d.ms==="Ja").sort((a,b)=>new Date(a.due)-new Date(b.due));
+  const msRows=ms.map(m=>{ const od=m.status!=="Completed"&&new Date(m.due)<TODAY;
+    const col=m.status==="Completed"?"var(--green)":od?"var(--red)":m.status==="In Progress"?"var(--blue)":"var(--grey)";
+    const sym=m.status==="Completed"?"✓":od?"!":"◆";
+    return `<div class="rep-ms"><span class="rdot" style="background:${col}">${sym}</span><span style="flex:1">${h(m.task)}</span><span class="rdate">${de(m.due)}</span></div>`; }).join("");
+  const risks=p.tasks.filter(d=>d.risk&&d.risk!=="-").sort((a,b)=>{
+    const ra=a.status==="Delayed"?0:1, rb=b.status==="Delayed"?0:1; if(ra!==rb) return ra-rb;
+    const pa=a.prio==="High"?0:a.prio==="Medium"?1:2, pb=b.prio==="High"?0:b.prio==="Medium"?1:2; if(pa!==pb) return pa-pb;
+    return new Date(a.due)-new Date(b.due);
+  }).slice(0,7);
+  const riskRows=risks.length?risks.map(d=>`<div class="rep-risk"><span><b class="pill ${statusClass(d.status)}" style="font-size:9px">${d.tid}</b> ${h(d.risk)}</span><span class="rdate">${de(d.due)}</span></div>`).join("")
+    :'<div class="note">Keine offenen Risiken / Issues erfasst.</div>';
+  const soon=p.tasks.filter(d=>d.status!=="Completed").filter(d=>{ const due=new Date(d.due); return due>=TODAY && (due-TODAY)<=30*864e5; }).sort((a,b)=>new Date(a.due)-new Date(b.due));
+  const endTask=cmap[cp.endTid];
+  const cpDelayed=cp.order.filter(t=>cmap[t]&&cmap[t].status==="Delayed").length;
+  return `
+  <div class="rep-actions no-print">
+    <button class="btn" onclick="window.print()">🖨 Als PDF drucken</button>
+    <button class="btn ghost" onclick="showReport('portfolio')">📄 Portfolio-Bericht</button>
+    <span class="note">Tipp: im Druckdialog „Querformat" wählen für mehr Breite.</span>
+  </div>
+  <div class="report-doc">
+    <div class="rep-band">
+      <div class="rb-l"><div class="logo">EW</div>
+        <div><h2>Statusbericht · ${h(p.name)}</h2><div class="rb-sub">Eurowings · Flight Training · ${h(p.fleet)}</div></div></div>
+      <div class="rb-r"><b>${ht}</b><br>Stand 25.06.2026 · ${h(p.lead)}</div>
+    </div>
+    <div class="rep-pad">
+      <div class="rep-summary">
+        <div class="pring" style="--p:${s.overall};--c:${hc};width:84px;height:84px"><b style="font-size:18px">${s.overall}%</b></div>
+        <div class="rep-kv">
+          <div class="b"><span>Status</span><b style="color:${hc};font-size:15px">${ht}</b></div>
+          <div class="b"><span>Phase</span><b style="font-size:14px">${h(p.phase)}</b></div>
+          <div class="b"><span>Ziel EIS</span><b style="font-size:14px">${de(p.eis)}</b></div>
+          <div class="b"><span>Offen</span><b>${s.open}</b></div>
+          <div class="b"><span>Kritisch</span><b style="color:${s.crit?'var(--red)':'inherit'}">${s.crit}</b></div>
+          <div class="b"><span>Delayed</span><b style="color:${s.r?'var(--red)':'inherit'}">${s.r}</b></div>
+          <div class="b"><span>Meilensteine</span><b>${s.msDone}/${s.ms}</b></div>
+          <div class="b"><span>Aufgaben</span><b>${s.n}</b></div>
+        </div>
+      </div>
+      <div class="rep-cols">
+        <div>
+          <div class="rep-sec"><h4>Fortschritt je Workstream</h4>${wsRows}</div>
+          <div class="rep-sec" style="margin-top:14px"><h4>Kritischer Pfad${cpDelayed?` · <span style="color:var(--red)">${cpDelayed} verzögert</span>`:""}</h4>
+            <div class="cpchain">${cp.order.map((tid,i)=>(i?'<span class="cparrow">→</span>':'')+`<span class="cpchip">${cmap[tid]?cmap[tid].tid:tid}</span>`).join("")||'<span class="note">—</span>'}</div>
+            <div class="note">Endpunkt ${endTask?de(endTask.due):"-"} · Verzögerungen auf diesem Pfad verschieben EIS.</div>
+          </div>
+        </div>
+        <div>
+          <div class="rep-sec"><h4>Meilensteine</h4>${msRows||'<span class="note">—</span>'}</div>
+          <div class="rep-sec" style="margin-top:14px"><h4>Top-Risiken &amp; Issues</h4>${riskRows}</div>
+          <div class="rep-sec" style="margin-top:14px"><h4>Fokus nächste 30 Tage (${soon.length})</h4>
+            ${soon.slice(0,5).map(d=>`<div class="rep-ms"><span style="flex:1">${d.tid} · ${h(d.task)}</span><span class="rdate">${de(d.due)}</span></div>`).join("")||'<span class="note">Keine Fälligkeiten in den nächsten 30 Tagen.</span>'}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+function portfolioReportHTML(){
+  const rows=PROJECTS.map(p=>{ const s=projStats(p);
+    const hc={g:"var(--green)",a:"var(--amber)",r:"var(--red)"}[s.health];
+    const ht={g:"On Track",a:"At Risk",r:"Kritisch"}[s.health];
+    const nm=p.tasks.filter(d=>d.ms==="Ja"&&d.status!=="Completed").sort((a,b)=>new Date(a.due)-new Date(b.due))[0];
+    return `<tr><td><b>${h(p.name)}</b><br><span class="note">${h(p.fleet)}</span></td>
+      <td><span class="phealth" style="background:${hc}">${ht}</span></td>
+      <td><div class="rtrack" style="width:90px;display:inline-block;vertical-align:middle"><i style="width:${s.overall}%;background:${hc}"></i></div> ${s.overall}%</td>
+      <td style="text-align:center">${s.open}</td>
+      <td style="text-align:center;color:${s.crit?'var(--red)':'inherit'}">${s.crit}</td>
+      <td style="text-align:center">${s.msDone}/${s.ms}</td>
+      <td>${nm?h(nm.task)+' · '+de(nm.due):'—'}</td>
+      <td>${de(p.eis)}</td></tr>`; }).join("");
+  const agg=PROJECTS.reduce((a,p)=>{ const s=projStats(p); a.open+=s.open; a.crit+=s.crit; a.ms+=s.ms; a.msDone+=s.msDone; a.ov+=s.overall; return a; },{open:0,crit:0,ms:0,msDone:0,ov:0});
+  const avg=PROJECTS.length?Math.round(agg.ov/PROJECTS.length):0;
+  return `
+  <div class="rep-actions no-print">
+    <button class="btn" onclick="window.print()">🖨 Als PDF drucken</button>
+    <button class="btn ghost" onclick="showReport('project')">📄 Projekt-Bericht (${h(PROJECTS[ACTIVE].name)})</button>
+  </div>
+  <div class="report-doc">
+    <div class="rep-band"><div class="rb-l"><div class="logo">EW</div>
+      <div><h2>Portfolio-Statusbericht</h2><div class="rb-sub">Eurowings · Flight Training · ${PROJECTS.length} Trainingsprojekte</div></div></div>
+      <div class="rb-r"><b>Ø ${avg}%</b><br>Stand 25.06.2026 · Chief Training Captain</div></div>
+    <div class="rep-pad">
+      <div class="rep-kv" style="margin-bottom:16px">
+        <div class="b"><span>Projekte</span><b>${PROJECTS.length}</b></div>
+        <div class="b"><span>Ø Fortschritt</span><b>${avg}%</b></div>
+        <div class="b"><span>Offene Tasks</span><b>${agg.open}</b></div>
+        <div class="b"><span>Kritische Tasks</span><b style="color:${agg.crit?'var(--red)':'inherit'}">${agg.crit}</b></div>
+        <div class="b"><span>Meilensteine</span><b>${agg.msDone}/${agg.ms}</b></div>
+      </div>
+      <table class="rep-table"><thead><tr><th>Projekt</th><th>Status</th><th>Fortschritt</th><th>Offen</th><th>Kritisch</th><th>MS</th><th>Nächster Meilenstein</th><th>Ziel EIS</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="note" style="margin-top:12px">Ampel: Grün = On Track · Gelb = At Risk (Verzögerungen vorhanden) · Rot = Kritisch (≥3 verzögert oder überfälliger Meilenstein).</div>
+    </div>
+  </div>`;
 }
 function rebuildProjSel(){
   document.getElementById("projSel").innerHTML = PROJECTS.map((p,i)=>`<option value="${i}" ${i===ACTIVE?"selected":""}>${h(p.name)}</option>`).join("");
@@ -958,7 +1111,7 @@ function resetDemo(){
 }
 
 /* ---------- NAV + HEADER WIRING ---------- */
-document.querySelectorAll("#nav .tab").forEach(t=>t.onclick=()=>showView(t.dataset.tab));
+document.querySelectorAll("#nav .tab").forEach(t=>t.onclick=()=>{ t.dataset.tab==="report" ? showReport("project") : showView(t.dataset.tab); });
 document.getElementById("projSel").onchange=function(){ openProject(this.value); };
 document.getElementById("depMode").addEventListener("change",()=>{ try{drawDeps();}catch(e){} });
 window.addEventListener("resize",()=>{ if(document.getElementById("gantt").classList.contains("active")){ try{drawDeps();}catch(e){} } });
