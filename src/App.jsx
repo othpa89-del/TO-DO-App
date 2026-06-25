@@ -42,8 +42,7 @@ const LEADS = [
   { v: 7, label: "1 Woche vorher" }, { v: 14, label: "2 Wochen vorher" },
 ];
 const SCOPES = {
-  personal: { key: "tasks-personal", shared: false, label: "Persönlich" },
-  team: { key: "tasks-team", shared: true, label: "Team" },
+  personal: { key: "tasks-personal", shared: false, label: "Aufgaben" },
 };
 const COMPANY_SUGGESTIONS = ["Eurowings", "Aviation Academy Austria", "Lufthansa Group", "Austro Control"];
 const DEFAULT_COMPANIES = [...COMPANY_SUGGESTIONS, "Privat"];
@@ -124,7 +123,7 @@ async function saveScope(scope, arr) {
 
 // ===========================================================================
 export default function App() {
-  const [tasks, setTasks] = useState({ personal: [], team: [] });
+  const [tasks, setTasks] = useState({ personal: [] });
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [companies, setCompanies] = useState(DEFAULT_COMPANIES);
   const [persons, setPersons] = useState([]);
@@ -155,10 +154,8 @@ export default function App() {
   const [newCat, setNewCat] = useState("");
   const [cmgrOpen, setCmgrOpen] = useState(false);
   const [newCompany, setNewCompany] = useState("");
-  const [expScope, setExpScope] = useState("all");
   const [expStatus, setExpStatus] = useState("all");
   const [bulkText, setBulkText] = useState("");
-  const [bulkScope, setBulkScope] = useState("team");
   const [bulkCat, setBulkCat] = useState("");
   const [pendingRestore, setPendingRestore] = useState(null);
   // Persons
@@ -178,9 +175,19 @@ export default function App() {
   useEffect(() => {
     let on = true;
     (async () => {
-      const [p, t] = await Promise.all([loadScope("personal"), loadScope("team")]);
+      const [p, tRaw] = await Promise.all([
+        loadScope("personal"),
+        window.storage.get("tasks-team", true).then((r) => (r && r.value ? JSON.parse(r.value) : [])).catch(() => []),
+      ]);
       if (!on) return;
-      setTasks({ personal: p.map(normalizeTask), team: t.map(normalizeTask) });
+      let personal = p.map(normalizeTask);
+      const teamTasks = (tRaw || []).map(normalizeTask);
+      if (teamTasks.length) {
+        // Einmalige Migration: frühere "Team"-Aufgaben in die normale Liste übernehmen, alten Speicher leeren
+        personal = [...personal, ...teamTasks];
+        try { await saveScope("personal", personal); await window.storage.set("tasks-team", JSON.stringify([]), true); } catch {}
+      }
+      setTasks({ personal });
       let cats = null;
       try { const r = await window.storage.get("categories", true); cats = r && r.value ? JSON.parse(r.value) : null; } catch {}
       if (!cats) { cats = DEFAULT_CATEGORIES; try { await window.storage.set("categories", JSON.stringify(cats), true); } catch {} }
@@ -279,10 +286,10 @@ export default function App() {
         start: form.start, due: form.due, remindLead: Number(form.remindLead), contact: form.contact.trim(), company: form.company.trim(),
         link: form.link.trim(), recurrence: form.recurrence, escalation: form.escalation, updatedAt: new Date().toISOString().slice(0, 10),
         createdAt: new Date().toISOString(),
-        createdBy: scope === "team" ? profile || "—" : "", completedAt: form.status === "erledigt" ? new Date().toISOString() : null,
+        createdBy: "", completedAt: form.status === "erledigt" ? new Date().toISOString() : null,
       });
       persist(scope, [task, ...tasks[scope]]);
-      flash(scope === "team" ? "Team-Aufgabe hinzugefügt." : "Aufgabe hinzugefügt.");
+      flash("Aufgabe hinzugefügt.");
       setForm({ ...blank, scope, category: form.category, company: form.company });
     }
   }
@@ -346,7 +353,7 @@ export default function App() {
 
   // Daten
   function doBackup() {
-    const payload = { app: "TO DO APP", version: 2, exportedAt: new Date().toISOString(), categories, companies, persons, tasks: { personal: tasks.personal, team: tasks.team } };
+    const payload = { app: "TO DO APP", version: 2, exportedAt: new Date().toISOString(), categories, companies, persons, tasks: { personal: tasks.personal } };
     downloadBlob(JSON.stringify(payload, null, 2), `TODO_Sicherung_${new Date().toISOString().slice(0, 10)}.json`, "application/json");
     flash("Sicherung erstellt.");
   }
@@ -358,12 +365,12 @@ export default function App() {
   }
   async function applyRestore() {
     const obj = pendingRestore; if (!obj) return;
-    const np = ((obj.tasks && obj.tasks.personal) || []).map(normalizeTask);
-    const nt = ((obj.tasks && obj.tasks.team) || []).map(normalizeTask);
+    // Alte Sicherungen können noch eine "team"-Liste enthalten -> in personal übernehmen
+    const np = [...(((obj.tasks && obj.tasks.personal) || []).map(normalizeTask)), ...(((obj.tasks && obj.tasks.team) || []).map(normalizeTask))];
     const cats = obj.categories || categories; const pers = obj.persons || persons; const comps = obj.companies || companies;
-    setTasks({ personal: np, team: nt }); setCategories(cats); setPersons(pers); setCompanies(comps);
+    setTasks({ personal: np }); setCategories(cats); setPersons(pers); setCompanies(comps);
     try {
-      await saveScope("personal", np); await saveScope("team", nt);
+      await saveScope("personal", np); await window.storage.set("tasks-team", JSON.stringify([]), true);
       await window.storage.set("categories", JSON.stringify(cats), true);
       await window.storage.set("companies", JSON.stringify(comps), true);
       await window.storage.set("persons", JSON.stringify(pers), true);
@@ -374,24 +381,20 @@ export default function App() {
   function doBulkAdd() {
     const lines = bulkText.split("\n").map((s) => s.trim()).filter(Boolean);
     if (!lines.length) { flash("Keine Zeilen erkannt."); return; }
-    const scope = bulkScope;
+    const scope = "personal";
     const news = lines.map((title) => normalizeTask({
       id: uid(), title, category: bulkCat, priority: "", status: "offen", due: "", remindLead: 3,
       escalation: "", updatedAt: new Date().toISOString().slice(0, 10),
       contact: "", company: "", link: "", recurrence: "none", createdAt: new Date().toISOString(),
-      createdBy: scope === "team" ? profile || "—" : "",
+      createdBy: "",
     }));
     persist(scope, [...news, ...tasks[scope]]);
     setBulkText(""); flash(lines.length + " Aufgaben hinzugefügt.");
   }
 
   // --- abgeleitete Task-Daten ---
-  const merged = [
-    ...tasks.personal.map((t) => ({ ...t, _scope: "personal" })),
-    ...tasks.team.map((t) => ({ ...t, _scope: "team" })),
-  ];
-  const inView = (t) => (view === "personal" ? t._scope === "personal" : view === "team" ? t._scope === "team" : true);
-  const taskViewPool = merged.filter(inView);
+  const merged = tasks.personal.map((t) => ({ ...t, _scope: "personal" }));
+  const taskViewPool = merged;
 
   let list = taskViewPool.filter((t) => {
     if (filterCat === "__none__") { if (t.category) return false; }
@@ -441,7 +444,6 @@ export default function App() {
 
   const selectedItems = merged.filter((t) => selected.has(keyOf(t)));
   const expList = merged
-    .filter((t) => (expScope === "personal" ? t._scope === "personal" : expScope === "team" ? t._scope === "team" : true))
     .filter((t) => (expStatus === "open" ? !isDone(t) : expStatus === "erledigt" ? isDone(t) : true))
     .sort((a, b) => { const da = a.due ? dayDiff(a.due) : Infinity; const db = b.due ? dayDiff(b.due) : Infinity; return da - db; });
   const expAllSelected = expList.length > 0 && expList.every((t) => selected.has(keyOf(t)));
@@ -474,11 +476,11 @@ export default function App() {
       Wiederholung: RECUR[t.recurrence] || "Keine", Ansprechperson: t.contact || "", Company: t.company || "",
       Referenz: t.link || "", Notiz: t.notes || "",
       Verlauf: (t.log || []).map((e) => `${dt(e.date)}${e.by ? " " + e.by : ""}: ${e.text}`).join(" | "),
-      Liste: SCOPES[t._scope].label, "Erstellt von": t.createdBy || "", "Erstellt am": dt(t.createdAt), "Erledigt am": dt(t.completedAt),
+      "Erstellt am": dt(t.createdAt), "Erledigt am": dt(t.completedAt),
     }));
     try {
       const ws = XLSX.utils.json_to_sheet(rows);
-      ws["!cols"] = [{ wch: 34 }, { wch: 24 }, { wch: 9 }, { wch: 18 }, { wch: 11 }, { wch: 14 }, { wch: 13 }, { wch: 13 }, { wch: 15 }, { wch: 13 }, { wch: 18 }, { wch: 22 }, { wch: 30 }, { wch: 40 }, { wch: 50 }, { wch: 11 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+      ws["!cols"] = [{ wch: 34 }, { wch: 24 }, { wch: 9 }, { wch: 18 }, { wch: 11 }, { wch: 14 }, { wch: 13 }, { wch: 13 }, { wch: 15 }, { wch: 13 }, { wch: 18 }, { wch: 22 }, { wch: 30 }, { wch: 40 }, { wch: 50 }, { wch: 12 }, { wch: 12 }];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "TO DO");
       const out = XLSX.write(wb, { bookType: "xlsx", type: "array" });
@@ -555,7 +557,6 @@ export default function App() {
                 {fmtDate(t.due)} · {relLabel(t.due)}
               </span>
             ) : <span className="due muted">Kein Datum</span>}
-            {view === "all" && <span className="scope-tag">{SCOPES[t._scope].label}</span>}
           </div>
           {(t.contact || t.company || t.updatedAt) && (
             <div className="task-contact">
@@ -613,7 +614,7 @@ export default function App() {
     groupNames = Object.keys(groups).sort((a, b) => a === "Ohne Bereich" ? 1 : b === "Ohne Bereich" ? -1 : a.localeCompare(b, "de"));
   }
 
-  const isTaskView = view === "all" || view === "personal" || view === "team";
+  const isTaskView = view === "all";
   const personsView = persons
     .filter((p) => pFilterTopic === "all" || (p.topics || []).includes(pFilterTopic))
     .filter((p) => {
@@ -638,9 +639,9 @@ export default function App() {
             </div>
           </div>
           <nav className="tabs">
-            {["new", "all", "personal", "team", "persons", "export"].map((v) => (
+            {["new", "all", "persons", "export"].map((v) => (
               <button key={v} className={"tab" + (view === v ? " on" : "")} onClick={() => setView(v)}>
-                {v === "all" ? "Alle" : v === "persons" ? "Persons" : v === "export" ? "Druck & Export" : v === "new" ? "Neue Aufgabe" : SCOPES[v].label}
+                {v === "all" ? "Aufgaben" : v === "persons" ? "Persons" : v === "export" ? "Druck & Export" : "Neue Aufgabe"}
               </button>
             ))}
             {isTaskView && <span className="tab-count">{openCount} offen · {doneCount} erledigt</span>}
@@ -698,7 +699,7 @@ export default function App() {
                   <button className="btn primary" onClick={submitPerson}>{pEditId ? "Aktualisieren" : "Hinzufügen"}</button>
                   {pEditId && <button className="btn ghost" onClick={cancelPerson}>Abbrechen</button>}
                 </div>
-                <p className="hint">Die Personenliste gilt teamweit. Beim Anlegen einer Aufgabe schlägt das Feld „Ansprechperson" diese Namen vor.</p>
+                <p className="hint">Beim Anlegen einer Aufgabe schlägt das Feld „Ansprechperson" diese Namen vor.</p>
               </div>
             </aside>
 
@@ -759,7 +760,6 @@ export default function App() {
                               <span className="pdrill-meta">
                                 <span style={{ color: (STATUS[t.status] || STATUS.offen).color, fontWeight: 800 }}>{(STATUS[t.status] || STATUS.offen).label || "—"}</span>
                                 {t.due && <span className="due">{fmtDate(t.due)}</span>}
-                                <span className="scope-tag">{SCOPES[t._scope].label}</span>
                               </span>
                             </div>
                           ))}
@@ -778,10 +778,6 @@ export default function App() {
               <h2>Auswahl & Export</h2>
               <p className="hint">Einzelne Aufgaben anhaken – oder ohne Auswahl die gesamte gefilterte Liste exportieren. „Drucken / PDF" öffnet den Druckdialog; dort „Als PDF speichern" wählen.</p>
               <div className="exp-controls">
-                <div className="tb-group"><span>Liste</span>
-                  <select value={expScope} onChange={(e) => setExpScope(e.target.value)}>
-                    <option value="all">Alle</option><option value="personal">Persönlich</option><option value="team">Team</option>
-                  </select></div>
                 <div className="tb-group"><span>Status</span>
                   <select value={expStatus} onChange={(e) => setExpStatus(e.target.value)}>
                     <option value="all">Alle</option><option value="open">Offen</option><option value="erledigt">Erledigt</option>
@@ -809,7 +805,6 @@ export default function App() {
                           {catDisplay(t.category) && <span className="badge" style={{ color: col, borderColor: col }}>{catDisplay(t.category)}</span>}
                           <span className="exp-status" style={{ color: st.color }}>{st.label || "—"}</span>
                           {t.due ? <span className="due">{fmtDate(t.due)}</span> : <span className="due muted">—</span>}
-                          <span className="scope-tag">{SCOPES[t._scope].label}</span>
                         </span>
                       </li>
                     );
@@ -838,17 +833,11 @@ export default function App() {
 
             <div className="card">
               <h2>Mehrere Aufgaben anlegen</h2>
-              <p className="hint">Eine Aufgabe pro Zeile. Wird mit dem gewählten Bereich in der gewählten Liste angelegt.</p>
-              <div className="row2">
-                <div className="field"><label>Liste</label>
-                  <select value={bulkScope} onChange={(e) => setBulkScope(e.target.value)}>
-                    <option value="personal">Persönlich</option><option value="team">Team</option>
-                  </select></div>
-                <div className="field"><label>Bereich</label>
-                  <select value={bulkCat} onChange={(e) => setBulkCat(e.target.value)}>
-                    <option value=""></option>{sortedCats.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select></div>
-              </div>
+              <p className="hint">Eine Aufgabe pro Zeile. Wird mit dem gewählten Bereich angelegt.</p>
+              <div className="field"><label>Bereich</label>
+                <select value={bulkCat} onChange={(e) => setBulkCat(e.target.value)}>
+                  <option value=""></option>{sortedCats.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select></div>
               <textarea rows={5} value={bulkText} onChange={(e) => setBulkText(e.target.value)} placeholder={"OM-D Kapitel 5 prüfen\nStandardisierungsbriefing vorbereiten\n…"} />
               <div className="data-row"><button className="btn primary" onClick={doBulkAdd}><Plus size={15} /> Aufgaben hinzufügen</button></div>
             </div>
@@ -928,19 +917,10 @@ export default function App() {
                 )}
                 <div className="field"><label>Referenz-Link (optional)</label>
                   <input value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} placeholder="https:// … (Reg, Drive-Dokument)" /></div>
-                {!editId && (
-                  <div className="field"><label>Liste</label>
-                    <div className="seg">
-                      {["personal", "team"].map((s) => (
-                        <button key={s} className={"seg-b" + (form.scope === s ? " on" : "")} onClick={() => setForm({ ...form, scope: s })}>{SCOPES[s].label}</button>
-                      ))}
-                    </div></div>
-                )}
                 <div className="actions">
                   <button className="btn primary" onClick={submit}>{editId ? "Aktualisieren" : "Hinzufügen"}</button>
                   {editId && <button className="btn ghost" onClick={cancelEdit}>Abbrechen</button>}
                 </div>
-                {form.scope === "team" && !editId && <p className="hint">Team-Aufgaben sind für alle sichtbar, die diese App öffnen.</p>}
               </div>
           </div>
         ) : (
@@ -1026,7 +1006,7 @@ export default function App() {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head"><h2>Bereiche verwalten</h2>
               <button className="icon" onClick={() => setMgrOpen(false)}><X size={18} /></button></div>
-            <p className="hint">Bereiche gelten teamweit. Die Reihenfolge ist automatisch alphabetisch.</p>
+            <p className="hint">Die Reihenfolge ist automatisch alphabetisch.</p>
             <div className="mgr-add">
               <input value={newCat} onChange={(e) => setNewCat(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCategory()} placeholder="Neuer Bereich …" />
               <button className="btn primary" onClick={addCategory}>Hinzufügen</button>
@@ -1049,7 +1029,7 @@ export default function App() {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head"><h2>Companies verwalten</h2>
               <button className="icon" onClick={() => setCmgrOpen(false)}><X size={18} /></button></div>
-            <p className="hint">Companies gelten teamweit. Die Reihenfolge ist automatisch alphabetisch.</p>
+            <p className="hint">Die Reihenfolge ist automatisch alphabetisch.</p>
             <div className="mgr-add">
               <input value={newCompany} onChange={(e) => setNewCompany(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCompany()} placeholder="Neue Company …" />
               <button className="btn primary" onClick={addCompany}>Hinzufügen</button>
@@ -1097,7 +1077,7 @@ function PrintDoc({ items }) {
         <div className="p-date">Erstellt: {now}<br />{items.length} Aufgabe(n)</div>
       </div>
       <table className="p-table">
-        <thead><tr><th>Titel</th><th>Bereich</th><th>Prio</th><th>Status</th><th>Eskal.</th><th>Fällig</th><th>Ansprechperson</th><th>Company</th><th>Liste</th></tr></thead>
+        <thead><tr><th>Titel</th><th>Bereich</th><th>Prio</th><th>Status</th><th>Eskal.</th><th>Fällig</th><th>Ansprechperson</th><th>Company</th></tr></thead>
         <tbody>
           {items.map((t) => (
             <tr key={keyOf(t)}>
@@ -1112,7 +1092,6 @@ function PrintDoc({ items }) {
               <td>{t.due ? `${fmtDate(t.due)} (${relLabel(t.due)})` : "—"}</td>
               <td>{t.contact || "—"}</td>
               <td>{t.company || "—"}</td>
-              <td>{SCOPES[t._scope].label}</td>
             </tr>
           ))}
         </tbody>

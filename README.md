@@ -85,11 +85,10 @@ Zugriffsregeln in der Datenbank geschützt.)
    - **Laptop (Chrome/Edge):** Installations-Symbol in der Adressleiste.
 4. **Abmelden:** Button unten rechts.
 
-## Team-Teilen
+## Synchronisation
 
-Diese Version synchronisiert pro **Konto** (alle deine Geräte). Sollen Kolleginnen/
-Kollegen eine gemeinsame Team-Liste sehen, ist eine Erweiterung nötig (gemeinsamer
-Arbeitsbereich statt rein persönlicher Daten) – bei Bedarf melden.
+Die Daten synchronisieren pro **Konto** über alle deine Geräte (live via Supabase
+Realtime). Auf jedem Gerät dasselbe Konto verwenden → überall dieselben Aufgaben.
 
 ## Hinweise
 
