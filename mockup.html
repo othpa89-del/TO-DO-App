@@ -296,7 +296,7 @@
     <div><span>Projektleiter</span><b class="hdr-edit" contenteditable data-pfield="lead" id="hdrLead"></b></div>
     <div><span>Phase</span><b class="hdr-edit" contenteditable data-pfield="phase" id="hdrPhase"></b></div>
     <div><span>Stand</span><b>25.06.2026</b></div>
-    <div><span>Ziel EIS</span><b><input type="date" data-pfield="eis" id="hdrEis"></b></div>
+    <div><span>Zieltermin</span><b><input type="date" data-pfield="eis" id="hdrEis"></b></div>
   </div>
 </header>
 
@@ -376,6 +376,7 @@
       <label style="font-size:12.5px;color:var(--muted)"><input type="checkbox" id="fMs"/> nur Milestones</label>
       <label style="font-size:12.5px;color:var(--muted)"><input type="checkbox" id="fCp"/> nur kritischer Pfad</label>
       <button class="btn" onclick="addRow()">➕ Zeile hinzufügen</button>
+      <button class="btn ghost" onclick="openWsManager()">🗂 Workstreams</button>
       <span id="savedTag" class="saved" style="opacity:0">✓ gespeichert</span>
       <span style="flex:1"></span>
       <button class="btn ghost" onclick="resetDemo()" title="Alle Änderungen verwerfen">↺ Demo</button>
@@ -622,13 +623,21 @@ const h = s => String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").r
 const statusClass = s => ({"Completed":"s-comp","In Progress":"s-prog","Not Started":"s-not","Delayed":"s-del"}[s]||"s-not");
 const prioClass = p => ({"High":"p-high","Medium":"p-med","Low":"p-low"}[p]||"p-med");
 const opt = (arr,v) => arr.map(o=>`<option ${o===v?"selected":""}>${h(o)}</option>`).join("");
-const wsName = a => WSNAME[a] || a;                       // unbekannte/importierte Workstreams: Code = Name
-const wsCodes = tasks => { const seen=WS.map(w=>w[1]), extra=[];
-  tasks.forEach(d=>{ if(!seen.includes(d.ws)&&!extra.includes(d.ws)) extra.push(d.ws); });
-  return [...WS, ...extra.map(c=>[c,c])]; };
-const wsOpt = v => { const o=WS.map(([n,a])=>`<option value="${a}" ${a===v?"selected":""}>${h(n)}</option>`);
-  if(v&&!WS.some(w=>w[1]===v)) o.push(`<option value="${h(v)}" selected>${h(v)} (importiert)</option>`);
+// Workstreams sind je Projekt frei definierbar (p.ws); Default = globale WS-Liste
+function pWS(p){ return (p&&p.ws&&p.ws.length)?p.ws:WS; }
+const wsNameFor = (p,a) => { const w=pWS(p).find(x=>x[1]===a); return w?w[0]:a; };
+const wsName = a => wsNameFor(PROJECTS[ACTIVE],a);
+function wsCodes(p){ const base=pWS(p), seen=base.map(w=>w[1]), extra=[];
+  ((p&&p.tasks)||[]).forEach(d=>{ if(!seen.includes(d.ws)&&!extra.includes(d.ws)) extra.push(d.ws); });
+  return [...base, ...extra.map(c=>[c,c])]; }
+const wsOpt = v => { const list=pWS(PROJECTS[ACTIVE]);
+  const o=list.map(([n,a])=>`<option value="${a}" ${a===v?"selected":""}>${h(n)}</option>`);
+  if(v&&!list.some(w=>w[1]===v)) o.push(`<option value="${h(v)}" selected>${h(v)} (extern)</option>`);
   return o.join(""); };
+function deriveWsCode(name,taken){ const base=String(name||"WS").replace(/[^A-Za-z0-9]+/g," ").trim().toUpperCase();
+  let code = base.indexOf(" ")>=0 ? base.split(/\s+/).map(w=>w[0]).join("").slice(0,5) : base.slice(0,4);
+  code=code||"WS"; let c=code,i=2; while(taken&&taken.has(c)){ c=code+i; i++; } if(taken) taken.add(c); return c; }
+function wsFromTasks(tasks){ const seen=[]; tasks.forEach(d=>{ if(!seen.includes(d.ws)) seen.push(d.ws); }); return seen.map(c=>[WSNAME[c]||c,c]); }
 
 /* ---------- data model + persistence ---------- */
 function mkTasks(arr){ return arr.map((r,i)=>{ const o={}; COLS.forEach((c,j)=>o[c]=r[j]); o.uid=i; return o; }); }
@@ -734,7 +743,7 @@ function projectReportHTML(p){
   const cmap=Object.fromEntries(p.tasks.map(t=>[normId(t.tid),t]));
   const hc={g:"var(--green)",a:"var(--amber)",r:"var(--red)"}[s.health];
   const ht={g:"On Track",a:"At Risk",r:"Kritisch"}[s.health];
-  const wsRows=wsCodes(p.tasks).map(([name,abbr])=>{ const items=p.tasks.filter(d=>d.ws===abbr); if(!items.length) return "";
+  const wsRows=wsCodes(p).map(([name,abbr])=>{ const items=p.tasks.filter(d=>d.ws===abbr); if(!items.length) return "";
     const pr=Math.round(items.reduce((a,d)=>a+d.pct,0)/items.length);
     return `<div class="repws"><span title="${name}">${name}</span><div class="rtrack"><i style="width:${pr}%"></i></div><b>${pr}%</b></div>`; }).join("");
   const ms=p.tasks.filter(d=>d.ms==="Ja").sort((a,b)=>new Date(a.due)-new Date(b.due));
@@ -770,7 +779,7 @@ function projectReportHTML(p){
         <div class="rep-kv">
           <div class="b"><span>Status</span><b style="color:${hc};font-size:15px">${ht}</b></div>
           <div class="b"><span>Phase</span><b style="font-size:14px">${h(p.phase)}</b></div>
-          <div class="b"><span>Ziel EIS</span><b style="font-size:14px">${de(p.eis)}</b></div>
+          <div class="b"><span>Zieltermin</span><b style="font-size:14px">${de(p.eis)}</b></div>
           <div class="b"><span>Offen</span><b>${s.open}</b></div>
           <div class="b"><span>Kritisch</span><b style="color:${s.crit?'var(--red)':'inherit'}">${s.crit}</b></div>
           <div class="b"><span>Delayed</span><b style="color:${s.r?'var(--red)':'inherit'}">${s.r}</b></div>
@@ -829,7 +838,7 @@ function portfolioReportHTML(){
         <div class="b"><span>Kritische Tasks</span><b style="color:${agg.crit?'var(--red)':'inherit'}">${agg.crit}</b></div>
         <div class="b"><span>Meilensteine</span><b>${agg.msDone}/${agg.ms}</b></div>
       </div>
-      <table class="rep-table"><thead><tr><th>Projekt</th><th>Status</th><th>Fortschritt</th><th>Offen</th><th>Kritisch</th><th>MS</th><th>Nächster Meilenstein</th><th>Ziel EIS</th></tr></thead><tbody>${rows}</tbody></table>
+      <table class="rep-table"><thead><tr><th>Projekt</th><th>Status</th><th>Fortschritt</th><th>Offen</th><th>Kritisch</th><th>MS</th><th>Nächster Meilenstein</th><th>Zieltermin</th></tr></thead><tbody>${rows}</tbody></table>
       <div class="note" style="margin-top:12px">Ampel: Grün = On Track · Gelb = At Risk (Verzögerungen vorhanden) · Rot = Kritisch (≥3 verzögert oder überfälliger Meilenstein).</div>
     </div>
   </div>`;
@@ -837,7 +846,7 @@ function portfolioReportHTML(){
 function rebuildProjSel(){
   document.getElementById("projSel").innerHTML = PROJECTS.map((p,i)=>`<option value="${i}" ${i===ACTIVE?"selected":""}>${h(p.name)}</option>`).join("");
 }
-function rebuildAll(){ buildDashboard(); renderTable(); buildGantt(); }
+function rebuildAll(){ rebuildWsFilter(); buildDashboard(); renderTable(); buildGantt(); }
 function openProject(i){ setActive(+i); rebuildProjSel(); rebuildAll(); showView("dash"); }
 
 /* ---------- PROJECT MANAGEMENT ---------- */
@@ -887,7 +896,7 @@ function renderPortfolio(){
         <div class="pcard-meta">
           <div><span>Projektleiter</span><b>${h(p.lead)}</b></div>
           <div><span>Phase</span><b>${h(p.phase)}</b></div>
-          <div><span>Ziel EIS</span><b>${de(p.eis)}</b></div></div></div>
+          <div><span>Zieltermin</span><b>${de(p.eis)}</b></div></div></div>
       <div class="pcard-stats">
         <div><b>${s.open}</b><span>offen</span></div>
         <div><b style="color:${s.crit?'var(--red)':'inherit'}">${s.crit}</b><span>kritisch</span></div>
@@ -925,7 +934,7 @@ function buildDashboard(){
   ].join("");
 
   // workstream progress
-  document.getElementById("wsProgress").innerHTML = wsCodes(DATA).map(([name,abbr])=>{
+  document.getElementById("wsProgress").innerHTML = wsCodes(PROJECTS[ACTIVE]).map(([name,abbr])=>{
     const items=DATA.filter(d=>d.ws===abbr);
     const p=Math.round(items.reduce((a,d)=>a+d.pct,0)/items.length);
     return `<div class="wsrow"><div class="name" title="${name}">${name}</div>
@@ -974,7 +983,9 @@ function kpi(lbl,val,foot,color){
 
 /* ---------- TABLE ---------- */
 const fWs=document.getElementById("fWs");
-WS.forEach(([n,a])=>fWs.insertAdjacentHTML("beforeend",`<option value="${a}">${n}</option>`));
+function rebuildWsFilter(){ const cur=fWs.value;
+  fWs.innerHTML=`<option value="">Alle Workstreams</option>`+wsCodes(PROJECTS[ACTIVE]).map(([n,a])=>`<option value="${a}">${h(n)}</option>`).join("");
+  if([...fWs.options].some(o=>o.value===cur)) fWs.value=cur; }
 ["fWs","fStatus","fPrio","fSearch","fMs","fCp"].forEach(id=>document.getElementById(id).addEventListener("input",renderTable));
 
 function currentRows(){
@@ -1113,9 +1124,9 @@ function sheetNames(names){ const seen={}, out=[]; names.forEach(n=>{ let b=Stri
   let nm=b,k=2; while(seen[nm.toLowerCase()]){ nm=b.slice(0,28-(""+k).length-1)+" "+k; k++; } seen[nm.toLowerCase()]=1; out.push(nm); }); return out; }
 const TASK_HEAD=["Workstream","Sub-Workstream","Task-ID","Aufgabe / Deliverable","Beschreibung","Verantwortlicher","Unterstützende Abteilungen","Startdatum","Due Date","Dauer (Tage)","Priorität","Status","% Completion","Milestone","Abhängigkeiten","Risiken / Issues","Letztes Update","Kommentar"];
 function projectRows(p){ const rows=[TASK_HEAD.slice()];
-  p.tasks.forEach(d=>rows.push([wsName(d.ws),d.sub,d.tid,d.task,d.desc,d.resp,d.support,de(d.start),de(d.due),d.dur,d.prio,d.status,d.pct,d.ms,d.deps,d.risk,de(d.upd),d.comment]));
+  p.tasks.forEach(d=>rows.push([wsNameFor(p,d.ws),d.sub,d.tid,d.task,d.desc,d.resp,d.support,de(d.start),de(d.due),d.dur,d.prio,d.status,d.pct,d.ms,d.deps,d.risk,de(d.upd),d.comment]));
   return rows; }
-function summaryRows(){ const rows=[["Projekt","Flotte","Projektleiter","Phase","Ziel EIS","Aufgaben","Offen","Kritisch","Delayed","MS erreicht","MS gesamt","Gesamtfortschritt %","Status"]];
+function summaryRows(){ const rows=[["Projekt","Flotte","Projektleiter","Phase","Zieltermin","Aufgaben","Offen","Kritisch","Delayed","MS erreicht","MS gesamt","Gesamtfortschritt %","Status"]];
   PROJECTS.forEach(p=>{ const s=projStats(p), ht={g:"On Track",a:"At Risk",r:"Kritisch"}[s.health];
     rows.push([p.name,p.fleet,p.lead,p.phase,de(p.eis),s.n,s.open,s.crit,s.r,s.msDone,s.ms,s.overall,ht]); });
   return rows; }
@@ -1357,7 +1368,7 @@ function doImport(){
   if(!tasks.length){ alert("Keine importierbaren Zeilen gefunden."); return; }
   let proj;
   if(tgt==="__new__"){ const name=(document.getElementById("impName").value||"Importiertes Projekt").trim();
-    proj={id:"p-imp-"+Date.now(),name,fleet:"–",lead:"Chief Training Captain",phase:"Planning",eis:"2027-12-31",tasks:[]}; PROJECTS.push(proj); }
+    proj={id:"p-imp-"+Date.now(),name,fleet:"–",lead:"Chief Training Captain",phase:"Planning",eis:"2027-12-31",tasks:[],ws:wsFromTasks(tasks)}; PROJECTS.push(proj); }
   else proj=PROJECTS[+tgt];
   const noMax={}; proj.tasks.forEach(d=>{ noMax[d.ws]=Math.max(noMax[d.ws]||0,d.no||0); });
   let uid=proj.tasks.reduce((m,d)=>Math.max(m,d.uid==null?-1:d.uid),-1)+1;
@@ -1365,6 +1376,55 @@ function doImport(){
   recomputeProject(proj);
   setActive(PROJECTS.indexOf(proj)); save(); rebuildProjSel(); rebuildAll(); closeImport(); showView("table");
   alert(tasks.length+" Aufgabe(n) importiert in „"+proj.name+"“.");
+}
+
+/* ---------- WORKSTREAM-VERWALTUNG (je Projekt) ---------- */
+let WSMGR={rows:[]};
+function wsUsage(code){ return DATA.filter(d=>d.ws===code).length; }
+function openWsManager(){ WSMGR={rows:pWS(PROJECTS[ACTIVE]).map(([n,a])=>({orig:a,name:n,code:a}))}; renderWsManager(); }
+function renderWsManager(){
+  const rows=WSMGR.rows.map((r,i)=>`<tr data-i="${i}">
+    <td><input class="ws-name" value="${h(r.name)}" placeholder="Workstream-Name" style="width:100%"></td>
+    <td><input class="ws-code" value="${h(r.code)}" placeholder="Code" style="width:96px;text-transform:uppercase"></td>
+    <td style="text-align:center;color:var(--muted)">${r.orig?wsUsage(r.orig):0}</td>
+    <td><button class="iconbtn" title="Entfernen" onclick="wsMgrRemove(${i})">✕</button></td></tr>`).join("");
+  const html=`<div class="imp-card" style="width:min(640px,96vw)">
+    <div class="imp-head"><b>🗂 Workstreams · ${h(PROJECTS[ACTIVE].name)}</b><button class="iconbtn" onclick="closeWsModal()">✕</button></div>
+    <div class="imp-body">
+      <p class="note" style="margin-top:0">Lege die Workstream-Struktur dieses Projekts fest. Der Code (Kürzel) erscheint in den Task-IDs (z. B. <b>PLAN-01</b>). Gilt nur für dieses Projekt.</p>
+      <table class="imp-map" style="table-layout:auto"><thead><tr><th>Workstream</th><th>Code</th><th>Tasks</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+      <button class="btn ghost" style="margin-top:10px" onclick="wsMgrAdd()">➕ Workstream hinzufügen</button>
+    </div>
+    <div class="imp-foot">
+      <span class="note">Entfernte Workstreams, die noch genutzt werden, bleiben als externe Gruppe erhalten.</span>
+      <span style="flex:1"></span>
+      <button class="btn ghost" onclick="wsMgrReset()">↺ Standard</button>
+      <button class="btn ghost" onclick="closeWsModal()">Abbrechen</button>
+      <button class="btn" onclick="wsMgrSave()">Speichern</button>
+    </div></div>`;
+  let m=document.getElementById("wsModal");
+  if(!m){ m=document.createElement("div"); m.id="wsModal"; m.className="imp-overlay"; document.body.appendChild(m); }
+  m.innerHTML=html; m.style.display="flex";
+}
+function syncWsmgr(){ const out=[];
+  document.querySelectorAll("#wsModal tbody tr").forEach(tr=>{ const i=+tr.dataset.i, o=WSMGR.rows[i];
+    out.push({orig:o?o.orig:"", name:tr.querySelector(".ws-name").value, code:tr.querySelector(".ws-code").value}); });
+  WSMGR.rows=out; }
+function wsMgrAdd(){ syncWsmgr(); WSMGR.rows.push({orig:"",name:"",code:""}); renderWsManager(); }
+function wsMgrRemove(i){ syncWsmgr(); WSMGR.rows.splice(i,1); renderWsManager(); }
+function wsMgrReset(){ if(confirm("Workstreams auf die Standardliste zurücksetzen?")){ WSMGR.rows=WS.map(([n,a])=>({orig:a,name:n,code:a})); renderWsManager(); } }
+function closeWsModal(){ const m=document.getElementById("wsModal"); if(m) m.style.display="none"; }
+function wsMgrSave(){
+  syncWsmgr();
+  const rows=WSMGR.rows.map(r=>({orig:r.orig,name:String(r.name).trim(),code:String(r.code).trim().toUpperCase()})).filter(r=>r.name||r.code);
+  if(!rows.length){ alert("Mindestens ein Workstream wird benötigt."); return; }
+  const taken=new Set();
+  rows.forEach(r=>{ if(!r.name) r.name=r.code; if(!r.code) r.code=deriveWsCode(r.name,taken);
+    else { let c=r.code,i=2; while(taken.has(c)){ c=r.code+i; i++; } r.code=c; taken.add(c); } });
+  const p=PROJECTS[ACTIVE];
+  rows.forEach(r=>{ if(r.orig && r.orig!==r.code) p.tasks.forEach(d=>{ if(d.ws===r.orig) d.ws=r.code; }); });
+  p.ws=rows.map(r=>[r.name,r.code]);
+  recomputeProject(p); setActive(ACTIVE); save(); rebuildAll(); closeWsModal(); markSaved();
 }
 
 /* ---------- GANTT ---------- */
@@ -1382,7 +1442,7 @@ function buildGantt(){
   const todayPct=((TODAY-g0)/span)*100;
   const CP=criticalPath(DATA).set;
 
-  wsCodes(DATA).forEach(([name,abbr])=>{
+  wsCodes(PROJECTS[ACTIVE]).forEach(([name,abbr])=>{
     html+=`<tr class="gws"><td class="gname">${name}</td><td class="gcell" colspan="${months.length}" style="position:relative">
       <div class="today" style="left:${todayPct}%"></div></td></tr>`;
     DATA.filter(d=>d.ws===abbr).forEach(d=>{
