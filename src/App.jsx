@@ -953,7 +953,6 @@ export default function App() {
           <div className="listwrap">
             <main className="panel">
               <div className="toolbar">
-                <button className="btn primary tb-new" onClick={newTask}><Plus size={15} /> Neue Aufgabe</button>
                 <div className="tb-group"><span>Bereich</span>
                   <select value={filterCat} onChange={(e) => setFilterCat(e.target.value)}>
                     <option value="all">Alle Bereiche</option><option value="__none__">Ohne Bereich</option>
@@ -1002,10 +1001,7 @@ export default function App() {
               {!loaded && <div className="empty">Aufgaben werden geladen …</div>}
               {loaded && list.length === 0 && (
                 <div className="empty">
-                  {search ? "Keine Treffer." : filterStatus === "erledigt" ? "Noch nichts erledigt." : "Keine Aufgaben in dieser Ansicht."}
-                  {!search && filterStatus !== "erledigt" && (
-                    <div style={{ marginTop: 12 }}><button className="btn primary" onClick={newTask}><Plus size={15} /> Neue Aufgabe anlegen</button></div>
-                  )}
+                  {search ? "Keine Treffer." : filterStatus === "erledigt" ? "Noch nichts erledigt." : "Keine Aufgaben in dieser Ansicht. Über den Tab „Neue Aufgabe" anlegen."}
                 </div>
               )}
 
