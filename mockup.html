@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>B737 MAX Training Program – Eurowings | PM Cockpit (Mockup)</title>
+<style>
+  :root{
+    --ew-magenta:#AF1E65; --ew-magenta-dark:#7d1548; --ew-magenta-soft:#fbeaf2;
+    --ink:#1f2733; --muted:#6b7686; --line:#e6e9ef; --bg:#f4f6f9; --card:#ffffff;
+    --green:#1e9e63; --amber:#e8a317; --red:#d23b3b; --blue:#2f6fed; --grey:#9aa3b1;
+    --shadow:0 1px 3px rgba(20,30,50,.08),0 6px 20px rgba(20,30,50,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);font-size:14px;line-height:1.45}
+  /* Header */
+  header{background:linear-gradient(110deg,var(--ew-magenta),var(--ew-magenta-dark));color:#fff;
+    padding:18px 26px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+  .brand{display:flex;align-items:center;gap:14px}
+  .logo{width:46px;height:46px;border-radius:11px;background:#fff;color:var(--ew-magenta);
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;letter-spacing:.5px;box-shadow:var(--shadow)}
+  .brand h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.2px}
+  .brand .sub{font-size:12px;opacity:.9;margin-top:2px}
+  .meta{display:flex;gap:22px;flex-wrap:wrap;font-size:12px}
+  .meta div span{display:block;opacity:.8;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px}
+  .meta div b{font-size:13px;font-weight:600}
+  .wrap{max-width:1640px;margin:0 auto;padding:22px 26px 60px}
+  /* Tabs */
+  .tabs{display:flex;gap:6px;margin:0 0 18px;flex-wrap:wrap}
+  .tab{padding:9px 16px;border:1px solid var(--line);background:#fff;border-radius:9px;cursor:pointer;
+    font-weight:600;color:var(--muted);font-size:13px}
+  .tab.active{background:var(--ew-magenta);color:#fff;border-color:var(--ew-magenta)}
+  .panel{display:none}
+  .panel.active{display:block}
+  /* KPI cards */
+  .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:20px}
+  @media(max-width:1200px){.kpis{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:680px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 16px 14px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .kpi .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:600}
+  .kpi .val{font-size:30px;font-weight:800;margin-top:6px;line-height:1}
+  .kpi .foot{font-size:11.5px;color:var(--muted);margin-top:7px}
+  .kpi .bar{accent-color:var(--ew-magenta)}
+  .kpi.accent{background:linear-gradient(135deg,var(--ew-magenta),var(--ew-magenta-dark));color:#fff}
+  .kpi.accent .lbl,.kpi.accent .foot{color:rgba(255,255,255,.85)}
+  .ring{--p:0;width:64px;height:64px;border-radius:50%;
+    background:conic-gradient(#fff calc(var(--p)*1%),rgba(255,255,255,.25) 0);
+    display:flex;align-items:center;justify-content:center;position:absolute;right:14px;top:14px}
+  .ring::before{content:"";position:absolute;width:48px;height:48px;border-radius:50%;background:var(--ew-magenta-dark)}
+  .ring b{position:relative;font-size:14px;font-weight:800}
+  /* Generic cards */
+  .grid2{display:grid;grid-template-columns:1.3fr 1fr;gap:18px;margin-bottom:20px}
+  @media(max-width:1000px){.grid2{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow)}
+  .card h3{margin:0 0 14px;font-size:14px;display:flex;align-items:center;gap:8px}
+  .card h3 .dot{width:8px;height:8px;border-radius:50%;background:var(--ew-magenta)}
+  /* Workstream progress */
+  .wsrow{display:flex;align-items:center;gap:12px;margin-bottom:11px}
+  .wsrow .name{width:230px;font-size:12.5px;font-weight:600;flex-shrink:0}
+  .wsrow .track{flex:1;height:14px;background:#eef1f6;border-radius:8px;overflow:hidden}
+  .wsrow .fill{height:100%;border-radius:8px;background:linear-gradient(90deg,var(--ew-magenta),#d8447f)}
+  .wsrow .pct{width:42px;text-align:right;font-size:12px;font-weight:700;color:var(--muted)}
+  /* Traffic light */
+  .traffic{display:flex;gap:14px;flex-wrap:wrap}
+  .tl{flex:1;min-width:120px;border-radius:12px;padding:14px;color:#fff;text-align:center}
+  .tl b{font-size:26px;display:block;font-weight:800}
+  .tl span{font-size:11.5px;opacity:.95}
+  .tl.g{background:var(--green)} .tl.a{background:var(--amber)} .tl.r{background:var(--red)} .tl.b{background:var(--grey)}
+  /* Milestones */
+  .ms{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px dashed var(--line)}
+  .ms:last-child{border-bottom:0}
+  .ms .ico{width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff}
+  .ms .mtxt{flex:1}
+  .ms .mtxt b{font-size:13px}
+  .ms .mtxt small{display:block;color:var(--muted);font-size:11.5px}
+  .badge{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap}
+  /* Table */
+  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  .toolbar select,.toolbar input{padding:8px 11px;border:1px solid var(--line);border-radius:9px;font-size:13px;background:#fff}
+  .btn{padding:9px 15px;border:1px solid var(--ew-magenta);background:var(--ew-magenta);color:#fff;border-radius:9px;
+    font-weight:600;cursor:pointer;font-size:13px}
+  .btn.ghost{background:#fff;color:var(--ew-magenta)}
+  .tablewrap{overflow:auto;border:1px solid var(--line);border-radius:14px;background:#fff;box-shadow:var(--shadow);max-height:74vh}
+  table{border-collapse:collapse;width:100%;font-size:12px;min-width:1900px}
+  thead th{position:sticky;top:0;background:var(--ew-magenta-dark);color:#fff;text-align:left;padding:10px 10px;
+    font-weight:600;font-size:11px;white-space:nowrap;z-index:5}
+  tbody td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  tbody tr:hover{background:var(--ew-magenta-soft)}
+  tr.msrow{background:#fff8e6}
+  tr.msrow:hover{background:#fff2cf}
+  td.tid{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;color:var(--ew-magenta-dark);white-space:nowrap}
+  .wschip{font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:var(--ew-magenta-soft);color:var(--ew-magenta-dark);white-space:nowrap}
+  .pill{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;display:inline-block}
+  .s-comp{background:#e3f6ec;color:var(--green)} .s-prog{background:#e7f0ff;color:var(--blue)}
+  .s-not{background:#eef0f4;color:var(--muted)} .s-del{background:#fde7e7;color:var(--red)}
+  .p-high{background:#fde7e7;color:var(--red)} .p-med{background:#fff3da;color:#b9810b} .p-low{background:#eef0f4;color:var(--muted)}
+  .mini{height:7px;background:#eef1f6;border-radius:5px;overflow:hidden;min-width:60px}
+  .mini i{display:block;height:100%;background:var(--ew-magenta)}
+  .ynyes{color:var(--ew-magenta);font-weight:800}
+  .nowrap{white-space:nowrap}
+  td.tk{min-width:220px;font-weight:600}
+  td.desc{min-width:260px;color:var(--muted)}
+  .risk{color:var(--red)}
+  /* Gantt */
+  .gantt{overflow:auto;border:1px solid var(--line);border-radius:14px;background:#fff;box-shadow:var(--shadow);max-height:78vh}
+  .gtable{border-collapse:collapse;min-width:1500px;width:100%;font-size:11.5px}
+  .gtable th.gm{background:var(--ew-magenta-dark);color:#fff;padding:7px 6px;font-size:10.5px;text-align:center;border-left:1px solid rgba(255,255,255,.15);position:sticky;top:0;z-index:4}
+  .gtable th.gname{background:var(--ew-magenta-dark);color:#fff;text-align:left;padding:7px 10px;position:sticky;left:0;top:0;z-index:6;min-width:240px}
+  .gtable td.gname{position:sticky;left:0;background:#fff;font-weight:600;padding:6px 10px;border-bottom:1px solid var(--line);z-index:2;min-width:240px}
+  .gtable td.gcell{border-left:1px solid #eef1f6;border-bottom:1px solid var(--line);padding:0;height:30px;position:relative}
+  .gbar{position:absolute;top:6px;height:16px;border-radius:5px;left:2%;right:2%;
+    background:linear-gradient(90deg,var(--ew-magenta),#d8447f);box-shadow:var(--shadow)}
+  .gbar.done{background:linear-gradient(90deg,var(--green),#46c285)}
+  .gbar.delay{background:linear-gradient(90deg,var(--red),#ef6b6b)}
+  .gbar.ms{background:transparent;box-shadow:none}
+  .gdiamond{position:absolute;top:4px;left:50%;transform:translateX(-50%) rotate(45deg);width:16px;height:16px;background:var(--amber);border:2px solid #fff;box-shadow:var(--shadow)}
+  .gtable tr.gws td{background:var(--ew-magenta-soft);font-weight:700;color:var(--ew-magenta-dark)}
+  .today{position:absolute;top:0;bottom:0;width:2px;background:var(--blue);z-index:3}
+  .leg{display:flex;gap:18px;flex-wrap:wrap;margin:12px 2px;font-size:11.5px;color:var(--muted)}
+  .leg span{display:inline-flex;align-items:center;gap:6px}
+  .leg i{width:16px;height:10px;border-radius:3px;display:inline-block}
+  .note{font-size:11.5px;color:var(--muted);margin-top:6px}
+  footer{text-align:center;color:var(--muted);font-size:11.5px;padding:24px}
+  .pillbar{display:flex;gap:6px;align-items:center}
+  @media print{
+    header{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .tabs,.toolbar,.tab{display:none!important}
+    .panel{display:block!important}
+    .tablewrap,.gantt{max-height:none;overflow:visible}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo">EW</div>
+    <div>
+      <h1>Boeing 737 MAX – Training Program Eurowings</h1>
+      <div class="sub">Project Management Cockpit · Fleet Introduction / Entry Into Service · <b>MOCKUP v0.1</b></div>
+    </div>
+  </div>
+  <div class="meta">
+    <div><span>Programm-Leitung</span><b>Chief Training Captain (PM Training)</b></div>
+    <div><span>Phase</span><b>Execution</b></div>
+    <div><span>Stand</span><b id="hdrDate">25.06.2026</b></div>
+    <div><span>Ziel EIS</span><b>15.06.2027</b></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="tabs">
+    <div class="tab active" data-tab="dash">📊 Dashboard</div>
+    <div class="tab" data-tab="table">📋 Master Task List</div>
+    <div class="tab" data-tab="gantt">📅 Gantt / Timeline</div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <section class="panel active" id="dash">
+    <div class="kpis" id="kpis"></div>
+    <div class="grid2">
+      <div class="card">
+        <h3><span class="dot"></span>Fortschritt je Workstream</h3>
+        <div id="wsProgress"></div>
+      </div>
+      <div class="card">
+        <h3><span class="dot"></span>Ampelübersicht (Status)</h3>
+        <div class="traffic" id="traffic"></div>
+        <div class="note">Ampel basiert auf Task-Status: Grün = Completed, Blau = In Progress, Gelb = Not Started (geplant), Rot = Delayed / kritisch.</div>
+      </div>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>Meilenstein-Tracking (10 Programm-Milestones)</h3>
+      <div id="milestones"></div>
+    </div>
+  </section>
+
+  <!-- TABLE -->
+  <section class="panel" id="table">
+    <div class="toolbar">
+      <select id="fWs"><option value="">Alle Workstreams</option></select>
+      <select id="fStatus">
+        <option value="">Alle Status</option>
+        <option>Not Started</option><option>In Progress</option><option>Completed</option><option>Delayed</option>
+      </select>
+      <select id="fPrio"><option value="">Alle Prioritäten</option><option>High</option><option>Medium</option><option>Low</option></select>
+      <input id="fSearch" placeholder="🔍 Suche Aufgabe / Verantwortlicher…" style="min-width:240px"/>
+      <label style="font-size:12.5px;color:var(--muted)"><input type="checkbox" id="fMs"/> nur Milestones</label>
+      <span style="flex:1"></span>
+      <button class="btn ghost" onclick="exportCSV()">⬇︎ Excel / CSV</button>
+      <button class="btn" onclick="window.print()">⬇︎ PDF / Drucken</button>
+    </div>
+    <div class="tablewrap">
+      <table id="tbl">
+        <thead><tr>
+          <th>Workstream</th><th>Sub-Workstream</th><th>Task-ID</th><th>Aufgabe / Deliverable</th>
+          <th>Beschreibung</th><th>Verantwortlicher</th><th>Unterstützende Abt.</th><th>Start</th>
+          <th>Due Date</th><th>Dauer (Tage)</th><th>Priorität</th><th>Status</th><th>% Compl.</th>
+          <th>Milestone</th><th>Abhängigkeiten</th><th>Risiken / Issues</th><th>Letztes Update</th><th>Kommentar</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="note" id="rowcount"></div>
+  </section>
+
+  <!-- GANTT -->
+  <section class="panel" id="gantt">
+    <div class="leg">
+      <span><i style="background:linear-gradient(90deg,var(--ew-magenta),#d8447f)"></i> Aufgabe (laufend/geplant)</span>
+      <span><i style="background:linear-gradient(90deg,var(--green),#46c285)"></i> Abgeschlossen</span>
+      <span><i style="background:linear-gradient(90deg,var(--red),#ef6b6b)"></i> Delayed</span>
+      <span><i style="transform:rotate(45deg);background:var(--amber);width:12px;height:12px"></i> Milestone</span>
+      <span><i style="background:var(--blue);width:3px;height:14px"></i> Heute (25.06.2026)</span>
+    </div>
+    <div class="gantt"><table class="gtable" id="gtbl"></table></div>
+    <div class="note">Vereinfachte Monats-Timeline. Balkenlänge & -position aus Start-/Due-Datum berechnet. In der finalen App: zoombar (Tag/Woche/Monat), mit Abhängigkeitspfeilen.</div>
+  </section>
+
+  <footer>Mockup · Eurowings B737 MAX Training Program · Datenwerte sind Platzhalter zur Konzept-Demonstration · erzeugt für Chief Training Captain</footer>
+</div>
+
+<script>
+/* ---------- WORKSTREAM-DEFINITION ---------- */
+const WS = [
+  ["Regulatory & Authority Approvals","REG"],
+  ["OM-D","OMD"],
+  ["OM-D Annex","OMDA"],
+  ["Instructor Training","INS"],
+  ["Examiner Training","EXM"],
+  ["Training Devices & Simulator","SIM"],
+  ["Training Material Development","TMD"],
+  ["Documentation & Manuals","DOC"],
+  ["3rd Parties & Boeing Coordination","BOE"],
+  ["Entry Into Service (EIS)","EIS"],
+];
+
+/* compact task tuples:
+   [ws, sub, taskNo, task, desc, resp, support, start, due, prio, status, pct, milestone, deps, risk, updated, comment] */
+const T = [
+/* === 1 Regulatory & Authority Approvals === */
+["REG","Concept Approval",1,"Training Concept Submission B737 MAX","Erstellung & Einreichung des Type-Rating Trainingskonzepts bei der Behörde (LBA/EASA).","Chief Training Captain","Compliance, Flight Ops","2026-01-08","2026-02-20","High","Completed",100,"Nein","-","Frühzeitige Behörden-Abstimmung nötig","2026-02-20","Basis für MS1"],
+["REG","Concept Approval",2,"Behörden-Kick-off Meeting","Auftakt-Meeting mit Aufsichtsbehörde zur Abstimmung Approval-Pfad.","Regulatory Compliance Manager","Flight Ops","2026-01-12","2026-01-19","High","Completed",100,"Nein","REG-1","-","2026-01-19","Positiv verlaufen"],
+["REG","Approval Path",3,"Gap-Analyse EASA Part-FCL / Part-ORA","Abgleich bestehender ATO-Genehmigung gegen MAX-Anforderungen.","Regulatory Compliance Manager","Quality, Compliance","2026-02-02","2026-03-13","High","Completed",100,"Nein","REG-1","-","2026-03-13","Keine kritischen Gaps"],
+["REG","Approval Path",4,"Antrag ATO-Erweiterung B737 MAX","Formaler Antrag zur Erweiterung der ATO um den Typ B737 MAX.","Regulatory Compliance Manager","Quality","2026-03-16","2026-04-30","High","In Progress",70,"Nein","REG-3","Bearbeitungszeit Behörde unklar","2026-06-18","Rückfragen offen"],
+["REG","OEB/Diff",5,"OEB Report Review & Differences","Operational Evaluation Board Report auswerten, Differences-Training ableiten.","Chief Training Captain","Boeing Liaison, Standards","2026-02-23","2026-04-10","High","Completed",100,"Nein","REG-1","-","2026-04-10","Diff zu B737 NG definiert"],
+["REG","Approval Path",6,"Compliance Checklist erstellen","Compliance Demonstration Matrix gegen Behördenauflagen.","Quality Manager","Compliance","2026-04-13","2026-05-29","High","In Progress",55,"Nein","REG-3","-","2026-06-20","laufend"],
+["REG","Authority Audit",7,"Vorbereitung Behörden-Audit ATO","Dokumenten- & Prozessvorbereitung für Behörden-Audit.","Quality Manager","Training, Compliance","2026-05-04","2026-07-10","High","In Progress",35,"Nein","REG-4,REG-6","Audit-Termin abhängig von Behörde","2026-06-22","Termin in Abstimmung"],
+["REG","Authority Audit",8,"Behörden-Audit Durchführung","Vor-Ort Audit der Behörde inkl. Findings-Bearbeitung.","Regulatory Compliance Manager","Quality, Training","2026-07-13","2026-08-21","High","Not Started",0,"Nein","REG-7","Findings könnten Zeitplan verzögern","2026-06-22","-"],
+["REG","Final Approval",9,"Authority Approval Received","Formale Genehmigung des MAX-Trainingsprogramms durch die Behörde.","Chief Training Captain","Compliance","2026-08-24","2026-09-04","High","Not Started",0,"Ja","REG-8","Kritischer Pfad – blockiert TR-Kurse","2026-06-22","MS2"],
+["REG","Reporting",10,"Regulatory Status Reporting (laufend)","Monatliches Compliance-/Approval-Status-Reporting an Programmleitung.","Regulatory Compliance Manager","Quality","2026-02-02","2027-06-15","Medium","In Progress",40,"Nein","REG-1","-","2026-06-15","Monatszyklus"],
+["REG","Final Approval",11,"OPS Spec / AOC Update B737 MAX","Aktualisierung Operations Specifications / AOC um den neuen Typ.","Regulatory Compliance Manager","Flight Ops, Compliance","2026-09-07","2026-10-09","High","Not Started",0,"Nein","REG-9","-","2026-06-22","-"],
+
+/* === 2 OM-D === */
+["OMD","Structure",1,"OM-D Gap-Analyse NG → MAX","Analyse OM-D Anpassungsbedarf für B737 MAX Trainingskapitel.","OM-D Author","Standards, Flight Ops","2026-02-02","2026-03-06","High","Completed",100,"Nein","-","-","2026-03-06","abgeschlossen"],
+["OMD","Structure",2,"OM-D Kapitelstruktur definieren","Festlegung der Gliederung / Kapitelstruktur OM-D MAX.","Standards Manager","OM-D Author","2026-03-09","2026-03-27","Medium","Completed",100,"Nein","OMD-1","-","2026-03-27","-"],
+["OMD","Content",3,"OM-D Type Rating Syllabus","Ausarbeitung Type-Rating Lehrplan im OM-D.","Chief Training Captain","Standards, OM-D Author","2026-03-30","2026-05-15","High","In Progress",65,"Nein","OMD-2,REG-5","Abhängig von OEB-Differences","2026-06-19","Entwurf in Review"],
+["OMD","Content",4,"OM-D Differences/Familiarisation Training","Kapitel Differences-/Familiarisation-Training NG↔MAX.","Standards Manager","OM-D Author","2026-04-13","2026-05-29","High","In Progress",50,"Nein","REG-5","-","2026-06-19","-"],
+["OMD","Content",5,"OM-D Recurrent & Refresher Konzept","Wiederkehrendes Training & Refresher-Vorgaben für MAX.","OM-D Author","Standards","2026-05-04","2026-06-19","Medium","In Progress",40,"Nein","OMD-3","-","2026-06-20","-"],
+["OMD","Content",6,"OM-D LOFT / Scenario Based Training","Line Oriented Flight Training & szenariobasierte Einheiten.","Standards Manager","Training","2026-05-18","2026-07-03","Medium","Not Started",0,"Nein","OMD-3","-","2026-06-20","-"],
+["OMD","Content",7,"OM-D Checking & Assessment Standards","Prüf- und Bewertungsstandards (EBT/Competencies) im OM-D.","Chief Training Captain","Standards, Examiner Lead","2026-05-25","2026-07-17","High","Not Started",0,"Nein","OMD-3","-","2026-06-20","-"],
+["OMD","Review",8,"OM-D Internal Review Cycle","Interne Qualitäts- & Fachreview-Runde OM-D.","Quality Manager","Standards, Flight Ops","2026-07-06","2026-08-07","High","Not Started",0,"Nein","OMD-3,OMD-4,OMD-7","-","2026-06-20","-"],
+["OMD","Approval",9,"OM-D Submission an Behörde","Einreichung des OM-D zur behördlichen Akzeptanz.","Regulatory Compliance Manager","Quality","2026-08-10","2026-08-28","High","Not Started",0,"Nein","OMD-8","Im kritischen Approval-Pfad","2026-06-20","-"],
+["OMD","Approval",10,"OM-D Behörden-Akzeptanz & Freigabe","Akzeptanz/Freigabe des OM-D durch die Behörde.","Chief Training Captain","Compliance","2026-08-31","2026-09-18","High","Not Started",0,"Nein","OMD-9","-","2026-06-20","-"],
+["OMD","Maintenance",11,"OM-D Revision Control & Distribution","Revisionsverwaltung & Verteilung der OM-D Freigabestände.","OM-D Author","IT, Documentation","2026-09-21","2027-06-15","Low","Not Started",0,"Nein","OMD-10","-","2026-06-20","-"],
+
+/* === 3 OM-D Annex === */
+["OMDA","Planning",1,"Annex-Übersicht & Bedarf festlegen","Festlegung benötigter OM-D Anhänge (Forms, Records, Briefings) für MAX.","Standards Manager","OM-D Author","2026-03-02","2026-03-20","Medium","Completed",100,"Nein","OMD-2","-","2026-03-20","-"],
+["OMDA","Forms",2,"Annex Training Records / Forms","Trainingsnachweise, Bewertungsbögen & Records-Vorlagen MAX.","OM-D Author","Crew Training, IT","2026-03-23","2026-05-08","Medium","In Progress",60,"Nein","OMDA-1","-","2026-06-17","-"],
+["OMDA","Briefings",3,"Annex Briefing Guides","Standard-Briefing-Guides für Sim- & Flugeinheiten.","Standards Manager","Training","2026-04-06","2026-05-22","Medium","In Progress",45,"Nein","OMDA-1","-","2026-06-17","-"],
+["OMDA","Checklists",4,"Annex Instructor Checklists","Checklisten & Guides für Instruktoren (TRI/SFI).","TRI Lead","Standards","2026-04-20","2026-06-05","Medium","In Progress",30,"Nein","OMDA-1","-","2026-06-19","-"],
+["OMDA","Grading",5,"Annex Competency Grading Scheme","Kompetenzbasiertes Bewertungsraster (Annex zu OM-D Ch. Checking).","Examiner Lead (TRE)","Standards","2026-05-04","2026-06-19","High","Not Started",0,"Nein","OMD-7","-","2026-06-19","-"],
+["OMDA","Forms",6,"Annex Pre-Course Joining Instructions","Teilnehmer-Infopaket & Joining Instructions MAX-Kurse.","Crew Training Coordinator","HR, Crew Planning","2026-05-11","2026-06-26","Low","Not Started",0,"Nein","OMDA-2","-","2026-06-19","-"],
+["OMDA","Records",7,"Annex Record-Keeping Vorgaben","Vorgaben zur revisionssicheren Trainings-Dokumentation.","Quality Manager","IT, Documentation","2026-05-18","2026-07-03","Medium","Not Started",0,"Nein","OMDA-2","-","2026-06-19","-"],
+["OMDA","Review",8,"Annex Konsolidierung & Review","Zusammenführung & Review aller Anhänge.","OM-D Author","Quality, Standards","2026-07-06","2026-08-07","Medium","Not Started",0,"Nein","OMDA-2,OMDA-3,OMDA-4,OMDA-5","-","2026-06-19","-"],
+["OMDA","Approval",9,"Annex Freigabe mit OM-D","Freigabe der Anhänge gemeinsam mit OM-D-Akzeptanz.","Chief Training Captain","Compliance","2026-08-10","2026-09-18","Medium","Not Started",0,"Nein","OMDA-8,OMD-10","-","2026-06-19","-"],
+["OMDA","Distribution",10,"Annex Verteilung & EFB-Integration","Bereitstellung der Anhänge/Forms in EFB & Trainingssystemen.","IT Coordinator","Documentation","2026-09-21","2026-10-23","Low","Not Started",0,"Nein","OMDA-9","-","2026-06-19","-"],
+
+/* === 4 Instructor Training === */
+["INS","Planning",1,"TRI/SFI Bedarfsplanung MAX","Ermittlung Anzahl benötigter Instruktoren (TRI/SFI) für EIS.","Chief Training Captain","Crew Planning, HR","2026-02-09","2026-03-13","High","Completed",100,"Nein","-","-","2026-03-13","12 TRI / 6 SFI Bedarf"],
+["INS","Selection",2,"Instruktoren-Nominierung & Auswahl","Auswahl & Nominierung der Instruktoren-Kandidaten.","Head of Training","Crew Planning","2026-03-16","2026-04-17","High","Completed",100,"Nein","INS-1","-","2026-04-17","Kandidaten bestätigt"],
+["INS","Curriculum",3,"Instructor Course Syllabus (MAX Diff)","Lehrplan Instruktoren-Differences-Kurs B737 MAX.","Standards Manager","Chief Training Captain","2026-04-06","2026-05-22","High","In Progress",60,"Nein","REG-5,OMD-3","-","2026-06-20","-"],
+["INS","Boeing",4,"Boeing Instructor Familiarisation","Boeing-seitige Instruktoren-Familiarisation / Train-the-Trainer.","Boeing Liaison","Training","2026-05-11","2026-06-12","High","In Progress",25,"Nein","BOE-3","Boeing-Slots begrenzt","2026-06-20","Termine bei Boeing"],
+["INS","Ground",5,"Instructor Ground/Technical Training","Technisches Typ-Training der Instruktoren (Systems/CBT).","TRI Lead","Training Dev","2026-06-15","2026-07-17","High","Not Started",0,"Nein","INS-3,TMD-3","-","2026-06-20","-"],
+["INS","Simulator",6,"Instructor Simulator Training","FFS-Training der Instruktoren auf MAX-Simulator.","TRI Lead","Simulator Manager","2026-07-20","2026-08-21","High","Not Started",0,"Nein","INS-5,SIM-7","Abhängig von Sim-Verfügbarkeit","2026-06-20","kritischer Pfad"],
+["INS","Standardisation",7,"Instructor Standardisation Meeting","Standardisierungs-Workshop zur einheitlichen Trainingsdurchführung.","Standards Manager","TRI Lead","2026-08-24","2026-09-04","Medium","Not Started",0,"Nein","INS-6","-","2026-06-20","-"],
+["INS","Qualification",8,"TRI/SFI Skill Test / Assessment","Befähigungsprüfung der Instruktoren durch TRE/Behörde.","Examiner Lead (TRE)","Compliance","2026-09-07","2026-09-25","High","Not Started",0,"Nein","INS-6,EXM-7","-","2026-06-20","-"],
+["INS","Milestone",9,"First Instructor Course Completed","Abschluss des ersten vollständigen Instruktoren-Kurses MAX.","Chief Training Captain","Training","2026-09-28","2026-10-02","High","Not Started",0,"Ja","INS-8","-","2026-06-20","MS3"],
+["INS","Records",10,"Instructor Authorisations & Records","Ausstellung Instruktoren-Berechtigungen & Aktenführung.","Crew Training Coordinator","Quality, HR","2026-10-05","2026-10-23","Medium","Not Started",0,"Nein","INS-9","-","2026-06-20","-"],
+["INS","Recurrent",11,"Instructor Continuation Concept","Konzept für laufende Standardisierung/Continuation der Instruktoren.","Standards Manager","Training","2026-10-12","2026-11-13","Low","Not Started",0,"Nein","INS-9","-","2026-06-20","-"],
+
+/* === 5 Examiner Training === */
+["EXM","Planning",1,"TRE Bedarf & Authorisation-Konzept","Bedarf an Type Rating Examiners & Behörden-Autorisierung klären.","Chief Training Captain","Compliance, Crew Planning","2026-03-02","2026-04-03","High","Completed",100,"Nein","-","-","2026-04-03","4 TRE Bedarf"],
+["EXM","Selection",2,"TRE Nominierung & Behördenantrag","Nominierung der TRE-Kandidaten & Antrag bei Behörde.","Head of Training","Compliance","2026-04-06","2026-05-08","High","In Progress",55,"Nein","EXM-1","Behörden-Autorisierung zeitkritisch","2026-06-18","-"],
+["EXM","Curriculum",3,"Examiner Course Syllabus (MAX)","Lehrplan für TRE-Differences/Standardisierung MAX.","Standards Manager","Chief Training Captain","2026-04-20","2026-06-05","High","In Progress",40,"Nein","REG-5,OMD-7","-","2026-06-20","-"],
+["EXM","Standardisation",4,"Examiner Standardisation Material","Standardisierungsunterlagen & Assessment-Kalibrierung.","Examiner Lead (TRE)","Standards","2026-05-18","2026-07-03","Medium","Not Started",0,"Nein","EXM-3,OMDA-5","-","2026-06-20","-"],
+["EXM","Ground",5,"Examiner Technical/Systems Update","Technisches Update der Examiner auf MAX-Systeme.","TRI Lead","Training Dev","2026-07-06","2026-08-07","High","Not Started",0,"Nein","EXM-3,TMD-3","-","2026-06-20","-"],
+["EXM","Simulator",6,"Examiner Simulator Standardisation","Sim-Standardisierung & Checking-Kalibrierung der TRE.","Examiner Lead (TRE)","Simulator Manager","2026-08-10","2026-09-04","High","Not Started",0,"Nein","EXM-5,SIM-7","Sim-Verfügbarkeit","2026-06-20","-"],
+["EXM","Qualification",7,"TRE Assessment of Competence","Befähigungsnachweis der Examiner (Behörde/Senior TRE).","Regulatory Compliance Manager","Compliance","2026-09-07","2026-09-25","High","Not Started",0,"Nein","EXM-6","-","2026-06-20","-"],
+["EXM","Milestone",8,"First Examiner Course Completed","Abschluss des ersten Examiner-Kurses MAX.","Chief Training Captain","Training","2026-09-28","2026-10-02","High","Not Started",0,"Ja","EXM-7","-","2026-06-20","MS4"],
+["EXM","Records",9,"Examiner Authorisations ausgestellt","Behördliche TRE-Berechtigungen ausgestellt & dokumentiert.","Crew Training Coordinator","Compliance, Quality","2026-10-05","2026-10-23","Medium","Not Started",0,"Nein","EXM-8","-","2026-06-20","-"],
+["EXM","Oversight",10,"Examiner Standardisation Oversight Plan","Laufender Standardisierungs-/Oversight-Plan für TRE.","Standards Manager","Quality","2026-10-12","2026-11-13","Low","Not Started",0,"Nein","EXM-8","-","2026-06-20","-"],
+
+/* === 6 Training Devices & Simulator === */
+["SIM","Strategy",1,"Simulator-Verfügbarkeit & Sourcing","Marktanalyse & Sourcing FFS B737 MAX (eigen/Partner/3rd Party).","Simulator Manager","Procurement, Boeing Liaison","2026-01-19","2026-03-06","High","Completed",100,"Nein","-","FFS-Slots am Markt knapp","2026-03-06","2 Anbieter shortlisted"],
+["SIM","Contract",2,"FFS Vertrag / Slot-Buchung","Vertragsabschluss & Slot-Sicherung Full Flight Simulator.","Procurement Lead","Simulator Manager, Legal","2026-03-09","2026-04-24","High","In Progress",70,"Nein","SIM-1","Vertragsverhandlung läuft","2026-06-15","finale Runde"],
+["SIM","Devices",3,"FTD / CBT / FMS-Trainer Beschaffung","Beschaffung ergänzender Trainingsgeräte (FTD, Part-Task, CBT).","Simulator Manager","IT, Procurement","2026-03-23","2026-05-29","Medium","In Progress",45,"Nein","SIM-1","-","2026-06-18","-"],
+["SIM","Data",4,"Simulator Data Package (Boeing)","Beschaffung & Einspielung Boeing Sim-Datenpaket MAX.","Boeing Liaison","Simulator Manager","2026-04-06","2026-05-22","High","In Progress",35,"Nein","BOE-2","Boeing-Lieferzeit","2026-06-18","-"],
+["SIM","Installation",5,"Simulator Konfiguration & Update","Hardware-/Software-Konfiguration des FFS auf MAX-Standard.","Simulator Manager","IT, Vendor","2026-06-01","2026-07-24","High","Not Started",0,"Nein","SIM-2,SIM-4","-","2026-06-20","-"],
+["SIM","Acceptance",6,"Simulator Acceptance Test","Abnahmetests & technische Validierung des Simulators.","Simulator Manager","Quality","2026-07-27","2026-08-21","High","Not Started",0,"Nein","SIM-5","-","2026-06-20","-"],
+["SIM","Qualification",7,"Simulator Qualification (Behörde)","Behördliche FSTD-Qualifikation (Initial Eval, Level D).","Regulatory Compliance Manager","Simulator Manager, Quality","2026-08-24","2026-09-18","High","Not Started",0,"Ja","SIM-6","Kritisch – blockiert alle Sim-Kurse","2026-06-20","MS7"],
+["SIM","Operations",8,"Sim-Schedule & Slot-Planung Kurse","Detaillierte Sim-Belegungsplanung für alle MAX-Kurse.","Simulator Manager","Crew Planning, Training","2026-09-21","2026-10-16","Medium","Not Started",0,"Nein","SIM-7","-","2026-06-20","-"],
+["SIM","Maintenance",9,"Simulator Maintenance & Support SLA","Wartungs-/Support-Konzept & SLA für Trainingsbetrieb.","Simulator Manager","Vendor, Procurement","2026-09-21","2026-10-30","Low","Not Started",0,"Nein","SIM-7","-","2026-06-20","-"],
+["SIM","Devices",10,"EFB / OFP / Performance Tool Setup","Bereitstellung EFB-Apps & Performance-Tools für Training.","IT Coordinator","Flight Ops","2026-06-15","2026-08-14","Medium","Not Started",0,"Nein","SIM-3","-","2026-06-20","-"],
+["SIM","Recurrent",11,"Sim Recurrent Capacity Planung","Kapazitätsplanung Sim für Recurrent nach EIS.","Simulator Manager","Crew Planning","2026-10-19","2026-11-27","Low","Not Started",0,"Nein","SIM-8","-","2026-06-20","-"],
+
+/* === 7 Training Material Development === */
+["TMD","Planning",1,"Trainingsmaterial-Inventar & Lücken","Bestandsaufnahme & Bedarf an Lernmaterial für MAX.","Training Development Lead","Standards","2026-02-16","2026-03-20","Medium","Completed",100,"Nein","-","-","2026-03-20","-"],
+["TMD","CBT",2,"CBT / eLearning Module MAX","Entwicklung computerbasierter Trainingsmodule (Systems/Diff).","Training Development Lead","IT, Boeing Liaison","2026-03-23","2026-05-22","High","In Progress",50,"Nein","TMD-1,REG-5","-","2026-06-19","-"],
+["TMD","Courseware",3,"Ground School Courseware","Präsenz-/Self-Study Unterlagen Technik & Systems.","Training Development Lead","Standards","2026-04-06","2026-06-05","High","In Progress",40,"Nein","TMD-1","-","2026-06-19","-"],
+["TMD","FCOM",4,"FCOM/QRH Trainingsauszüge","Trainingsrelevante Auszüge & Aufbereitung aus FCOM/QRH.","Standards Manager","Boeing Liaison","2026-04-20","2026-06-05","Medium","In Progress",30,"Nein","BOE-2","-","2026-06-19","-"],
+["TMD","Sim",5,"Simulator Lesson Plans / Sortie Guides","Detaillierte Sim-Lektionspläne & Sortie-Guides.","TRI Lead","Standards","2026-05-04","2026-07-03","High","Not Started",0,"Nein","OMD-3","-","2026-06-19","-"],
+["TMD","Assessment",6,"Knowledge Tests / Question Bank","Aufbau Wissenstests & Fragendatenbank MAX.","Training Development Lead","Standards","2026-05-18","2026-07-17","Medium","Not Started",0,"Nein","TMD-3","-","2026-06-19","-"],
+["TMD","Media",7,"Cockpit Poster / Visuals / Animationen","Visuelle Lernmedien (Panels, Flows, Animationen).","Training Development Lead","IT","2026-06-01","2026-07-17","Low","Not Started",0,"Nein","TMD-3","-","2026-06-19","-"],
+["TMD","Review",8,"Fachreview & Validierung Material","Technische & didaktische Validierung des Materials.","Standards Manager","Quality, TRI Lead","2026-07-20","2026-08-21","High","Not Started",0,"Nein","TMD-2,TMD-3,TMD-5","-","2026-06-19","-"],
+["TMD","LMS",9,"LMS-Integration & Deployment","Einspielung der Module ins Learning Management System.","IT Coordinator","Training Dev","2026-08-24","2026-09-18","Medium","Not Started",0,"Nein","TMD-8","-","2026-06-19","-"],
+["TMD","Release",10,"Training Material Released","Formale Freigabe & Bereitstellung des gesamten Trainingsmaterials.","Chief Training Captain","Quality","2026-09-21","2026-09-25","High","Not Started",0,"Ja","TMD-9","-","2026-06-19","MS8"],
+["TMD","Maintenance",11,"Material Revision & Feedback-Loop","Revisionsprozess & Feedback-Einarbeitung nach Kursstart.","Training Development Lead","Standards","2026-09-28","2027-06-15","Low","Not Started",0,"Nein","TMD-10","-","2026-06-19","-"],
+
+/* === 8 Documentation & Manuals === */
+["DOC","Planning",1,"Dokumenten-Landkarte MAX","Übersicht aller betroffenen Manuals & Dokumente für MAX.","Documentation Manager","Standards, Flight Ops","2026-02-09","2026-03-06","Medium","Completed",100,"Nein","-","-","2026-03-06","-"],
+["DOC","FCOM",2,"FCOM Aufbereitung & Verteilung","Bereitstellung & Verteilung FCOM B737 MAX.","Documentation Manager","Boeing Liaison","2026-03-09","2026-04-24","High","In Progress",55,"Nein","DOC-1,BOE-2","-","2026-06-17","-"],
+["DOC","QRH",3,"QRH / Checklisten Customisation","Anpassung & Freigabe QRH/Normal & Non-Normal Checklists.","Standards Manager","Flight Ops","2026-03-23","2026-05-15","High","In Progress",45,"Nein","DOC-1","-","2026-06-17","-"],
+["DOC","MEL",4,"MEL / CDL Erstellung","Erstellung Minimum Equipment List / CDL für MAX.","Flight Ops Engineering","Compliance","2026-04-06","2026-05-29","High","In Progress",30,"Nein","DOC-1","Behörden-Genehmigung MEL","2026-06-17","-"],
+["DOC","Performance",5,"Performance Manual / RTOW","Performance-Unterlagen & RTOW-Tabellen MAX.","Flight Ops Engineering","IT","2026-04-20","2026-06-12","Medium","Not Started",0,"Nein","DOC-1","-","2026-06-17","-"],
+["DOC","OM-B",6,"OM-B Aircraft Operating Manual","Erstellung/Anpassung OM-B für Typ B737 MAX.","Standards Manager","Flight Ops","2026-05-04","2026-06-26","High","Not Started",0,"Nein","DOC-2,DOC-3","-","2026-06-17","-"],
+["DOC","Route",7,"OM-C Route & Aerodrome Anpassung","Prüfung OM-C Relevanz / Anpassungen für MAX-Einsatz.","Flight Ops","Standards","2026-05-18","2026-06-26","Low","Not Started",0,"Nein","DOC-1","-","2026-06-17","-"],
+["DOC","Review",8,"Manuals Cross-Review & Konsistenz","Quervergleich & Konsistenzprüfung aller Manuals.","Quality Manager","Standards, Documentation","2026-06-29","2026-08-07","High","Not Started",0,"Nein","DOC-2,DOC-3,DOC-4,DOC-6","-","2026-06-17","-"],
+["DOC","Approval",9,"Manuals Freigabe & Behörden-Einreichung","Freigabe & ggf. Einreichung relevanter Manuals.","Regulatory Compliance Manager","Quality","2026-08-10","2026-09-04","High","Not Started",0,"Nein","DOC-8","-","2026-06-17","-"],
+["DOC","Distribution",10,"Dokumenten-Verteilung & EFB Sync","Verteilung freigegebener Dokumente über EFB/DMS.","IT Coordinator","Documentation","2026-09-07","2026-09-25","Medium","Not Started",0,"Nein","DOC-9","-","2026-06-17","-"],
+["DOC","Maintenance",11,"Revision Service & Rev-Control","Laufender Revisionsservice & Änderungsmanagement.","Documentation Manager","Quality","2026-09-28","2027-06-15","Low","Not Started",0,"Nein","DOC-10","-","2026-06-17","-"],
+
+/* === 9 3rd Parties & Boeing Coordination === */
+["BOE","Setup",1,"Boeing Programm-Kontakt & Kick-off","Etablierung Boeing-Schnittstelle & Programm-Kick-off.","Boeing Liaison","Chief Training Captain","2026-01-12","2026-02-06","High","Completed",100,"Nein","-","-","2026-02-06","SPOC benannt"],
+["BOE","Data",2,"Boeing Data & Manual License","Lizenz/Vertrag für Boeing Daten, Manuals & Revisionsservice.","Procurement Lead","Boeing Liaison, Legal","2026-02-09","2026-03-27","High","In Progress",65,"Nein","BOE-1","-","2026-06-15","Vertrag in Review"],
+["BOE","Training",3,"Boeing Training Support Vereinbarung","Vereinbarung über Boeing Train-the-Trainer & Support.","Boeing Liaison","Procurement","2026-02-23","2026-04-10","High","In Progress",50,"Nein","BOE-1","Boeing-Kapazität begrenzt","2026-06-15","-"],
+["BOE","Sim Vendor",4,"3rd Party Simulator Vendor Mgmt","Steuerung externer Simulator-/FSTD-Anbieter.","Simulator Manager","Procurement","2026-03-09","2026-05-08","High","In Progress",40,"Nein","BOE-1,SIM-1","-","2026-06-18","-"],
+["BOE","CBT Vendor",5,"3rd Party CBT/Courseware Vendor","Auswahl & Steuerung externer Courseware-Lieferanten.","Training Development Lead","Procurement","2026-03-23","2026-05-15","Medium","In Progress",35,"Nein","BOE-1","-","2026-06-18","-"],
+["BOE","Logistics",6,"Boeing Spares / Aircraft Delivery Sync","Abstimmung Trainingsplan mit Flugzeug-Auslieferung Boeing.","Boeing Liaison","Fleet, Crew Planning","2026-04-06","2026-06-05","High","Not Started",0,"Nein","BOE-1","Delivery-Slip Risiko","2026-06-20","-"],
+["BOE","Quality",7,"Vendor Quality / Oversight Audits","Oversight-/Qualitätsaudits bei externen Trainingspartnern.","Quality Manager","Procurement","2026-05-18","2026-07-10","Medium","Not Started",0,"Nein","BOE-4,BOE-5","-","2026-06-20","-"],
+["BOE","Coordination",8,"Boeing Technical Query Management","Prozess für technische Rückfragen an Boeing (TQ/Service Requests).","Boeing Liaison","Standards","2026-03-02","2027-06-15","Medium","In Progress",30,"Nein","BOE-1","-","2026-06-20","laufend"],
+["BOE","Contracts",9,"3rd Party Verträge finalisiert","Finalisierung aller relevanten Drittpartei-Verträge.","Procurement Lead","Legal","2026-06-08","2026-07-31","High","Not Started",0,"Nein","BOE-2,BOE-4,BOE-5","-","2026-06-20","-"],
+["BOE","Review",10,"Boeing/3rd Party Readiness Review","Gemeinsames Readiness-Review mit Boeing & Partnern.","Boeing Liaison","Chief Training Captain","2026-10-19","2026-11-13","Medium","Not Started",0,"Nein","BOE-3,BOE-6,BOE-9","-","2026-06-20","-"],
+
+/* === 10 Entry Into Service (EIS) === */
+["EIS","Concept MS",1,"Boeing 737 MAX Training Concept Approved","Programm-Meilenstein: Freigabe des Gesamt-Trainingskonzepts.","Chief Training Captain","Standards, Compliance","2026-02-16","2026-02-20","High","Completed",100,"Ja","REG-1","-","2026-02-20","MS – erreicht"],
+["EIS","Pilot Pool",2,"Pilot-Pool & Konvertierungsplan","Festlegung Crew-Pool & Reihenfolge der Typumschulungen.","Head of Training","Crew Planning, HR","2026-04-06","2026-05-29","High","In Progress",45,"Nein","INS-1","-","2026-06-20","-"],
+["EIS","TR Course",3,"First Pilot Type Rating Course Started","Programm-Meilenstein: Start des ersten Piloten-Type-Rating-Kurses.","Chief Training Captain","Training, Crew Planning","2026-10-05","2026-10-09","High","Not Started",0,"Ja","REG-9,SIM-7,INS-9,TMD-10","Abhängig von Approval + Sim + Instruktoren","2026-06-20","MS5 – kritischer Pfad"],
+["EIS","TR Course",4,"First Pilot Type Rating Course Completed","Programm-Meilenstein: Abschluss des ersten TR-Kurses inkl. Skill Test.","Chief Training Captain","Examiner Lead, Training","2026-11-30","2026-12-04","High","Not Started",0,"Ja","EIS-3","-","2026-06-20","MS6"],
+["EIS","Line Training",5,"Line Training / LIFUS Konzept","Konzept Line Flying Under Supervision & Line-Check Vorgaben.","Standards Manager","Flight Ops","2026-09-21","2026-11-06","High","Not Started",0,"Nein","OMD-7","-","2026-06-20","-"],
+["EIS","Crew Planning",6,"Crew Roster Integration MAX","Integration der MAX-qualifizierten Crews in Dienstplanung.","Crew Planning Manager","Head of Training","2026-11-09","2026-12-11","Medium","Not Started",0,"Nein","EIS-4","-","2026-06-20","-"],
+["EIS","Readiness",7,"Operational Readiness Review","Programm-Meilenstein: ORR vor Aufnahme des Liniendienstes.","Chief Training Captain","Flight Ops, Safety, Quality","2027-01-04","2027-01-15","High","Not Started",0,"Ja","EIS-4,EIS-5,DOC-9","-","2026-06-20","MS9"],
+["EIS","Safety",8,"Safety Risk Assessment EIS","Sicherheitsbeurteilung & Risk Assessment für Indienststellung.","Safety Manager","Flight Ops, Quality","2026-11-16","2026-12-18","High","Not Started",0,"Nein","EIS-5","-","2026-06-20","-"],
+["EIS","Line Check",9,"Initial Line Check Programm","Erst-Linienchecks & Freigabe der ersten Linecrews.","Examiner Lead (TRE)","Flight Ops","2027-01-18","2027-02-26","High","Not Started",0,"Nein","EIS-7","-","2026-06-20","-"],
+["EIS","Go-Live",10,"Entry Into Service (EIS)","Programm-Meilenstein: Aufnahme des kommerziellen MAX-Liniendienstes.","Chief Training Captain","Flight Ops, Network, Safety","2027-06-08","2027-06-15","High","Not Started",0,"Ja","EIS-7,EIS-9","Endtermin – Gesamtziel des Programms","2026-06-20","MS10 – EIS"],
+["EIS","Post-EIS",11,"Post-EIS Lessons Learned Review","Auswertung & Lessons Learned nach Indienststellung.","Chief Training Captain","Quality, Safety","2027-06-15","2027-07-15","Low","Not Started",0,"Nein","EIS-10","-","2026-06-20","-"],
+];
+
+const WSNAME = Object.fromEntries(WS.map(w=>[w[1],w[0]]));
+const COLS = ["ws","sub","no","task","desc","resp","support","start","due","prio","status","pct","ms","deps","risk","upd","comment"];
+const DATA = T.map(r=>{
+  const o={}; r.forEach((v,i)=>o[COLS[i]]=v);
+  o.tid = o.ws+"-"+String(o.no).padStart(2,"0");
+  o.dur = Math.round((new Date(o.due)-new Date(o.start))/864e5);
+  return o;
+});
+const TODAY = new Date("2026-06-25");
+
+/* ---------- helpers ---------- */
+const de = iso => { const d=new Date(iso); return String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0")+"."+d.getFullYear(); };
+const statusClass = s => ({"Completed":"s-comp","In Progress":"s-prog","Not Started":"s-not","Delayed":"s-del"}[s]);
+const prioClass = p => ({"High":"p-high","Medium":"p-med","Low":"p-low"}[p]);
+function recomputeDelay(){ // mark overdue not-completed as Delayed for the demo
+  DATA.forEach(d=>{ if(d.status!=="Completed" && new Date(d.due)<TODAY){ d.status="Delayed"; } });
+}
+recomputeDelay();
+
+/* ---------- TABS ---------- */
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+  document.querySelectorAll(".panel").forEach(x=>x.classList.remove("active"));
+  t.classList.add("active");
+  document.getElementById(t.dataset.tab).classList.add("active");
+});
+
+/* ---------- DASHBOARD ---------- */
+function buildDashboard(){
+  const total=DATA.length;
+  const open=DATA.filter(d=>d.status!=="Completed").length;
+  const done=DATA.filter(d=>d.status==="Completed").length;
+  const crit=DATA.filter(d=>d.status==="Delayed" || (d.prio==="High" && d.status!=="Completed")).length;
+  const delayed=DATA.filter(d=>d.status==="Delayed").length;
+  const ms=DATA.filter(d=>d.ms==="Ja");
+  const msDone=ms.filter(d=>d.status==="Completed").length;
+  const overall=Math.round(DATA.reduce((a,d)=>a+d.pct,0)/total);
+
+  document.getElementById("kpis").innerHTML = [
+    kpi("Offene Tasks",open,`von ${total} gesamt · ${done} erledigt`),
+    kpi("Kritische Tasks",crit,`${delayed} delayed · High-Prio offen`,crit>0?"red":""),
+    kpi("Meilensteine",`${msDone}/${ms.length}`,"Programm-Milestones erreicht"),
+    kpi("Delayed",delayed,"über Due Date hinaus",delayed>0?"red":""),
+    kpi("High-Prio gesamt",DATA.filter(d=>d.prio==="High").length,"strategisch / kritischer Pfad"),
+    `<div class="kpi accent"><div class="ring" style="--p:${overall}"><b>${overall}%</b></div>
+       <div class="lbl">Gesamtfortschritt</div><div class="val">${overall}%</div>
+       <div class="foot">gewichteter Mittel-Fortschritt aller Tasks</div></div>`
+  ].join("");
+
+  // workstream progress
+  document.getElementById("wsProgress").innerHTML = WS.map(([name,abbr])=>{
+    const items=DATA.filter(d=>d.ws===abbr);
+    const p=Math.round(items.reduce((a,d)=>a+d.pct,0)/items.length);
+    return `<div class="wsrow"><div class="name" title="${name}">${name}</div>
+      <div class="track"><div class="fill" style="width:${p}%"></div></div>
+      <div class="pct">${p}%</div></div>`;
+  }).join("");
+
+  // traffic light
+  const g=DATA.filter(d=>d.status==="Completed").length;
+  const b=DATA.filter(d=>d.status==="In Progress").length;
+  const a=DATA.filter(d=>d.status==="Not Started").length;
+  const r=DATA.filter(d=>d.status==="Delayed").length;
+  document.getElementById("traffic").innerHTML = `
+    <div class="tl g"><b>${g}</b><span>Completed</span></div>
+    <div class="tl b" style="background:var(--blue)"><b>${b}</b><span>In Progress</span></div>
+    <div class="tl a"><b>${a}</b><span>Not Started</span></div>
+    <div class="tl r"><b>${r}</b><span>Delayed</span></div>`;
+
+  // milestones
+  document.getElementById("milestones").innerHTML = ms
+    .sort((x,y)=>new Date(x.due)-new Date(y.due))
+    .map(m=>{
+      const st=m.status, c=statusClass(st);
+      const ico = st==="Completed"?"var(--green)": st==="Delayed"?"var(--red)": st==="In Progress"?"var(--blue)":"var(--grey)";
+      const sym = st==="Completed"?"✓": st==="Delayed"?"!":"◆";
+      return `<div class="ms"><div class="ico" style="background:${ico}">${sym}</div>
+        <div class="mtxt"><b>${m.task}</b><small>${WSNAME[m.ws]} · Ziel: ${de(m.due)} · ${m.tid}</small></div>
+        <span class="badge ${c}">${st}</span></div>`;
+    }).join("");
+}
+function kpi(lbl,val,foot,color){
+  const vc = color==="red" ? "style='color:var(--red)'":"";
+  return `<div class="kpi"><div class="lbl">${lbl}</div><div class="val" ${vc}>${val}</div><div class="foot">${foot}</div></div>`;
+}
+
+/* ---------- TABLE ---------- */
+const fWs=document.getElementById("fWs");
+WS.forEach(([n,a])=>fWs.insertAdjacentHTML("beforeend",`<option value="${a}">${n}</option>`));
+["fWs","fStatus","fPrio","fSearch","fMs"].forEach(id=>document.getElementById(id).addEventListener("input",renderTable));
+
+function currentRows(){
+  const ws=fWs.value, st=document.getElementById("fStatus").value, pr=document.getElementById("fPrio").value;
+  const q=document.getElementById("fSearch").value.toLowerCase(), onlyMs=document.getElementById("fMs").checked;
+  return DATA.filter(d=>(!ws||d.ws===ws)&&(!st||d.status===st)&&(!pr||d.prio===pr)
+    &&(!onlyMs||d.ms==="Ja")
+    &&(!q||(d.task+d.resp+d.desc+d.tid).toLowerCase().includes(q)));
+}
+function renderTable(){
+  const rows=currentRows();
+  document.getElementById("tbody").innerHTML = rows.map(d=>`
+    <tr class="${d.ms==="Ja"?"msrow":""}">
+      <td><span class="wschip">${WSNAME[d.ws]}</span></td>
+      <td class="nowrap">${d.sub}</td>
+      <td class="tid">${d.tid}</td>
+      <td class="tk">${d.task}</td>
+      <td class="desc">${d.desc}</td>
+      <td class="nowrap">${d.resp}</td>
+      <td>${d.support}</td>
+      <td class="nowrap">${de(d.start)}</td>
+      <td class="nowrap">${de(d.due)}</td>
+      <td style="text-align:center">${d.dur}</td>
+      <td><span class="pill ${prioClass(d.prio)}">${d.prio}</span></td>
+      <td><span class="pill ${statusClass(d.status)}">${d.status}</span></td>
+      <td><div class="pillbar"><div class="mini" style="flex:1"><i style="width:${d.pct}%"></i></div><span style="font-size:11px;font-weight:700">${d.pct}%</span></div></td>
+      <td style="text-align:center">${d.ms==="Ja"?'<span class="ynyes">Ja</span>':'Nein'}</td>
+      <td class="nowrap">${d.deps}</td>
+      <td class="${d.risk!=="-"?"risk":""}">${d.risk}</td>
+      <td class="nowrap">${de(d.upd)}</td>
+      <td>${d.comment}</td>
+    </tr>`).join("");
+  document.getElementById("rowcount").textContent = `${rows.length} von ${DATA.length} Tasks angezeigt`;
+}
+
+/* ---------- CSV EXPORT ---------- */
+function exportCSV(){
+  const head=["Workstream","Sub-Workstream","Task-ID","Aufgabe / Deliverable","Beschreibung","Verantwortlicher",
+    "Unterstützende Abteilungen","Startdatum","Due Date","Dauer (Tage)","Priorität","Status","% Completion",
+    "Milestone","Abhängigkeiten","Risiken / Issues","Letztes Update","Kommentar"];
+  const esc=v=>`"${String(v).replace(/"/g,'""')}"`;
+  const rows=currentRows().map(d=>[WSNAME[d.ws],d.sub,d.tid,d.task,d.desc,d.resp,d.support,de(d.start),de(d.due),
+    d.dur,d.prio,d.status,d.pct+"%",d.ms,d.deps,d.risk,de(d.upd),d.comment].map(esc).join(";"));
+  const csv="﻿"+[head.map(esc).join(";"),...rows].join("\r\n");
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="B737MAX_Training_Programm_Eurowings.csv";
+  a.click();
+}
+
+/* ---------- GANTT ---------- */
+function buildGantt(){
+  const months=[]; let cur=new Date("2026-01-01"); const end=new Date("2027-07-01");
+  while(cur<end){ months.push(new Date(cur)); cur.setMonth(cur.getMonth()+1); }
+  const g0=months[0], g1=months[months.length-1]; g1.setMonth(g1.getMonth()+1);
+  const span=g1-months[0];
+  const mLbl=d=>["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"][d.getMonth()]+" "+String(d.getFullYear()).slice(2);
+
+  let html=`<thead><tr><th class="gname">Workstream / Aufgabe</th>${months.map(m=>`<th class="gm">${mLbl(m)}</th>`).join("")}</tr></thead><tbody>`;
+  const todayPct=((TODAY-g0)/span)*100;
+
+  WS.forEach(([name,abbr])=>{
+    html+=`<tr class="gws"><td class="gname">${name}</td><td class="gcell" colspan="${months.length}" style="position:relative">
+      <div class="today" style="left:${todayPct}%"></div></td></tr>`;
+    DATA.filter(d=>d.ws===abbr).forEach(d=>{
+      const s=new Date(d.start), e=new Date(d.due);
+      const left=((s-g0)/span)*100, width=Math.max(((e-s)/span)*100,0.8);
+      const cls = d.status==="Completed"?"done": d.status==="Delayed"?"delay":"";
+      const bar = d.ms==="Ja"
+        ? `<div class="gdiamond" style="left:${left+width/2}%" title="${d.task} – ${de(d.due)}"></div>`
+        : `<div class="gbar ${cls}" style="left:${left}%;width:${width}%" title="${d.task}\n${de(d.start)} → ${de(d.due)} (${d.pct}%)"></div>`;
+      html+=`<tr><td class="gname" style="font-weight:500;font-size:11px">${d.tid} · ${d.task}</td>
+        <td class="gcell" colspan="${months.length}" style="position:relative">
+          <div class="today" style="left:${todayPct}%"></div>${bar}</td></tr>`;
+    });
+  });
+  html+="</tbody>";
+  document.getElementById("gtbl").innerHTML=html;
+}
+
+buildDashboard(); renderTable(); buildGantt();
+</script>
+</body>
+</html>
