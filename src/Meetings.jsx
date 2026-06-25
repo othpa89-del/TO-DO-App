@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Plane, Star, Archive, Search, Plus, X, Pencil, Printer, FileText, Download,
   Trash2, Check, Mic, Square as SquareIcon, Image as ImageIcon, Paperclip,
-  ChevronDown, ChevronUp, Users, Bold, Italic, List, ListOrdered, CheckSquare, Link as LinkIcon,
+  ChevronDown, ChevronUp, Users, Bold, Italic, List, ListOrdered, CheckSquare, Link as LinkIcon, Settings,
 } from "lucide-react";
 
 // ===========================================================================
@@ -31,6 +31,11 @@ async function loadMeetings() {
 async function saveMeetings(arr) {
   try { await window.storage.set("meetings", JSON.stringify(arr), true); return true; } catch { return false; }
 }
+async function loadTypes() {
+  try { const r = await window.storage.get("meetingTypes", true); const a = r && r.value ? JSON.parse(r.value) : null; return Array.isArray(a) && a.length ? a : MEETING_TYPES.slice(); }
+  catch { return MEETING_TYPES.slice(); }
+}
+async function saveTypes(arr) { try { await window.storage.set("meetingTypes", JSON.stringify(arr), true); } catch {} }
 
 function blankMeeting(profile) {
   return {
@@ -118,6 +123,7 @@ function RichText({ value, onChange, placeholder }) {
 // ===========================================================================
 export default function Meetings({ persons = [], categories = [], profile = "", onCreateTask, companyColor }) {
   const [meetings, setMeetings] = useState([]);
+  const [types, setTypes] = useState(MEETING_TYPES);
   const [loaded, setLoaded] = useState(false);
   const [editing, setEditing] = useState(null);
   const [search, setSearch] = useState("");
@@ -128,14 +134,18 @@ export default function Meetings({ persons = [], categories = [], profile = "", 
   const [layout, setLayout] = useState("list");
   const [toast, setToast] = useState("");
   const [confirmDel, setConfirmDel] = useState(null);
+  const [mgrOpen, setMgrOpen] = useState(false);
 
   useEffect(() => {
     let on = true;
     loadMeetings().then((m) => { if (on) { setMeetings(m); setLoaded(true); } });
-    const h = () => loadMeetings().then((m) => on && setMeetings(m));
+    loadTypes().then((t) => on && setTypes(t));
+    const h = () => { loadMeetings().then((m) => on && setMeetings(m)); loadTypes().then((t) => on && setTypes(t)); };
     window.addEventListener("ctc:remote", h);
     return () => { on = false; window.removeEventListener("ctc:remote", h); };
   }, []);
+
+  function persistTypes(next) { setTypes(next); saveTypes(next); }
 
   function flash(m) { setToast(m); clearTimeout(flash._t); flash._t = setTimeout(() => setToast(""), 2200); }
   function persist(next) { setMeetings(next); saveMeetings(next); }
@@ -162,21 +172,16 @@ export default function Meetings({ persons = [], categories = [], profile = "", 
     return arr.slice().sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt || "").localeCompare(a.createdAt || ""));
   }, [meetings, showArchive, favOnly, fType, fStatus, search]);
 
-  if (editing) {
-    return (
-      <div className="mm-root">
-        <style>{css}</style>
-        <MeetingEditor meeting={editing} persons={persons} categories={categories} profile={profile}
-          companyColor={companyColor} onCreateTask={onCreateTask} flash={flash}
-          onSave={saveMeeting} onCancel={() => setEditing(null)} />
-        {toast && <div className="mm-toast">{toast}</div>}
-      </div>
-    );
-  }
-
   return (
     <div className="mm-root">
       <style>{css}</style>
+      {mgrOpen && <TypeManager types={types} onChange={persistTypes} onClose={() => setMgrOpen(false)} />}
+      {editing ? (
+        <MeetingEditor meeting={editing} persons={persons} categories={categories} profile={profile}
+          types={types} onManageTypes={() => setMgrOpen(true)}
+          companyColor={companyColor} onCreateTask={onCreateTask} flash={flash}
+          onSave={saveMeeting} onCancel={() => setEditing(null)} />
+      ) : (
       <div className="mm-wrap">
         <div className="mm-head">
           <h2><Plane size={18} strokeWidth={2.2} /> Meeting Minutes</h2>
@@ -190,8 +195,9 @@ export default function Meetings({ persons = [], categories = [], profile = "", 
           </div>
           <div className="mm-fg"><span>Typ</span>
             <select value={fType} onChange={(e) => setFType(e.target.value)}>
-              <option value="all">Alle Typen</option>{MEETING_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              <option value="all">Alle Typen</option>{types.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
+            <button className="mm-gear" onClick={() => setMgrOpen(true)} title="Typen verwalten"><Settings size={13} /></button>
           </div>
           <div className="mm-fg"><span>Status</span>
             <select value={fStatus} onChange={(e) => setFStatus(e.target.value)}>
@@ -243,6 +249,7 @@ export default function Meetings({ persons = [], categories = [], profile = "", 
           ))}
         </div>
       </div>
+      )}
       {toast && <div className="mm-toast">{toast}</div>}
     </div>
   );
@@ -251,7 +258,7 @@ export default function Meetings({ persons = [], categories = [], profile = "", 
 // ===========================================================================
 //  Editor
 // ===========================================================================
-function MeetingEditor({ meeting, persons, categories, profile, companyColor, onCreateTask, onSave, onCancel, flash }) {
+function MeetingEditor({ meeting, persons, categories, profile, types = MEETING_TYPES, onManageTypes, companyColor, onCreateTask, onSave, onCancel, flash }) {
   const [m, setM] = useState(meeting);
   const [openAgenda, setOpenAgenda] = useState({});
   const [recording, setRecording] = useState(false);
@@ -361,7 +368,12 @@ function MeetingEditor({ meeting, persons, categories, profile, companyColor, on
             <input list="mm-cats" value={m.category} onChange={(e) => set("category", e.target.value)} />
             <datalist id="mm-cats">{categories.map((c) => <option key={c} value={c} />)}</datalist>
           </F>
-          <F label="Meeting-Typ"><select value={m.type} onChange={(e) => set("type", e.target.value)}>{MEETING_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</select></F>
+          <F label="Meeting-Typ" action={onManageTypes && <button type="button" className="mm-link" onClick={onManageTypes}><Settings size={12} /> Verwalten</button>}>
+            <select value={m.type} onChange={(e) => set("type", e.target.value)}>
+              {!types.includes(m.type) && m.type && <option value={m.type}>{m.type}</option>}
+              {types.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </F>
           <F label="Status"><select value={m.status} onChange={(e) => set("status", e.target.value)}>{MEETING_STATUS.map((s) => <option key={s} value={s}>{s}</option>)}</select></F>
           <F label="Datum"><input type="date" value={m.date} onChange={(e) => set("date", e.target.value)} /></F>
           <F label="Beginn"><input type="time" value={m.start} onChange={(e) => set("start", e.target.value)} /></F>
@@ -516,8 +528,39 @@ function Section({ title, action, children }) {
     </div>
   );
 }
-function F({ label, wide, children }) {
-  return <div className={"mm-field" + (wide ? " wide" : "")}><label>{label}</label>{children}</div>;
+function F({ label, wide, action, children }) {
+  return (
+    <div className={"mm-field" + (wide ? " wide" : "")}>
+      <div className="mm-flabel"><label>{label}</label>{action}</div>
+      {children}
+    </div>
+  );
+}
+function TypeManager({ types, onChange, onClose }) {
+  const [val, setVal] = useState("");
+  function add() {
+    const t = val.trim(); if (!t) return;
+    if (types.some((x) => x.toLowerCase() === t.toLowerCase())) { setVal(""); return; }
+    onChange([...types, t]); setVal("");
+  }
+  return (
+    <div className="mm-modal-bg" onClick={onClose}>
+      <div className="mm-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="mm-modal-head"><h3>Meeting-Typen verwalten</h3><button className="mm-ic" onClick={onClose}><X size={18} /></button></div>
+        <div className="mm-addrow">
+          <input value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} placeholder="Neuer Typ …" />
+          <button className="mm-btn primary" onClick={add}><Plus size={14} /> Hinzufügen</button>
+        </div>
+        <div className="mm-taglist">
+          {types.map((t) => (
+            <span key={t} className="mm-tagchip">{t}<button onClick={() => onChange(types.filter((x) => x !== t))} title="Entfernen"><X size={13} /></button></span>
+          ))}
+          {types.length === 0 && <span className="mm-hint">Keine Typen – füge oben einen hinzu.</span>}
+        </div>
+        <p className="mm-hint">Diese Typen erscheinen im Filter und beim Anlegen eines Meetings.</p>
+      </div>
+    </div>
+  );
 }
 function ParticipantPicker({ label, field, list = [], persons, onAdd, onRemove, companyColor, muted }) {
   return (
@@ -702,7 +745,22 @@ const css = `
 .mm-grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .mm-field{display:flex;flex-direction:column;gap:4px;min-width:0;}
 .mm-field.wide{grid-column:1 / -1;}
+.mm-flabel{display:flex;align-items:center;justify-content:space-between;gap:8px;}
 .mm-field label{font-size:11px;font-weight:800;color:${C.grey};text-transform:uppercase;letter-spacing:.03em;}
+.mm-link{display:inline-flex;align-items:center;gap:4px;background:none;border:none;color:${C.sky};font-family:inherit;font-size:11px;font-weight:800;cursor:pointer;padding:0;}
+.mm-link:hover{color:${C.burgundy};}
+.mm-gear{background:none;border:1px solid ${C.line};border-radius:7px;color:${C.cool};cursor:pointer;padding:6px;display:inline-flex;}
+.mm-gear:hover{border-color:${C.burgundy};color:${C.burgundy};}
+.mm-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:70;padding:20px;}
+.mm-modal{background:#fff;border-radius:14px;width:100%;max-width:440px;max-height:84vh;overflow:auto;padding:18px 20px;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.mm-modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.mm-modal-head h3{font-size:15px;font-weight:900;color:${C.ink};margin:0;}
+.mm-addrow{display:flex;gap:8px;margin-bottom:12px;}
+.mm-addrow input{flex:1;}
+.mm-taglist{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;}
+.mm-tagchip{display:inline-flex;align-items:center;gap:6px;background:${C.fill};border:1px solid ${C.line};border-radius:7px;padding:5px 9px;font-size:13px;font-weight:700;color:${C.body};}
+.mm-tagchip button{background:none;border:none;color:${C.cool};cursor:pointer;display:flex;padding:0;}
+.mm-tagchip button:hover{color:${C.burgundyDarker};}
 .mm-root input,.mm-root select,.mm-root textarea{width:100%;max-width:100%;min-width:0;font-family:inherit;font-size:14px;color:${C.body};background:${C.white};border:1px solid ${C.line};border-radius:8px;padding:8px 10px;outline:none;}
 .mm-root input[type="date"],.mm-root input[type="time"]{-webkit-appearance:none;appearance:none;}
 .mm-root textarea{resize:vertical;}
