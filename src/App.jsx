@@ -157,8 +157,6 @@ export default function App() {
   const [cmgrOpen, setCmgrOpen] = useState(false);
   const [newCompany, setNewCompany] = useState("");
   const [expStatus, setExpStatus] = useState("all");
-  const [bulkText, setBulkText] = useState("");
-  const [bulkCat, setBulkCat] = useState("");
   const [pendingRestore, setPendingRestore] = useState(null);
   // Persons
   const [pForm, setPForm] = useState({ name: "", company: "", role: "", email: "", phone: "", topics: [], notes: "" });
@@ -393,19 +391,6 @@ export default function App() {
       flash("Sicherung wiederhergestellt.");
     } catch { flash("Wiederherstellung teilweise fehlgeschlagen."); }
     setPendingRestore(null);
-  }
-  function doBulkAdd() {
-    const lines = bulkText.split("\n").map((s) => s.trim()).filter(Boolean);
-    if (!lines.length) { flash("Keine Zeilen erkannt."); return; }
-    const scope = "personal";
-    const news = lines.map((title) => normalizeTask({
-      id: uid(), title, category: bulkCat, priority: "", status: "offen", due: "", remindLead: 3,
-      escalation: "", updatedAt: new Date().toISOString().slice(0, 10),
-      contact: "", company: "", link: "", recurrence: "none", createdAt: new Date().toISOString(),
-      createdBy: "",
-    }));
-    persist(scope, [...news, ...tasks[scope]]);
-    setBulkText(""); flash(lines.length + " Aufgaben hinzugefügt.");
   }
 
   // --- abgeleitete Task-Daten ---
@@ -877,17 +862,6 @@ export default function App() {
                   </div>
                 </div>
               )}
-            </div>
-
-            <div className="card">
-              <h2>Mehrere Aufgaben anlegen</h2>
-              <p className="hint">Eine Aufgabe pro Zeile. Wird mit dem gewählten Bereich angelegt.</p>
-              <div className="field"><label>Bereich</label>
-                <select value={bulkCat} onChange={(e) => setBulkCat(e.target.value)}>
-                  <option value=""></option>{sortedCats.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select></div>
-              <textarea rows={5} value={bulkText} onChange={(e) => setBulkText(e.target.value)} placeholder={"OM-D Kapitel 5 prüfen\nStandardisierungsbriefing vorbereiten\n…"} />
-              <div className="data-row"><button className="btn primary" onClick={doBulkAdd}><Plus size={15} /> Aufgaben hinzufügen</button></div>
             </div>
           </div>
         ) : view === "new" ? (
