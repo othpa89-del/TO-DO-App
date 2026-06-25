@@ -219,6 +219,24 @@
   .rep-table{width:100%;min-width:0;border-collapse:collapse;font-size:11px}
   .rep-table th{background:var(--ew-magenta-dark);color:#fff;text-align:left;padding:6px 8px;font-size:10px;white-space:nowrap}
   .rep-table td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+  /* Import dialog */
+  .imp-overlay{position:fixed;inset:0;background:rgba(20,25,40,.5);display:none;align-items:center;justify-content:center;z-index:1000;padding:20px}
+  .imp-card{background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:min(980px,96vw);max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
+  .imp-head{display:flex;justify-content:space-between;align-items:center;padding:13px 18px;background:linear-gradient(110deg,var(--ew-magenta),var(--ew-magenta-dark));color:#fff;font-size:15px}
+  .imp-head .iconbtn{background:rgba(255,255,255,.15);border-color:transparent;color:#fff}
+  .imp-body{padding:16px 18px;overflow:auto}
+  .imp-row{margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .imp-row select,.imp-row input{padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px}
+  .imp-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:18px}
+  @media(max-width:760px){.imp-grid{grid-template-columns:1fr}}
+  .imp-map{width:100%;min-width:0;border-collapse:collapse;font-size:12.5px;table-layout:fixed}
+  .imp-map th{text-align:left;color:var(--muted);font-size:11px;padding:4px 6px;border-bottom:1px solid var(--line);background:#fff;position:static}
+  .imp-map td{padding:4px 6px;border-bottom:1px solid var(--line)}
+  .imp-map td:first-child,.imp-map th:first-child{width:44%;font-weight:600}
+  .imp-map select{width:100%;padding:5px 7px;border:1px solid var(--line);border-radius:7px;font-size:12.5px;background:#fff}
+  .imp-prev h4{margin:0 0 8px;font-size:12.5px;color:var(--ew-magenta-dark)}
+  .imp-prev .rep-table{min-width:0;font-size:11px}
+  .imp-foot{display:flex;gap:10px;align-items:center;padding:12px 18px;border-top:1px solid var(--line);flex-wrap:wrap}
   /* Touch scrolling for iPad */
   .tablewrap,.gantt,#nav{-webkit-overflow-scrolling:touch}
   /* iPad / kleinere Laptops */
@@ -317,7 +335,8 @@
       <button class="btn ghost" onclick="exportBackup()">⤓ Backup (JSON)</button>
       <button class="btn ghost" onclick="document.getElementById('importFile').click()">⤒ Wiederherstellen</button>
       <button class="btn ghost" onclick="exportXLSXPortfolio()">⬇︎ Excel (alle Projekte)</button>
-      <span class="note" style="margin:0">Sichere dein Portfolio als Datei, um es zwischen Laptop und iPad zu übertragen.</span>
+      <button class="btn" onclick="document.getElementById('importXlsx').click()">📥 Excel/CSV importieren</button>
+      <span class="note" style="margin:0">Backup = ganzes Portfolio sichern/übertragen · Import = bestehende Excel-Listen als Projekt überführen.</span>
     </div>
     <div class="kpis" id="portfolioKpis"></div>
     <div class="pgrid" id="portfolioGrid"></div>
@@ -403,6 +422,7 @@
   <div class="print-footer" id="pfFoot"></div>
 </div>
 <input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="importBackup(this)"/>
+<input type="file" id="importXlsx" accept=".xlsx,.xls,.csv" style="display:none" onchange="startImport(this)"/>
 
 <script>
 /* ---------- WORKSTREAM-DEFINITION ---------- */
@@ -602,7 +622,13 @@ const h = s => String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").r
 const statusClass = s => ({"Completed":"s-comp","In Progress":"s-prog","Not Started":"s-not","Delayed":"s-del"}[s]||"s-not");
 const prioClass = p => ({"High":"p-high","Medium":"p-med","Low":"p-low"}[p]||"p-med");
 const opt = (arr,v) => arr.map(o=>`<option ${o===v?"selected":""}>${h(o)}</option>`).join("");
-const wsOpt = v => WS.map(([n,a])=>`<option value="${a}" ${a===v?"selected":""}>${h(n)}</option>`).join("");
+const wsName = a => WSNAME[a] || a;                       // unbekannte/importierte Workstreams: Code = Name
+const wsCodes = tasks => { const seen=WS.map(w=>w[1]), extra=[];
+  tasks.forEach(d=>{ if(!seen.includes(d.ws)&&!extra.includes(d.ws)) extra.push(d.ws); });
+  return [...WS, ...extra.map(c=>[c,c])]; };
+const wsOpt = v => { const o=WS.map(([n,a])=>`<option value="${a}" ${a===v?"selected":""}>${h(n)}</option>`);
+  if(v&&!WS.some(w=>w[1]===v)) o.push(`<option value="${h(v)}" selected>${h(v)} (importiert)</option>`);
+  return o.join(""); };
 
 /* ---------- data model + persistence ---------- */
 function mkTasks(arr){ return arr.map((r,i)=>{ const o={}; COLS.forEach((c,j)=>o[c]=r[j]); o.uid=i; return o; }); }
@@ -708,7 +734,7 @@ function projectReportHTML(p){
   const cmap=Object.fromEntries(p.tasks.map(t=>[normId(t.tid),t]));
   const hc={g:"var(--green)",a:"var(--amber)",r:"var(--red)"}[s.health];
   const ht={g:"On Track",a:"At Risk",r:"Kritisch"}[s.health];
-  const wsRows=WS.map(([name,abbr])=>{ const items=p.tasks.filter(d=>d.ws===abbr); if(!items.length) return "";
+  const wsRows=wsCodes(p.tasks).map(([name,abbr])=>{ const items=p.tasks.filter(d=>d.ws===abbr); if(!items.length) return "";
     const pr=Math.round(items.reduce((a,d)=>a+d.pct,0)/items.length);
     return `<div class="repws"><span title="${name}">${name}</span><div class="rtrack"><i style="width:${pr}%"></i></div><b>${pr}%</b></div>`; }).join("");
   const ms=p.tasks.filter(d=>d.ms==="Ja").sort((a,b)=>new Date(a.due)-new Date(b.due));
@@ -899,7 +925,7 @@ function buildDashboard(){
   ].join("");
 
   // workstream progress
-  document.getElementById("wsProgress").innerHTML = WS.map(([name,abbr])=>{
+  document.getElementById("wsProgress").innerHTML = wsCodes(DATA).map(([name,abbr])=>{
     const items=DATA.filter(d=>d.ws===abbr);
     const p=Math.round(items.reduce((a,d)=>a+d.pct,0)/items.length);
     return `<div class="wsrow"><div class="name" title="${name}">${name}</div>
@@ -926,7 +952,7 @@ function buildDashboard(){
       const ico = st==="Completed"?"var(--green)": st==="Delayed"?"var(--red)": st==="In Progress"?"var(--blue)":"var(--grey)";
       const sym = st==="Completed"?"✓": st==="Delayed"?"!":"◆";
       return `<div class="ms"><div class="ico" style="background:${ico}">${sym}</div>
-        <div class="mtxt"><b>${m.task}</b><small>${WSNAME[m.ws]} · Ziel: ${de(m.due)} · ${m.tid}</small></div>
+        <div class="mtxt"><b>${m.task}</b><small>${wsName(m.ws)} · Ziel: ${de(m.due)} · ${m.tid}</small></div>
         <span class="badge ${c}">${st}</span></div>`;
     }).join("");
 
@@ -992,7 +1018,7 @@ function exportCSV(){
     "Unterstützende Abteilungen","Startdatum","Due Date","Dauer (Tage)","Priorität","Status","% Completion",
     "Milestone","Abhängigkeiten","Risiken / Issues","Letztes Update","Kommentar"];
   const esc=v=>`"${String(v).replace(/"/g,'""')}"`;
-  const rows=currentRows().map(d=>[WSNAME[d.ws],d.sub,d.tid,d.task,d.desc,d.resp,d.support,de(d.start),de(d.due),
+  const rows=currentRows().map(d=>[wsName(d.ws),d.sub,d.tid,d.task,d.desc,d.resp,d.support,de(d.start),de(d.due),
     d.dur,d.prio,d.status,d.pct+"%",d.ms,d.deps,d.risk,de(d.upd),d.comment].map(esc).join(";"));
   const csv="﻿"+[head.map(esc).join(";"),...rows].join("\r\n");
   const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
@@ -1087,7 +1113,7 @@ function sheetNames(names){ const seen={}, out=[]; names.forEach(n=>{ let b=Stri
   let nm=b,k=2; while(seen[nm.toLowerCase()]){ nm=b.slice(0,28-(""+k).length-1)+" "+k; k++; } seen[nm.toLowerCase()]=1; out.push(nm); }); return out; }
 const TASK_HEAD=["Workstream","Sub-Workstream","Task-ID","Aufgabe / Deliverable","Beschreibung","Verantwortlicher","Unterstützende Abteilungen","Startdatum","Due Date","Dauer (Tage)","Priorität","Status","% Completion","Milestone","Abhängigkeiten","Risiken / Issues","Letztes Update","Kommentar"];
 function projectRows(p){ const rows=[TASK_HEAD.slice()];
-  p.tasks.forEach(d=>rows.push([WSNAME[d.ws],d.sub,d.tid,d.task,d.desc,d.resp,d.support,de(d.start),de(d.due),d.dur,d.prio,d.status,d.pct,d.ms,d.deps,d.risk,de(d.upd),d.comment]));
+  p.tasks.forEach(d=>rows.push([wsName(d.ws),d.sub,d.tid,d.task,d.desc,d.resp,d.support,de(d.start),de(d.due),d.dur,d.prio,d.status,d.pct,d.ms,d.deps,d.risk,de(d.upd),d.comment]));
   return rows; }
 function summaryRows(){ const rows=[["Projekt","Flotte","Projektleiter","Phase","Ziel EIS","Aufgaben","Offen","Kritisch","Delayed","MS erreicht","MS gesamt","Gesamtfortschritt %","Status"]];
   PROJECTS.forEach(p=>{ const s=projStats(p), ht={g:"On Track",a:"At Risk",r:"Kritisch"}[s.health];
@@ -1101,6 +1127,244 @@ function exportXLSXPortfolio(){
 }
 function exportXLSXProject(p){
   download(buildXlsx([{name:sheetNames([p.name])[0],rows:projectRows(p)}]),"Eurowings_"+fnSafe(p.name)+".xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+}
+
+/* ---------- EXCEL / CSV IMPORT ---------- */
+let IMP={sheets:[],si:0};
+const IMPORT_FIELDS=[
+  ["task","Aufgabe / Deliverable *"],["ws","Workstream"],["sub","Sub-Workstream"],["desc","Beschreibung"],
+  ["resp","Verantwortlicher"],["support","Unterstützende Abteilungen"],["start","Startdatum"],["due","Due Date"],
+  ["prio","Priorität"],["status","Status"],["pct","% Completion"],["ms","Milestone"],
+  ["deps","Abhängigkeiten"],["risk","Risiken / Issues"],["upd","Letztes Update"],["comment","Kommentar"]
+];
+const SYN={
+  task:["aufgabe","deliverable","task","tätigkeit","taetigkeit","activity","titel","maßnahme","massnahme","thema"],
+  ws:["workstream","work stream","arbeitspaket","arbeitspaket beschreibung","bereich","stream","kategorie","modul","gewerk"],
+  sub:["sub-workstream","sub workstream","unterbereich","teilbereich","subkategorie","sub"],
+  desc:["beschreibung","description","details","detail","inhalt","scope"],
+  resp:["verantwortlich","verantwortlicher","responsible","owner","zuständig","zustaendig","lead","bearbeiter"],
+  support:["unterstützend","unterstuetzend","unterstützende","support","supporting","mitwirkende","beteiligte"],
+  start:["start","startdatum","beginn","von","start date","startdate","anfang"],
+  due:["due","due date","duedate","fällig","faellig","enddatum","ende","bis","deadline","termin","zieldatum","soll"],
+  prio:["priorität","prioritaet","priority","prio","wichtigkeit"],
+  status:["status","state","zustand","fortschritt status"],
+  pct:["%","completion","fortschritt","prozent","progress","erledigt","fertigstellung","compl"],
+  ms:["milestone","meilenstein"],
+  deps:["abhängigkeit","abhaengigkeit","abhängigkeiten","dependencies","dependency","predecessor","vorgänger","vorgaenger"],
+  risk:["risiko","risiken","issue","issues","risk","problem"],
+  upd:["letztes update","last update","aktualisiert","updated","stand","änderungsdatum"],
+  comment:["kommentar","comment","bemerkung","notiz","notes","anmerkung","info"]
+};
+
+// --- file readers ---
+async function inflateRaw(bytes){
+  if(typeof DecompressionStream==="undefined") throw new Error("Dieser Browser kann .xlsx nicht entpacken. Bitte die Liste als CSV speichern und erneut importieren.");
+  const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+async function unzip(buf){
+  const b=new Uint8Array(buf), dv=new DataView(b.buffer);
+  let eo=-1; for(let i=b.length-22;i>=0;i--){ if(dv.getUint32(i,true)===0x06054b50){ eo=i; break; } }
+  if(eo<0) throw new Error("Keine gültige Excel-Datei (kein ZIP). Eventuell altes .xls-Format – bitte als .xlsx oder .csv speichern.");
+  const count=dv.getUint16(eo+10,true), cdOff=dv.getUint32(eo+16,true);
+  const files={}; let p=cdOff;
+  for(let n=0;n<count;n++){
+    if(dv.getUint32(p,true)!==0x02014b50) break;
+    const method=dv.getUint16(p+10,true), compSize=dv.getUint32(p+20,true);
+    const nameLen=dv.getUint16(p+28,true), extraLen=dv.getUint16(p+30,true), commLen=dv.getUint16(p+32,true);
+    const lhOff=dv.getUint32(p+42,true);
+    const name=new TextDecoder().decode(b.subarray(p+46,p+46+nameLen));
+    const lNameLen=dv.getUint16(lhOff+26,true), lExtra=dv.getUint16(lhOff+28,true);
+    const dataStart=lhOff+30+lNameLen+lExtra;
+    files[name]={method,comp:b.subarray(dataStart,dataStart+compSize)};
+    p+=46+nameLen+extraLen+commLen;
+  }
+  return files;
+}
+async function readEntry(files,name){ const f=files[name]; if(!f) return null;
+  if(f.method===0) return new TextDecoder().decode(f.comp);
+  if(f.method===8) return new TextDecoder().decode(await inflateRaw(f.comp));
+  throw new Error("Nicht unterstützte Komprimierung in der Datei."); }
+function excelToISO(n){ const ms=Math.round((n-25569)*86400*1000); const d=new Date(ms); return isNaN(d)?String(n):d.toISOString().slice(0,10); }
+function colNum(ref){ const m=/^([A-Z]+)/.exec(ref||""); if(!m) return 0; let n=0; for(const ch of m[1]) n=n*26+(ch.charCodeAt(0)-64); return n-1; }
+const _tags=(el,name)=>el.getElementsByTagName(name);   // namensraum-tolerant (localName)
+function parseSheetXml(xml,ss,dateXf){
+  const doc=new DOMParser().parseFromString(xml,"application/xml"); const rows=[];
+  const rowEls=doc.getElementsByTagName("row");
+  for(const row of rowEls){
+    const arr=[]; let auto=0;
+    for(const c of row.getElementsByTagName("c")){
+      const ref=c.getAttribute("r"); const ci=ref?colNum(ref):auto; auto=ci+1;
+      const t=c.getAttribute("t"), s=c.getAttribute("s"); let val="";
+      if(t==="s"){ const v=_tags(c,"v")[0]; val=v?(ss[+v.textContent]||""):""; }
+      else if(t==="inlineStr"){ let x=""; for(const tt of _tags(c,"t")) x+=tt.textContent; val=x; }
+      else if(t==="str"){ const v=_tags(c,"v")[0]; val=v?v.textContent:""; }
+      else if(t==="b"){ const v=_tags(c,"v")[0]; val=v&&v.textContent==="1"?"Ja":"Nein"; }
+      else { const v=_tags(c,"v")[0]; if(v){ const num=parseFloat(v.textContent); val=(s!=null&&dateXf.has(+s)&&isFinite(num))?excelToISO(num):v.textContent; } }
+      arr[ci]=val;
+    }
+    rows.push(arr);
+  }
+  const w=rows.reduce((m,r)=>Math.max(m,r.length),0);
+  rows.forEach(r=>{ for(let i=0;i<w;i++) if(r[i]==null) r[i]=""; });
+  return rows;
+}
+async function parseXlsx(buf){
+  const files=await unzip(buf);
+  const ss=[]; const ssXml=await readEntry(files,"xl/sharedStrings.xml");
+  if(ssXml){ const sd=new DOMParser().parseFromString(ssXml,"application/xml");
+    for(const si of sd.getElementsByTagName("si")){ let s=""; for(const t of _tags(si,"t")) s+=t.textContent; ss.push(s); } }
+  const dateXf=new Set(); const stXml=await readEntry(files,"xl/styles.xml");
+  if(stXml){ const sd=new DOMParser().parseFromString(stXml,"application/xml"); const nf={};
+    for(const n of sd.getElementsByTagName("numFmt")) nf[n.getAttribute("numFmtId")]=n.getAttribute("formatCode")||"";
+    const isDate=(id,code)=>{ id=+id; if([14,15,16,17,18,19,20,21,22,27,28,29,30,31,32,33,34,35,36,45,46,47,50,51,52,53,54,55,56,57,58].includes(id)) return true; return !!(code&&/[dmyhs]/i.test(code)&&!/[#0%]/.test(code)); };
+    const cx=sd.getElementsByTagName("cellXfs")[0]; const xfs=cx?cx.getElementsByTagName("xf"):[];
+    for(let i=0;i<xfs.length;i++){ const id=xfs[i].getAttribute("numFmtId"); if(id!=null&&isDate(id,nf[id])) dateXf.add(i); } }
+  const rels={}; const relXml=await readEntry(files,"xl/_rels/workbook.xml.rels");
+  if(relXml){ const rd=new DOMParser().parseFromString(relXml,"application/xml");
+    for(const r of rd.getElementsByTagName("Relationship")) rels[r.getAttribute("Id")]=r.getAttribute("Target"); }
+  const sheets=[]; const wbXml=await readEntry(files,"xl/workbook.xml");
+  if(wbXml){ const wd=new DOMParser().parseFromString(wbXml,"application/xml");
+    for(const sh of wd.getElementsByTagName("sheet")){
+      const rid=sh.getAttribute("r:id")||sh.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","id");
+      let target=rels[rid]||""; target = target.startsWith("/") ? target.slice(1) : (/^xl\//.test(target)?target:"xl/"+target);
+      sheets.push({name:sh.getAttribute("name")||"Tabelle",target}); } }
+  if(!sheets.length) sheets.push({name:"Tabelle1",target:"xl/worksheets/sheet1.xml"});
+  const out=[];
+  for(const sh of sheets){ const xml=await readEntry(files,sh.target); if(xml) out.push({name:sh.name,rows:parseSheetXml(xml,ss,dateXf)}); }
+  return out;
+}
+function parseCSV(text,delim){
+  text=text.replace(/^﻿/,""); const rows=[]; let row=[],cell="",q=false;
+  for(let i=0;i<text.length;i++){ const ch=text[i];
+    if(q){ if(ch=='"'){ if(text[i+1]=='"'){cell+='"';i++;} else q=false; } else cell+=ch; }
+    else if(ch=='"') q=true;
+    else if(ch===delim){ row.push(cell); cell=""; }
+    else if(ch=='\n'){ row.push(cell); rows.push(row); row=[]; cell=""; }
+    else if(ch!='\r') cell+=ch;
+  }
+  if(cell.length||row.length){ row.push(cell); rows.push(row); }
+  return rows;
+}
+async function readSpreadsheet(file){
+  const name=file.name.toLowerCase();
+  if(name.endsWith(".csv")){ const text=await file.text(); const first=text.replace(/^﻿/,"").split(/\r?\n/)[0]||"";
+    const delim=(first.split(";").length>first.split(",").length)?";":(first.indexOf("\t")>=0&&first.indexOf(",")<0?"\t":","); return [{name:file.name,rows:parseCSV(text,delim)}]; }
+  if(name.endsWith(".xls")&&!name.endsWith(".xlsx")) throw new Error("Altes .xls-Format wird nicht unterstützt. Bitte in Excel als .xlsx oder .csv speichern.");
+  return await parseXlsx(await file.arrayBuffer());
+}
+
+// --- normalizers ---
+function normWS(v,def){ if(!v) return def; const s=String(v).trim();
+  const a=WS.find(w=>w[1].toLowerCase()===s.toLowerCase()); if(a) return a[1];
+  const n=WS.find(w=>w[0].toLowerCase()===s.toLowerCase()||w[0].toLowerCase().includes(s.toLowerCase())||s.toLowerCase().includes(w[0].toLowerCase())); if(n) return n[1];
+  return s.slice(0,24); }
+function normStatus(v,pct){ const s=String(v||"").toLowerCase();
+  if(/(abgeschlossen|erledigt|fertig|done|complete|closed|100)/.test(s)) return "Completed";
+  if(/(verzög|verzoeg|delay|überfäll|ueberfaell|kritisch|overdue)/.test(s)) return "Delayed";
+  if(/(in arbeit|in progress|laufend|bearbeitung|ongoing|wip|begonnen|started)/.test(s)) return "In Progress";
+  if(/(offen|not started|geplant|^neu|todo|to do|open|nicht begonnen)/.test(s)) return "Not Started";
+  if(pct>=100) return "Completed"; if(pct>0) return "In Progress"; return "Not Started"; }
+function normPrio(v){ const s=String(v||"").toLowerCase();
+  if(/(hoch|high|kritisch|urgent|^1$|^a$)/.test(s)) return "High";
+  if(/(niedrig|low|gering|^3$|^c$)/.test(s)) return "Low"; return "Medium"; }
+function normYesNo(v){ return /(ja|yes|^y$|^x$|true|wahr|^1$|meilenstein|milestone)/.test(String(v||"").toLowerCase().trim())?"Ja":"Nein"; }
+function parsePct(v){ if(v==null||v==="") return 0; let n=parseFloat(String(v).replace("%","").replace(",",".").trim()); if(!isFinite(n)) return 0; if(n<=1) n*=100; return Math.max(0,Math.min(100,Math.round(n))); }
+function parseDateVal(v){ if(v==null||v==="") return ""; const s=String(v).trim(); if(!s) return "";
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  let m=/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})$/.exec(s);
+  if(m){ let d=+m[1],mo=+m[2],y=+m[3]; if(y<100) y+=2000; if(mo>12&&d<=12){ const t=d; d=mo; mo=t; } return `${y}-${pad(mo)}-${pad(d)}`; }
+  const dt=new Date(s); return isNaN(dt)?"":dt.toISOString().slice(0,10); }
+
+// --- mapping UI ---
+function autoMap(headers){
+  const norm=headers.map(x=>String(x||"").trim().toLowerCase()); const used=new Set(), map={};
+  IMPORT_FIELDS.forEach(([f])=>{ const syns=SYN[f]||[]; let bi=-1,bs=0;
+    norm.forEach((hh,i)=>{ if(used.has(i)||!hh) return; let sc=0;
+      syns.forEach(s=>{ if(hh===s) sc=Math.max(sc,3); else if(hh.includes(s)||s.includes(hh)) sc=Math.max(sc,2); });
+      if(sc>bs){ bs=sc; bi=i; } });
+    if(bi>=0){ map[f]=bi; used.add(bi); } });
+  return map;
+}
+async function startImport(input){
+  const file=input.files&&input.files[0]; if(!file) return;
+  try{ const sheets=(await readSpreadsheet(file)).filter(s=>s.rows&&s.rows.length);
+    if(!sheets.length){ alert("Die Datei enthält keine Daten."); input.value=""; return; }
+    IMP={sheets,si:0,fileName:file.name}; renderImportModal();
+  }catch(e){ alert("Import fehlgeschlagen:\n"+e.message); }
+  input.value="";
+}
+function impSwitchSheet(i){ IMP.si=+i; renderImportModal(); }
+function closeImport(){ const m=document.getElementById("importModal"); if(m) m.style.display="none"; }
+function readMapping(){ const map={}; document.querySelectorAll("#importModal select[data-impf]").forEach(s=>{ const v=+s.value; if(v>=0) map[s.dataset.impf]=v; }); return map; }
+function updateImpPreview(){
+  const map=readMapping(), rows=IMP.dataRows.slice(0,3), cols=["task","ws","resp","status","due"];
+  const head=cols.map(c=>`<th>${IMPORT_FIELDS.find(f=>f[0]===c)[1].replace(" *","")}</th>`).join("");
+  const body=rows.map(r=>`<tr>${cols.map(c=>`<td>${map[c]!=null?h(r[map[c]]||""):'<span class="note">—</span>'}</td>`).join("")}</tr>`).join("");
+  const el=document.getElementById("impPrev"); if(el) el.innerHTML=`<table class="rep-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+function renderImportModal(){
+  const sh=IMP.sheets[IMP.si]; IMP.headers=sh.rows[0]||[]; IMP.dataRows=sh.rows.slice(1);
+  const map=autoMap(IMP.headers);
+  const colOpts=sel=>`<option value="-1">— nicht importieren —</option>`+IMP.headers.map((hd,i)=>`<option value="${i}" ${sel===i?"selected":""}>${h(hd||("Spalte "+colL(i)))}</option>`).join("");
+  const sheetSel=IMP.sheets.length>1?`<label style="font-size:13px">Tabellenblatt: <select onchange="impSwitchSheet(this.value)">${IMP.sheets.map((s,i)=>`<option value="${i}" ${i===IMP.si?"selected":""}>${h(s.name)}</option>`).join("")}</select></label>`:"";
+  const projSel=`<select id="impTarget"><option value="__new__">➕ Neues Projekt anlegen</option>${PROJECTS.map((p,i)=>`<option value="${i}">An „${h(p.name)}" anhängen</option>`).join("")}</select>`;
+  const fields=IMPORT_FIELDS.map(([f,lbl])=>`<tr><td>${lbl}</td><td><select data-impf="${f}">${colOpts(map[f]!=null?map[f]:-1)}</select></td></tr>`).join("");
+  const defWs=`<select id="impDefWs">${WS.map(([n,a])=>`<option value="${a}">${h(n)}</option>`).join("")}</select>`;
+  const defName=h(sh.name&&sh.name!=="Tabelle1"?sh.name:IMP.fileName.replace(/\.[^.]+$/,""));
+  const html=`<div class="imp-card">
+    <div class="imp-head"><b>📥 Excel / CSV importieren</b><button class="iconbtn" onclick="closeImport()">✕</button></div>
+    <div class="imp-body">
+      <div class="imp-row">${sheetSel}<span class="note">${IMP.dataRows.length} Datenzeilen · Quelle: ${h(IMP.fileName)}</span></div>
+      <div class="imp-row">Ziel: ${projSel} <span id="impNewWrap">· Projektname: <input id="impName" value="${defName}" style="min-width:220px"></span></div>
+      <div class="imp-row">Standard-Workstream (für leere/unbekannte): ${defWs}</div>
+      <div class="imp-grid">
+        <table class="imp-map"><thead><tr><th>App-Feld</th><th>Excel-/CSV-Spalte</th></tr></thead><tbody>${fields}</tbody></table>
+        <div class="imp-prev"><h4>Vorschau (erste 3 Zeilen)</h4><div id="impPrev"></div></div>
+      </div>
+    </div>
+    <div class="imp-foot">
+      <span class="note">* „Aufgabe / Deliverable" muss zugeordnet sein. Status/Priorität werden normalisiert, unbekannte Workstreams übernommen.</span>
+      <span style="flex:1"></span>
+      <button class="btn ghost" onclick="closeImport()">Abbrechen</button>
+      <button class="btn" onclick="doImport()">Importieren</button>
+    </div></div>`;
+  let m=document.getElementById("importModal");
+  if(!m){ m=document.createElement("div"); m.id="importModal"; m.className="imp-overlay"; document.body.appendChild(m); }
+  m.innerHTML=html; m.style.display="flex";
+  document.getElementById("impTarget").onchange=function(){ document.getElementById("impNewWrap").style.display=this.value==="__new__"?"inline":"none"; };
+  m.querySelectorAll("select[data-impf]").forEach(s=>s.addEventListener("change",updateImpPreview));
+  updateImpPreview();
+}
+function doImport(){
+  const map=readMapping();
+  if(map.task==null){ alert("Bitte das Feld „Aufgabe / Deliverable“ einer Spalte zuordnen."); return; }
+  const defWs=document.getElementById("impDefWs").value, tgt=document.getElementById("impTarget").value;
+  const tasks=[];
+  IMP.dataRows.forEach(r=>{
+    const get=f=> map[f]!=null ? String(r[map[f]]==null?"":r[map[f]]).trim() : "";
+    const task=get("task"); if(!task && !get("desc")) return;
+    let pct=parsePct(get("pct")); let status=normStatus(get("status"),pct);
+    if(status==="Completed" && map.pct==null) pct=100;
+    const t={ ws:normWS(get("ws"),defWs), sub:get("sub")||"–", task:task||"(ohne Titel)", desc:get("desc"),
+      resp:get("resp"), support:get("support"), start:parseDateVal(get("start")), due:parseDateVal(get("due")),
+      prio:normPrio(get("prio")), status, pct, ms:normYesNo(get("ms")), deps:get("deps")||"-",
+      risk:get("risk")||"-", upd:parseDateVal(get("upd"))||TODAY_ISO, comment:get("comment") };
+    if(!t.start&&t.due) t.start=t.due; if(!t.due&&t.start) t.due=t.start;
+    if(!t.start&&!t.due){ t.start=TODAY_ISO; t.due=TODAY_ISO; }
+    tasks.push(t);
+  });
+  if(!tasks.length){ alert("Keine importierbaren Zeilen gefunden."); return; }
+  let proj;
+  if(tgt==="__new__"){ const name=(document.getElementById("impName").value||"Importiertes Projekt").trim();
+    proj={id:"p-imp-"+Date.now(),name,fleet:"–",lead:"Chief Training Captain",phase:"Planning",eis:"2027-12-31",tasks:[]}; PROJECTS.push(proj); }
+  else proj=PROJECTS[+tgt];
+  const noMax={}; proj.tasks.forEach(d=>{ noMax[d.ws]=Math.max(noMax[d.ws]||0,d.no||0); });
+  let uid=proj.tasks.reduce((m,d)=>Math.max(m,d.uid==null?-1:d.uid),-1)+1;
+  tasks.forEach(t=>{ noMax[t.ws]=(noMax[t.ws]||0)+1; t.no=noMax[t.ws]; t.uid=uid++; proj.tasks.push(t); });
+  recomputeProject(proj);
+  setActive(PROJECTS.indexOf(proj)); save(); rebuildProjSel(); rebuildAll(); closeImport(); showView("table");
+  alert(tasks.length+" Aufgabe(n) importiert in „"+proj.name+"“.");
 }
 
 /* ---------- GANTT ---------- */
@@ -1118,7 +1382,7 @@ function buildGantt(){
   const todayPct=((TODAY-g0)/span)*100;
   const CP=criticalPath(DATA).set;
 
-  WS.forEach(([name,abbr])=>{
+  wsCodes(DATA).forEach(([name,abbr])=>{
     html+=`<tr class="gws"><td class="gname">${name}</td><td class="gcell" colspan="${months.length}" style="position:relative">
       <div class="today" style="left:${todayPct}%"></div></td></tr>`;
     DATA.filter(d=>d.ws===abbr).forEach(d=>{
