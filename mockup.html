@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>B737 MAX Training Program – Eurowings | PM Cockpit (Mockup)</title>
+<title>Eurowings · Trainings-Portfolio | Multi-Projekt PM Cockpit (Mockup)</title>
 <style>
   :root{
     --ew-magenta:#AF1E65; --ew-magenta-dark:#7d1548; --ew-magenta-soft:#fbeaf2;
@@ -143,12 +143,67 @@
   .iconbtn{border:1px solid var(--line);background:#fff;border-radius:6px;cursor:pointer;padding:3px 7px;font-size:12px;line-height:1.3;color:var(--muted)}
   .iconbtn:hover{background:var(--ew-magenta-soft);border-color:var(--ew-magenta);color:var(--ew-magenta-dark)}
   .saved{font-size:11.5px;color:var(--green);font-weight:700;transition:opacity .4s}
+  /* Portfolio */
+  .portfolio-head h2{margin:0;font-size:21px}
+  .portfolio-head p{margin:3px 0 16px;color:var(--muted);font-size:13px}
+  .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:18px}
+  .pcard{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
+  .pcard-top{display:flex;justify-content:space-between;gap:10px;padding:15px 16px 12px;border-top:4px solid var(--hc)}
+  .pcard-fleet{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:700}
+  .pcard-name{font-size:15.5px;font-weight:700;margin-top:2px;line-height:1.25}
+  .phealth{height:fit-content;color:#fff;font-size:10px;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap}
+  .pcard-ring{display:flex;gap:14px;align-items:center;padding:2px 16px 12px}
+  .pring{--p:0;--c:var(--ew-magenta);width:60px;height:60px;border-radius:50%;flex-shrink:0;
+    background:conic-gradient(var(--c) calc(var(--p)*1%),#eef1f6 0);display:flex;align-items:center;justify-content:center;position:relative}
+  .pring::before{content:"";position:absolute;width:44px;height:44px;border-radius:50%;background:#fff}
+  .pring b{position:relative;font-size:14px;font-weight:800}
+  .pcard-meta{flex:1;display:flex;flex-direction:column;gap:3px}
+  .pcard-meta div{display:flex;justify-content:space-between;font-size:11.5px;gap:8px}
+  .pcard-meta span{color:var(--muted)} .pcard-meta b{font-weight:600;text-align:right}
+  .pcard-stats{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);background:#fafbfc}
+  .pcard-stats div{padding:9px 4px;text-align:center;border-right:1px solid var(--line)}
+  .pcard-stats div:last-child{border-right:0}
+  .pcard-stats b{display:block;font-size:18px;font-weight:800}
+  .pcard-stats span{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+  .pbar{height:6px;background:#eef1f6} .pbar i{display:block;height:100%}
+  .pcard-tl{display:flex;gap:4px;padding:10px 16px 4px}
+  .pcard-tl .d{height:8px;border-radius:4px;min-width:3px}
+  .pcard-tl .d.g{background:var(--green)} .pcard-tl .d.b{background:var(--blue)} .pcard-tl .d.a{background:var(--amber)} .pcard-tl .d.r{background:var(--red)}
+  .pcard-act{display:flex;gap:8px;padding:8px 16px 16px;align-items:center}
+  .pcard-act .btn{flex:1}
+  .pcard-new{align-items:center;justify-content:center;border:2px dashed var(--line);box-shadow:none;color:var(--muted);cursor:pointer;min-height:240px;font-weight:600;gap:8px}
+  .pcard-new:hover{border-color:var(--ew-magenta);color:var(--ew-magenta)}
+  .pcard-new .plus{font-size:34px;line-height:1}
+  .navsel{padding:8px 11px;border:1px solid var(--line);border-radius:9px;font-size:13px;background:#fff;font-weight:600;color:var(--ew-magenta-dark);max-width:280px}
+  .hdr-edit{outline:none;border-radius:6px;padding:1px 4px;border:1px solid transparent}
+  .hdr-edit:hover{border-color:rgba(255,255,255,.35)}
+  .hdr-edit:focus{box-shadow:0 0 0 2px rgba(255,255,255,.5);background:rgba(255,255,255,.14)}
+  .meta input[type=date]{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:6px;font-size:12px;padding:2px 5px}
+  /* Print-only branding */
+  .print-header,.print-footer{display:none}
   @media print{
+    @page{margin:12mm}
+    body{background:#fff}
+    header,#nav,.toolbar,#screenFooter{display:none!important}
+    .print-header{display:flex!important;align-items:center;justify-content:space-between;
+      border-bottom:3px solid var(--ew-magenta);padding-bottom:10px;margin-bottom:16px}
+    .print-header .logo{width:42px;height:42px;background:var(--ew-magenta);color:#fff}
+    .print-header .ph-t b{font-size:15px;color:var(--ew-magenta-dark)}
+    .print-header .ph-t span{display:block;font-size:12px;color:#333;margin-top:1px}
+    .print-header .ph-r{text-align:right}
+    .print-header .ph-r b{font-size:14px;color:var(--ew-magenta-dark)}
+    .print-header .ph-r span{display:block;font-size:11px;color:#666}
+    .print-footer{display:block!important;position:fixed;bottom:0;left:0;right:0;
+      border-top:1px solid #ccc;padding-top:5px;font-size:9.5px;color:#666;text-align:center}
+    .wrap{max-width:none;padding:0}
+    .panel{display:none!important} .panel.active{display:block!important}
     .rowact,td:last-child,th:last-child{display:none!important}
-    header{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    .tabs,.toolbar,.tab{display:none!important}
-    .panel{display:block!important}
-    .tablewrap,.gantt{max-height:none;overflow:visible}
+    .tablewrap,.gantt{max-height:none;overflow:visible;border:none;box-shadow:none}
+    table{min-width:0;font-size:8.5px} .gtable{min-width:0;font-size:8px}
+    thead th{position:static}
+    .pgrid{grid-template-columns:repeat(2,1fr)}
+    .kpi,.card,.pcard,.ms,.wsrow,tr{break-inside:avoid}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   }
 </style>
 </head>
@@ -157,27 +212,50 @@
   <div class="brand">
     <div class="logo">EW</div>
     <div>
-      <h1>Boeing 737 MAX – Training Program Eurowings</h1>
-      <div class="sub">Project Management Cockpit · Fleet Introduction / Entry Into Service · <b>MOCKUP v0.1</b></div>
+      <h1 id="hdrTitle">Eurowings · Trainings-Portfolio</h1>
+      <div class="sub">Eurowings · Flight Training · Project Management Cockpit · <b>MOCKUP v0.2</b></div>
     </div>
   </div>
-  <div class="meta">
-    <div><span>Programm-Leitung</span><b>Chief Training Captain (PM Training)</b></div>
-    <div><span>Phase</span><b>Execution</b></div>
-    <div><span>Stand</span><b id="hdrDate">25.06.2026</b></div>
-    <div><span>Ziel EIS</span><b>15.06.2027</b></div>
+  <div class="meta" id="hdrMeta" style="display:none">
+    <div><span>Projektleiter</span><b class="hdr-edit" contenteditable data-pfield="lead" id="hdrLead"></b></div>
+    <div><span>Phase</span><b class="hdr-edit" contenteditable data-pfield="phase" id="hdrPhase"></b></div>
+    <div><span>Stand</span><b>25.06.2026</b></div>
+    <div><span>Ziel EIS</span><b><input type="date" data-pfield="eis" id="hdrEis"></b></div>
   </div>
 </header>
 
 <div class="wrap">
-  <div class="tabs">
-    <div class="tab active" data-tab="dash">📊 Dashboard</div>
-    <div class="tab" data-tab="table">📋 Master Task List</div>
-    <div class="tab" data-tab="gantt">📅 Gantt / Timeline</div>
+  <!-- Branded header shown only when printing / exporting PDF -->
+  <div class="print-header">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="logo">EW</div>
+      <div class="ph-t"><b>Eurowings · Flight Training</b><span id="phProject"></span></div>
+    </div>
+    <div class="ph-r"><b id="phView"></b><span>Stand: 25.06.2026 · Chief Training Captain</span></div>
   </div>
 
+  <div class="tabs" id="nav">
+    <div class="tab" data-tab="portfolio">🗂 Portfolio</div>
+    <select id="projSel" class="navsel" title="Projekt wechseln"></select>
+    <div class="tab" data-tab="dash">📊 Dashboard</div>
+    <div class="tab" data-tab="table">📋 Tasks</div>
+    <div class="tab" data-tab="gantt">📅 Gantt</div>
+    <span style="flex:1"></span>
+    <button class="btn ghost" onclick="window.print()">🖨 Diese Seite drucken / PDF</button>
+  </div>
+
+  <!-- PORTFOLIO (Startseite: alle Projekte) -->
+  <section class="panel active" id="portfolio">
+    <div class="portfolio-head">
+      <h2>Trainings-Portfolio</h2>
+      <p>Alle Flotteneinführungs- &amp; Trainingsprojekte im Überblick · jedes Projekt ist unabhängig steuerbar</p>
+    </div>
+    <div class="kpis" id="portfolioKpis"></div>
+    <div class="pgrid" id="portfolioGrid"></div>
+  </section>
+
   <!-- DASHBOARD -->
-  <section class="panel active" id="dash">
+  <section class="panel" id="dash">
     <div class="kpis" id="kpis"></div>
     <div class="grid2">
       <div class="card">
@@ -241,7 +319,8 @@
     <div class="note">Vereinfachte Monats-Timeline. Balkenlänge & -position aus Start-/Due-Datum berechnet. In der finalen App: zoombar (Tag/Woche/Monat), mit Abhängigkeitspfeilen.</div>
   </section>
 
-  <footer>Mockup · Eurowings B737 MAX Training Program · Datenwerte sind Platzhalter zur Konzept-Demonstration · erzeugt für Chief Training Captain</footer>
+  <footer id="screenFooter">Mockup · Eurowings Flight Training · Multi-Projekt PM Cockpit · Datenwerte sind Platzhalter zur Konzept-Demonstration · erzeugt für Chief Training Captain</footer>
+  <div class="print-footer" id="pfFoot"></div>
 </div>
 
 <script>
@@ -390,14 +469,48 @@ const T = [
 ["EIS","Post-EIS",11,"Post-EIS Lessons Learned Review","Auswertung & Lessons Learned nach Indienststellung.","Chief Training Captain","Quality, Safety","2027-06-15","2027-07-15","Low","Not Started",0,"Nein","EIS-10","-","2026-06-20","-"],
 ];
 
+/* ---------- ADDITIONAL DEMO PROJECTS (own independent task lists) ---------- */
+const T_A320 = [
+["REG","Concept",1,"A320neo Differences Training Concept","Konzept für CEO→NEO Differences-Training erstellen & abstimmen.","Fleet Captain A320","Standards, Compliance","2026-01-12","2026-02-13","High","Completed",100,"Nein","-","-","2026-02-13","-"],
+["REG","Approval",2,"Behörden-Akzeptanz Differences-Programm","Akzeptanz des Differences-Trainings durch die Behörde.","Regulatory Compliance Manager","Quality","2026-02-16","2026-06-10","High","In Progress",75,"Nein","REG-1","Akzeptanz verzögert sich","2026-06-12","Nachreichung offen"],
+["OMD","Content",3,"OM-D NEO Differences Kapitel","Ergänzung OM-D um A320neo-Differences (Engines/PEP/Systems).","Standards Manager","Fleet Captain A320","2026-02-16","2026-04-17","High","Completed",100,"Nein","REG-1","-","2026-04-17","-"],
+["SIM","Data",4,"A320neo Sim Data Update","Einspielung NEO-Datenpaket (LEAP/PW) in bestehende A320-FFS.","Simulator Manager","Airbus Liaison","2026-03-02","2026-05-08","High","In Progress",60,"Nein","BOE-11","-","2026-06-15","-"],
+["SIM","Config",5,"Simulator Differences Konfiguration","Anpassung/Validierung FFS auf NEO-Stand.","Simulator Manager","Vendor","2026-05-11","2026-07-10","High","In Progress",30,"Nein","SIM-4","-","2026-06-18","-"],
+["INS","Briefing",6,"Instructor Differences Briefing","Briefing/Standardisierung der Instruktoren für NEO-Differences.","TRI Lead","Standards","2026-04-06","2026-05-15","Medium","Completed",100,"Nein","OMD-3","-","2026-05-15","-"],
+["TMD","CBT",7,"NEO Differences CBT/eLearning","Self-Study Differences-Modul für alle A320-Crews.","Training Development Lead","IT","2026-03-16","2026-05-29","High","In Progress",55,"Nein","OMD-3","-","2026-06-19","-"],
+["TMD","FCOM",8,"FCOM/QRH NEO Updates","Einarbeitung NEO-Unterschiede in FCOM/QRH-Auszüge.","Standards Manager","Airbus Liaison","2026-04-13","2026-06-12","Medium","In Progress",40,"Nein","BOE-11","-","2026-06-17","-"],
+["DOC","MEL",9,"MEL Update A320neo","Aktualisierung MEL/CDL für NEO-Subtyp.","Flight Ops Engineering","Compliance","2026-05-04","2026-07-03","Medium","Not Started",0,"Nein","REG-1","-","2026-06-17","-"],
+["EXM","Briefing",10,"Examiner Differences Briefing","Standardisierung der TRE für NEO-Differences-Checks.","Examiner Lead (TRE)","Standards","2026-06-08","2026-07-17","Medium","Not Started",0,"Nein","OMD-3","-","2026-06-20","-"],
+["BOE","Vendor",11,"Airbus Data & Manual License NEO","Lizenz/Datenpaket Airbus für NEO-Differences.","Procurement Lead","Airbus Liaison","2026-01-19","2026-03-13","High","Completed",100,"Nein","-","-","2026-03-13","-"],
+["EIS","Concept MS",12,"A320neo Differences Concept Approved","Meilenstein: Freigabe des Differences-Trainingskonzepts.","Fleet Captain A320","Standards","2026-02-16","2026-02-20","High","Completed",100,"Ja","REG-1","-","2026-02-20","MS – erreicht"],
+["EIS","Rollout MS",13,"Fleet Differences Rollout Started","Meilenstein: Start des flottenweiten Differences-Trainings.","Fleet Captain A320","Crew Planning","2026-08-03","2026-08-07","High","Not Started",0,"Ja","REG-2,SIM-5","Abhängig von Behörden-Akzeptanz","2026-06-20","MS"],
+["EIS","Go-Live",14,"Entry Into Service A320neo","Meilenstein: Aufnahme A320neo Liniendienst.","Fleet Captain A320","Flight Ops, Network","2027-02-08","2027-02-15","High","Not Started",0,"Ja","EIS-13","-","2026-06-20","MS – EIS"],
+];
+const T_E2 = [
+["REG","Concept",1,"E195-E2 Training Concept Submission","Erstkonzept Type-Rating-Training E195-E2 erstellen & einreichen.","Project Captain E2","Compliance","2026-05-04","2026-08-14","High","In Progress",20,"Nein","-","Neuer Hersteller – Prozess unklar","2026-06-20","Frühphase"],
+["REG","Approval",2,"ATO-Erweiterung E195-E2","Antrag ATO-Erweiterung um Embraer E2.","Regulatory Compliance Manager","Quality","2026-08-17","2026-11-06","High","Not Started",0,"Nein","REG-1","-","2026-06-20","-"],
+["SIM","Sourcing",3,"FFS Sourcing E195-E2","Marktanalyse & Sourcing Simulator E2.","Simulator Manager","Procurement","2026-06-01","2026-09-04","High","In Progress",15,"Nein","-","Sim-Verfügbarkeit unklar","2026-06-20","-"],
+["OMD","Structure",4,"OM-D Struktur E195-E2","Aufbau OM-D Trainingskapitel für E2.","Standards Manager","Project Captain E2","2026-09-07","2026-11-13","Medium","Not Started",0,"Nein","REG-1","-","2026-06-20","-"],
+["INS","Planning",5,"Instructor Bedarf & Plan E2","Bedarfsplanung Instruktoren E2.","Head of Training","Crew Planning","2026-09-07","2026-10-16","High","Not Started",0,"Nein","-","-","2026-06-20","-"],
+["EXM","Planning",6,"Examiner Konzept E2","TRE-Bedarf & Autorisierungskonzept E2.","Project Captain E2","Compliance","2026-10-05","2026-11-20","Medium","Not Started",0,"Nein","-","-","2026-06-20","-"],
+["TMD","Planning",7,"Trainingsmaterial Inventar E2","Bedarf & Inventar Lernmaterial E2.","Training Development Lead","Standards","2026-06-15","2026-08-21","Medium","In Progress",10,"Nein","-","-","2026-06-20","-"],
+["DOC","Planning",8,"Dokumenten-Landkarte E2","Übersicht betroffener Manuals E2.","Documentation Manager","Standards","2026-09-07","2026-10-09","Low","Not Started",0,"Nein","-","-","2026-06-20","-"],
+["BOE","Setup",9,"Embraer Coordination Kick-off","Etablierung Embraer-Schnittstelle & Programm-Kick-off.","Project Captain E2","Procurement","2026-05-11","2026-06-19","High","In Progress",50,"Nein","-","-","2026-06-20","-"],
+["EIS","Concept MS",10,"E195-E2 Training Concept Approved","Meilenstein: Freigabe des Trainingskonzepts E2.","Project Captain E2","Standards","2026-11-23","2026-11-27","High","Not Started",0,"Ja","REG-1,OMD-4","-","2026-06-20","MS"],
+["EIS","Sim MS",11,"Simulator Qualification E195-E2","Meilenstein: FSTD-Qualifikation E2.","Simulator Manager","Compliance","2027-05-03","2027-05-28","High","Not Started",0,"Ja","SIM-3","-","2026-06-20","MS"],
+["EIS","TR MS",12,"First Type Rating Course E195-E2","Meilenstein: Start erster Type-Rating-Kurs E2.","Project Captain E2","Training","2027-08-02","2027-08-06","High","Not Started",0,"Ja","REG-2,EIS-11","-","2026-06-20","MS"],
+["EIS","Go-Live",13,"Entry Into Service E195-E2","Meilenstein: Aufnahme E195-E2 Liniendienst.","Project Captain E2","Flight Ops, Network","2027-10-25","2027-11-01","High","Not Started",0,"Ja","EIS-12","-","2026-06-20","MS – EIS"],
+];
+
 const WSNAME = Object.fromEntries(WS.map(w=>[w[1],w[0]]));
 const COLS = ["ws","sub","no","task","desc","resp","support","start","due","prio","status","pct","ms","deps","risk","upd","comment"];
 const TODAY = new Date("2026-06-25");
-const KEY = "ew_b737max_pm_v1";
+const KEY = "ew_pm_portfolio_v1";
 const STATUSES = ["Not Started","In Progress","Completed","Delayed"];
 const PRIOS = ["High","Medium","Low"];
+const VIEWLBL = {portfolio:"Portfolio-Übersicht",dash:"Dashboard",table:"Master Task List",gantt:"Gantt / Timeline"};
 
-let DATA = [], UID = 0;
+let PROJECTS = [], ACTIVE = 0, DATA = [], UID = 0, VIEW = "portfolio";
 
 /* ---------- helpers ---------- */
 const pad = n => String(n).padStart(2,"0");
@@ -410,28 +523,135 @@ const opt = (arr,v) => arr.map(o=>`<option ${o===v?"selected":""}>${h(o)}</optio
 const wsOpt = v => WS.map(([n,a])=>`<option value="${a}" ${a===v?"selected":""}>${h(n)}</option>`).join("");
 
 /* ---------- data model + persistence ---------- */
-function recompute(){ DATA.forEach(d=>{ d.tid=d.ws+"-"+pad(d.no); d.dur=days(d.start,d.due); }); }
-function save(){ try{ localStorage.setItem(KEY, JSON.stringify(DATA)); }catch(e){} }
-function seed(){
-  DATA = T.map((r,idx)=>{ const o={}; COLS.forEach((c,i)=>o[c]=r[i]); o.uid=idx; return o; });
-  UID = DATA.length;
-  // initial demo realism: overdue & not completed -> Delayed (only on first seed)
-  DATA.forEach(d=>{ if(d.status!=="Completed" && new Date(d.due)<TODAY) d.status="Delayed"; });
-  recompute();
+function mkTasks(arr){ return arr.map((r,i)=>{ const o={}; COLS.forEach((c,j)=>o[c]=r[j]); o.uid=i; return o; }); }
+function recomputeProject(p){ p.tasks.forEach(d=>{ d.tid=d.ws+"-"+pad(d.no); d.dur=days(d.start,d.due); }); }
+function recompute(){ recomputeProject(PROJECTS[ACTIVE]); }
+function seedDelay(tasks){ tasks.forEach(d=>{ if(d.status!=="Completed" && new Date(d.due)<TODAY) d.status="Delayed"; }); }
+function seedPortfolio(){
+  PROJECTS = [
+    {id:"p-b737max",name:"Boeing 737 MAX – Type Rating Program",fleet:"Boeing 737-8 MAX",lead:"Chief Training Captain",phase:"Execution",eis:"2027-06-15",tasks:mkTasks(T)},
+    {id:"p-a320neo",name:"Airbus A320neo – CEO→NEO Differences",fleet:"Airbus A320neo",lead:"Fleet Captain A320",phase:"Execution",eis:"2027-02-15",tasks:mkTasks(T_A320)},
+    {id:"p-e195e2",name:"Embraer E195-E2 – New Type Introduction",fleet:"Embraer E195-E2",lead:"Project Captain E2",phase:"Planning",eis:"2027-11-01",tasks:mkTasks(T_E2)},
+  ];
+  PROJECTS.forEach(p=>{ seedDelay(p.tasks); recomputeProject(p); });
+  ACTIVE = 0;
 }
+function setActive(i){ ACTIVE=Math.max(0,Math.min(i,PROJECTS.length-1)); DATA=PROJECTS[ACTIVE].tasks;
+  UID=DATA.reduce((m,d)=>Math.max(m,d.uid),-1)+1; recompute(); }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify({active:PROJECTS[ACTIVE]&&PROJECTS[ACTIVE].id,projects:PROJECTS})); }catch(e){} }
 function load(){
   let s=null; try{ s=localStorage.getItem(KEY); }catch(e){}
-  if(s){ try{ DATA=JSON.parse(s); UID=DATA.reduce((m,d)=>Math.max(m,d.uid),-1)+1; recompute(); return; }catch(e){} }
-  seed(); save();
+  if(s){ try{ const o=JSON.parse(s); if(o&&o.projects&&o.projects.length){ PROJECTS=o.projects; PROJECTS.forEach(recomputeProject);
+      const i=PROJECTS.findIndex(p=>p.id===o.active); setActive(i>=0?i:0); return; } }catch(e){} }
+  seedPortfolio(); setActive(0); save();
 }
 
-/* ---------- TABS ---------- */
-document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
-  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
-  document.querySelectorAll(".panel").forEach(x=>x.classList.remove("active"));
-  t.classList.add("active");
-  document.getElementById(t.dataset.tab).classList.add("active");
-});
+/* ---------- portfolio statistics ---------- */
+function projStats(p){
+  const t=p.tasks, n=t.length||1;
+  const done=t.filter(d=>d.status==="Completed").length;
+  const open=t.filter(d=>d.status!=="Completed").length;
+  const delayed=t.filter(d=>d.status==="Delayed").length;
+  const crit=t.filter(d=>d.status==="Delayed"||(d.prio==="High"&&d.status!=="Completed")).length;
+  const msAll=t.filter(d=>d.ms==="Ja"), msDone=msAll.filter(d=>d.status==="Completed").length;
+  const overdueMs=msAll.filter(d=>d.status!=="Completed" && new Date(d.due)<TODAY).length;
+  const overall=Math.round(t.reduce((a,d)=>a+d.pct,0)/n);
+  const g=done, b=t.filter(d=>d.status==="In Progress").length, a=t.filter(d=>d.status==="Not Started").length, r=delayed;
+  let health="g"; if(delayed>0) health="a"; if(delayed>=3||overdueMs>0) health="r";
+  return {n:t.length,done,open,delayed,crit,ms:msAll.length,msDone,overall,g,b,a,r,health};
+}
+
+/* ---------- VIEWS / NAVIGATION ---------- */
+function showView(v){
+  VIEW=v;
+  document.querySelectorAll("#nav .tab").forEach(x=>x.classList.toggle("active",x.dataset.tab===v));
+  ["portfolio","dash","table","gantt"].forEach(id=>document.getElementById(id).classList.toggle("active",id===v));
+  if(v==="portfolio") renderPortfolio();
+  updateHeader();
+  window.scrollTo(0,0);
+}
+function updateHeader(){
+  const p=PROJECTS[ACTIVE], t=document.getElementById("hdrTitle"), meta=document.getElementById("hdrMeta");
+  if(VIEW==="portfolio"){
+    t.textContent="Eurowings · Trainings-Portfolio"; t.removeAttribute("contenteditable"); meta.style.display="none";
+  } else {
+    t.setAttribute("contenteditable",""); t.classList.add("hdr-edit"); t.dataset.pfield="name"; t.textContent=p.name;
+    meta.style.display="flex";
+    document.getElementById("hdrLead").textContent=p.lead;
+    document.getElementById("hdrPhase").textContent=p.phase;
+    document.getElementById("hdrEis").value=p.eis;
+  }
+  document.getElementById("phProject").textContent = VIEW==="portfolio" ? "Programm-Portfolio · alle Trainingsprojekte" : (p.fleet+" · "+p.name);
+  document.getElementById("phView").textContent = VIEWLBL[VIEW];
+  document.getElementById("pfFoot").textContent = "Eurowings Flight Training · PM Cockpit · "+(VIEW==="portfolio"?"Portfolio-Übersicht":p.name)+" · Vertraulich / Mockup";
+}
+function rebuildProjSel(){
+  document.getElementById("projSel").innerHTML = PROJECTS.map((p,i)=>`<option value="${i}" ${i===ACTIVE?"selected":""}>${h(p.name)}</option>`).join("");
+}
+function rebuildAll(){ buildDashboard(); renderTable(); buildGantt(); }
+function openProject(i){ setActive(+i); rebuildProjSel(); rebuildAll(); showView("dash"); }
+
+/* ---------- PROJECT MANAGEMENT ---------- */
+function newProject(){
+  const name=prompt("Name des neuen Projekts:","Neues Trainingsprojekt"); if(!name) return;
+  const fleet=prompt("Flotte / Flugzeugtyp:","")||"–";
+  PROJECTS.push({id:"p-"+Date.now(),name:name,fleet:fleet,lead:"Chief Training Captain",phase:"Planning",eis:"2027-12-31",tasks:[]});
+  save(); openProject(PROJECTS.length-1);
+}
+function renameProject(i){
+  const p=PROJECTS[i];
+  const name=prompt("Projektname:",p.name); if(name===null) return; if(name) p.name=name;
+  const fleet=prompt("Flotte / Flugzeugtyp:",p.fleet); if(fleet!==null) p.fleet=fleet;
+  save(); rebuildProjSel(); renderPortfolio(); if(i===ACTIVE) updateHeader();
+}
+function deleteProject(i){
+  if(PROJECTS.length<=1){ alert("Mindestens ein Projekt muss bestehen bleiben."); return; }
+  if(!confirm("Projekt wirklich löschen?\n\n"+PROJECTS[i].name)) return;
+  PROJECTS.splice(i,1); if(ACTIVE>=PROJECTS.length) ACTIVE=PROJECTS.length-1;
+  setActive(ACTIVE); save(); rebuildProjSel(); rebuildAll(); renderPortfolio();
+}
+
+/* ---------- PORTFOLIO RENDER ---------- */
+function renderPortfolio(){
+  const agg={open:0,crit:0,ms:0,msDone:0,overall:0,active:0};
+  PROJECTS.forEach(p=>{ const s=projStats(p); agg.open+=s.open; agg.crit+=s.crit; agg.ms+=s.ms; agg.msDone+=s.msDone; agg.overall+=s.overall; if(p.phase!=="Completed") agg.active++; });
+  const avg=PROJECTS.length?Math.round(agg.overall/PROJECTS.length):0;
+  document.getElementById("portfolioKpis").innerHTML=[
+    kpi("Projekte",PROJECTS.length,`${agg.active} aktiv`),
+    kpi("Offene Tasks",agg.open,"über alle Projekte"),
+    kpi("Kritische Tasks",agg.crit,"delayed + High-Prio offen",agg.crit>0?"red":""),
+    kpi("Meilensteine",`${agg.msDone}/${agg.ms}`,"erreicht / gesamt"),
+    kpi("Ø Fortschritt",avg+"%","Mittel über Projekte"),
+    `<div class="kpi accent"><div class="lbl">Portfolio</div><div class="val">${avg}%</div><div class="foot">Gesamtfortschritt aller Trainingsprojekte</div></div>`
+  ].join("");
+  document.getElementById("portfolioGrid").innerHTML = PROJECTS.map((p,i)=>{
+    const s=projStats(p);
+    const hc={g:"var(--green)",a:"var(--amber)",r:"var(--red)"}[s.health];
+    const ht={g:"On Track",a:"At Risk",r:"Kritisch"}[s.health];
+    const tot=Math.max(s.g+s.b+s.a+s.r,1);
+    const seg=(c,cls)=>c?`<span class="d ${cls}" style="flex:${c}"></span>`:"";
+    return `<div class="pcard">
+      <div class="pcard-top" style="--hc:${hc}">
+        <div><div class="pcard-fleet">${h(p.fleet)}</div><div class="pcard-name">${h(p.name)}</div></div>
+        <span class="phealth" style="background:${hc}">${ht}</span></div>
+      <div class="pcard-ring"><div class="pring" style="--p:${s.overall};--c:${hc}"><b>${s.overall}%</b></div>
+        <div class="pcard-meta">
+          <div><span>Projektleiter</span><b>${h(p.lead)}</b></div>
+          <div><span>Phase</span><b>${h(p.phase)}</b></div>
+          <div><span>Ziel EIS</span><b>${de(p.eis)}</b></div></div></div>
+      <div class="pcard-stats">
+        <div><b>${s.open}</b><span>offen</span></div>
+        <div><b style="color:${s.crit?'var(--red)':'inherit'}">${s.crit}</b><span>kritisch</span></div>
+        <div><b>${s.msDone}/${s.ms}</b><span>Mileston.</span></div>
+        <div><b>${s.n}</b><span>Tasks</span></div></div>
+      <div class="pbar"><i style="width:${s.overall}%;background:${hc}"></i></div>
+      <div class="pcard-tl" title="Grün ${s.g} · Blau ${s.b} · Gelb ${s.a} · Rot ${s.r}">${seg(s.g,"g")}${seg(s.b,"b")}${seg(s.a,"a")}${seg(s.r,"r")}</div>
+      <div class="pcard-act"><button class="btn" onclick="openProject(${i})">Projekt öffnen →</button>
+        <button class="iconbtn" onclick="renameProject(${i})" title="Bearbeiten">✎</button>
+        <button class="iconbtn" onclick="deleteProject(${i})" title="Löschen">✕</button></div>
+    </div>`;
+  }).join("") + `<div class="pcard pcard-new" onclick="newProject()"><div class="plus">＋</div><div>Neues Projekt anlegen</div></div>`;
+}
 
 /* ---------- DASHBOARD ---------- */
 function buildDashboard(){
@@ -543,16 +763,20 @@ function exportCSV(){
   const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
-  a.download="B737MAX_Training_Programm_Eurowings.csv";
+  const fn=((PROJECTS[ACTIVE]&&PROJECTS[ACTIVE].name)||"Projekt").replace(/[^a-z0-9]+/gi,"_").replace(/^_|_$/g,"");
+  a.download="Eurowings_"+fn+"_Tasks.csv";
   a.click();
 }
 
 /* ---------- GANTT ---------- */
 function buildGantt(){
-  const months=[]; let cur=new Date("2026-01-01"); const end=new Date("2027-07-01");
-  while(cur<end){ months.push(new Date(cur)); cur.setMonth(cur.getMonth()+1); }
-  const g0=months[0], g1=months[months.length-1]; g1.setMonth(g1.getMonth()+1);
-  const span=g1-months[0];
+  if(!DATA.length){ document.getElementById("gtbl").innerHTML="<tbody><tr><td style='padding:18px;color:#888'>Noch keine Aufgaben in diesem Projekt.</td></tr></tbody>"; return; }
+  const ds=DATA.flatMap(d=>[new Date(d.start),new Date(d.due)]);
+  let g0=new Date(Math.min(...ds)), gEnd=new Date(Math.max(...ds));
+  g0=new Date(g0.getFullYear(),g0.getMonth(),1);
+  gEnd=new Date(gEnd.getFullYear(),gEnd.getMonth()+1,1);
+  const months=[]; let cur=new Date(g0); while(cur<gEnd){ months.push(new Date(cur)); cur.setMonth(cur.getMonth()+1); }
+  const span=gEnd-g0;
   const mLbl=d=>["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"][d.getMonth()]+" "+String(d.getFullYear()).slice(2);
 
   let html=`<thead><tr><th class="gname">Workstream / Aufgabe</th>${months.map(m=>`<th class="gm">${mLbl(m)}</th>`).join("")}</tr></thead><tbody>`;
@@ -582,7 +806,7 @@ const tbody = document.getElementById("tbody");
 const savedTag = document.getElementById("savedTag");
 let saveTimer, statTimer;
 const saveDebounced = () => { clearTimeout(saveTimer); saveTimer=setTimeout(save,400); };
-const refreshStats = () => { buildDashboard(); buildGantt(); };
+const refreshStats = () => { buildDashboard(); buildGantt(); renderPortfolio(); rebuildProjSel(); };
 const refreshStatsDebounced = () => { clearTimeout(statTimer); statTimer=setTimeout(refreshStats,250); };
 function markSaved(){ if(!savedTag) return; savedTag.textContent="✓ gespeichert"; savedTag.style.opacity=1;
   clearTimeout(markSaved._t); markSaved._t=setTimeout(()=>savedTag.style.opacity=0,1400); }
@@ -609,7 +833,7 @@ tbody.addEventListener("change", e=>{
 tbody.addEventListener("click", e=>{
   const b=e.target.closest("[data-act]"); if(!b) return; const tr=b.closest("tr"); const d=byUid(tr.dataset.uid); if(!d) return;
   if(b.dataset.act==="del" && confirm("Aufgabe löschen?\n\n"+d.tid+" – "+d.task)){
-    DATA=DATA.filter(x=>x.uid!==d.uid); save(); renderTable(); refreshStats(); markSaved(); }
+    const i=DATA.findIndex(x=>x.uid===d.uid); if(i>=0) DATA.splice(i,1); save(); renderTable(); refreshStats(); markSaved(); }
   if(b.dataset.act==="dup"){
     const c=JSON.parse(JSON.stringify(d)); c.uid=UID++; c.no=nextNo(c.ws);
     c.task=d.task+" (Kopie)"; c.status="Not Started"; c.pct=0; c.ms="Nein";
@@ -624,13 +848,28 @@ function addRow(){
   const w=document.querySelector(".tablewrap"); if(w) w.scrollTop=w.scrollHeight;
 }
 function resetDemo(){
-  if(confirm("Alle Änderungen verwerfen und die Demo-Daten wiederherstellen?")){
-    try{ localStorage.removeItem(KEY); }catch(e){} seed(); save(); renderTable(); refreshStats(); markSaved(); }
+  if(confirm("Gesamtes Portfolio auf Demo-Daten zurücksetzen?\nAlle Projekte & Änderungen gehen verloren.")){
+    try{ localStorage.removeItem(KEY); }catch(e){} seedPortfolio(); setActive(0); save();
+    rebuildProjSel(); rebuildAll(); showView("portfolio"); markSaved(); }
 }
+
+/* ---------- NAV + HEADER WIRING ---------- */
+document.querySelectorAll("#nav .tab").forEach(t=>t.onclick=()=>showView(t.dataset.tab));
+document.getElementById("projSel").onchange=function(){ openProject(this.value); };
+// edit project meta from the header (name / lead / phase via contenteditable, EIS via date input)
+document.querySelector("header").addEventListener("input",e=>{
+  const f=e.target.dataset.pfield; if(!f||e.target.tagName==="INPUT") return;
+  PROJECTS[ACTIVE][f]=e.target.textContent; save(); rebuildProjSel(); markSaved();
+});
+document.querySelector("header").addEventListener("change",e=>{
+  const f=e.target.dataset.pfield; if(f&&e.target.tagName==="INPUT"){ PROJECTS[ACTIVE][f]=e.target.value; save(); markSaved(); }
+});
 
 /* ---------- INIT ---------- */
 load();
-buildDashboard(); renderTable(); buildGantt();
+rebuildProjSel();
+rebuildAll();
+showView("portfolio");
 </script>
 </body>
 </html>
