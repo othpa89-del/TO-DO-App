@@ -188,12 +188,16 @@ export default function Meetings({ persons = [], categories = [], profile = "", 
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Meeting, Projekt, Teilnehmer suchen …" />
             {search && <button className="mm-x" onClick={() => setSearch("")}><X size={14} /></button>}
           </div>
-          <select value={fType} onChange={(e) => setFType(e.target.value)}>
-            <option value="all">Alle Typen</option>{MEETING_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-          <select value={fStatus} onChange={(e) => setFStatus(e.target.value)}>
-            <option value="all">Alle Status</option>{MEETING_STATUS.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+          <div className="mm-fg"><span>Typ</span>
+            <select value={fType} onChange={(e) => setFType(e.target.value)}>
+              <option value="all">Alle Typen</option>{MEETING_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div className="mm-fg"><span>Status</span>
+            <select value={fStatus} onChange={(e) => setFStatus(e.target.value)}>
+              <option value="all">Alle Status</option>{MEETING_STATUS.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
           <button className={"mm-toggle" + (favOnly ? " on" : "")} onClick={() => setFavOnly((v) => !v)}><Star size={14} /> Favoriten</button>
           <button className={"mm-toggle" + (showArchive ? " on" : "")} onClick={() => setShowArchive((v) => !v)}><Archive size={14} /> {showArchive ? "Archiv" : "Aktiv"}</button>
           <div className="mm-layout">
@@ -651,7 +655,9 @@ const css = `
 .mm-search{display:flex;align-items:center;gap:7px;border:1px solid ${C.line};border-radius:8px;padding:0 10px;flex:1;min-width:180px;color:${C.cool};}
 .mm-search input{border:none;outline:none;padding:8px 0;font-size:14px;font-family:inherit;width:100%;background:none;}
 .mm-x{background:none;border:none;color:${C.cool};cursor:pointer;display:flex;}
-.mm-controls select{padding:7px 8px;font-size:13px;border:1px solid ${C.line};border-radius:8px;background:${C.white};font-family:inherit;}
+.mm-controls select{width:auto;max-width:200px;padding:6px 8px;font-size:12px;border:1px solid ${C.line};border-radius:8px;background:${C.white};font-family:inherit;}
+.mm-fg{display:flex;align-items:center;gap:5px;}
+.mm-fg span{font-size:10px;font-weight:800;color:${C.cool};text-transform:uppercase;letter-spacing:.04em;}
 .mm-toggle{display:inline-flex;align-items:center;gap:5px;font-family:inherit;font-size:13px;font-weight:700;color:${C.grey};background:${C.white};border:1px solid ${C.line};border-radius:8px;padding:7px 10px;cursor:pointer;}
 .mm-toggle.on{background:${C.burgundy};border-color:${C.burgundy};color:#fff;}
 .mm-layout{display:flex;gap:2px;margin-left:auto;}
