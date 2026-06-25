@@ -440,8 +440,6 @@ export default function App() {
     else stat.offen++;
     if (!isDone(t) && urgency(t) === "overdue") stat.overdue++;
   });
-  const openCount = taskViewPool.filter((t) => !isDone(t)).length;
-  const doneCount = taskViewPool.filter((t) => isDone(t)).length;
 
   const selectedItems = merged.filter((t) => selected.has(keyOf(t)));
   const expList = merged
@@ -645,7 +643,6 @@ export default function App() {
                 {v === "all" ? "Aufgaben" : v === "meetings" ? "Meeting Minutes" : v === "persons" ? "Persons" : v === "export" ? "Druck & Export" : "Neue Aufgabe"}
               </button>
             ))}
-            {isTaskView && <span className="tab-count">{openCount} offen · {doneCount} erledigt</span>}
           </nav>
         </header>
 
@@ -1173,7 +1170,6 @@ const css = `
 .tab{background:transparent;border:none;color:rgba(255,255,255,.78);font-family:inherit;font-size:14px;font-weight:700;padding:13px 16px;cursor:pointer;border-bottom:3px solid transparent;transition:.15s;}
 .tab:hover{color:${C.white};}
 .tab.on{color:${C.white};border-bottom-color:${C.skyLight};}
-.tab-count{margin-left:auto;color:rgba(255,255,255,.7);font-size:12px;font-weight:600;}
 
 .band{display:flex;gap:14px;flex-wrap:wrap;padding:16px 24px;background:${C.skyPale};border-bottom:1px solid ${C.line};}
 .rgroup{background:${C.white};border:1px solid ${C.line};border-top-width:3px;border-radius:9px;padding:11px 14px;min-width:200px;flex:1;}
