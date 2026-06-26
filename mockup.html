@@ -295,6 +295,20 @@
   .imp-map td{padding:4px 6px;border-bottom:1px solid var(--line)}
   .imp-map td:first-child,.imp-map th:first-child{width:44%;font-weight:600}
   .imp-map select{width:100%;padding:5px 7px;border:1px solid var(--line);border-radius:7px;font-size:12.5px;background:#fff}
+  /* New-project template chooser */
+  .tpl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(238px,1fr));gap:10px;margin:10px 0 16px}
+  .tpl-card{border:1.5px solid var(--line);border-radius:12px;padding:12px 13px;cursor:pointer;transition:border-color .12s,box-shadow .12s;background:#fff}
+  .tpl-card:hover{border-color:var(--ew-magenta-soft);box-shadow:0 2px 10px rgba(0,0,0,.06)}
+  .tpl-card.sel{border-color:var(--ew-magenta);box-shadow:0 0 0 2px var(--ew-magenta-soft)}
+  .tpl-ico{font-size:22px;line-height:1;margin-bottom:6px}
+  .tpl-name{font-weight:700;font-size:13.5px;color:var(--ink);margin-bottom:3px}
+  .tpl-desc{font-size:11.5px;color:var(--muted);line-height:1.45;margin-bottom:8px}
+  .tpl-meta{font-size:10.5px;color:var(--ew-magenta-dark);font-weight:600}
+  .np-form{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+  @media(max-width:560px){.np-form{grid-template-columns:1fr}}
+  .np-form label{display:flex;flex-direction:column;font-size:12px;color:var(--muted);gap:4px;font-weight:600}
+  .np-form input{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:8px;color:var(--ink)}
+  .np-form input:focus{outline:none;border-color:var(--ew-magenta);box-shadow:0 0 0 2px var(--ew-magenta-soft)}
   .imp-prev h4{margin:0 0 8px;font-size:12.5px;color:var(--ew-magenta-dark)}
   .imp-prev .rep-table{min-width:0;font-size:11px}
   .imp-foot{display:flex;gap:10px;align-items:center;padding:12px 18px;border-top:1px solid var(--line);flex-wrap:wrap}
@@ -1001,11 +1015,161 @@ function rebuildAll(){ rebuildWsFilter(); buildDashboard(); renderTable(); build
 function openProject(i){ setActive(+i); rebuildProjSel(); rebuildAll(); showView("dash"); }
 
 /* ---------- PROJECT MANAGEMENT ---------- */
-function newProject(){
-  const name=prompt("Name of the new project:","New project"); if(!name) return;
-  const fleet=prompt("Fleet / type:","")||"–";
-  PROJECTS.push({id:"p-"+Date.now(),name:name,fleet:fleet,lead:"Chief Training Captain",phase:"Planning",eis:"2027-12-31",tasks:[]});
-  save(); openProject(PROJECTS.length-1);
+/* ---------- PROJECT TEMPLATES ----------
+   Template task rows are compact: [wsCode, sub, title, prio, milestone(0/1), startWeek, durWeeks, deps].
+   Dates are generated relative to "today" at creation time, statuses start as Not Started / 0 %. */
+const WS_DIFF=[["Concept & Regulatory","REG"],["OM-D Differences","OMD"],["Instructor Standardisation","INS"],["Simulator & Devices","SIM"],["Training Material","TMD"],["Entry Into Service","EIS"]];
+const WS_RECUR=[["Programme Planning","PLAN"],["Regulatory & Compliance","REG"],["Content Update","CON"],["Instructor Briefing","INS"],["Scheduling","SCH"],["Delivery","DEL"],["Records & Compliance","REC"]];
+const WS_ATO=[["Application","APP"],["Gap Analysis","GAP"],["Documentation","DOC"],["Compliance","CMP"],["Authority Liaison","AUTH"],["Approval","APR"]];
+const WS_GEN=[["Initiation","INIT"],["Planning","PLAN"],["Execution","EXE"],["Monitoring & Control","MON"],["Closure","CLO"]];
+
+const TPL_EIS=[
+  ["REG","Concept","Training concept submission to authority","High",0,0,4,"-"],
+  ["REG","Concept","Authority kick-off & approval path","High",0,1,2,"REG-1"],
+  ["REG","Approval","Gap analysis Part-FCL / Part-ORA","High",0,2,4,"REG-1"],
+  ["REG","Approval","Training programme approval","High",1,8,6,"REG-3"],
+  ["OMD","Structure","OM-D gap analysis & chapter structure","High",0,2,4,"-"],
+  ["OMD","Content","Draft OM-D type chapters","Medium",0,6,8,"OMD-1"],
+  ["OMD","Content","OM-D review & release","High",1,14,3,"OMD-2"],
+  ["OMDA","Annex","Define annexes (forms, briefings, records)","Medium",0,8,6,"OMD-2"],
+  ["INS","Planning","Instructor (TRI/SFI) demand planning","High",0,2,3,"-"],
+  ["INS","Selection","Instructor nomination & selection","High",0,5,4,"INS-1"],
+  ["INS","Training","Instructor standardisation training","High",1,16,4,"INS-2"],
+  ["EXM","Planning","TRE demand & authorisation concept","High",0,4,3,"-"],
+  ["EXM","Authorisation","Examiner authorisation by authority","High",0,18,4,"EXM-1"],
+  ["SIM","Strategy","Simulator availability & sourcing","High",0,0,6,"-"],
+  ["SIM","Qualification","FFS qualification & data package","High",0,8,10,"SIM-1"],
+  ["SIM","Readiness","Simulator ready for training","High",1,20,2,"SIM-2"],
+  ["TMD","Planning","Training material inventory & gaps","Medium",0,4,4,"-"],
+  ["TMD","Development","Develop courseware & WBT","Medium",0,10,10,"TMD-1"],
+  ["DOC","Planning","Document map & manual updates","Medium",0,6,8,"-"],
+  ["BOE","Setup","OEM / Boeing programme kick-off","High",0,0,3,"-"],
+  ["BOE","Data","OEM data & licence package","High",0,3,6,"BOE-1"],
+  ["EIS","Readiness","Operational readiness review","High",1,22,2,"REG-4"],
+  ["EIS","Go-Live","Entry Into Service","High",1,24,1,"EIS-1"],
+];
+const TPL_DIFF=[
+  ["REG","Concept","Differences training concept","High",0,0,3,"-"],
+  ["REG","Approval","Authority approval of differences","High",1,6,4,"REG-1"],
+  ["OMD","Content","OM-D differences chapter","High",0,2,5,"REG-1"],
+  ["OMD","Content","OM-D review & release","High",1,9,2,"OMD-1"],
+  ["INS","Briefing","Instructor differences briefing","Medium",0,5,3,"OMD-1"],
+  ["SIM","Devices","Simulator / device differences config","High",0,3,4,"-"],
+  ["SIM","Devices","Device readiness","High",1,8,2,"SIM-1"],
+  ["TMD","Material","Differences material & WBT","Medium",0,4,6,"-"],
+  ["EIS","Readiness","Crew differences rollout plan","Medium",0,10,3,"REG-2"],
+  ["EIS","Go-Live","Differences training go-live","High",1,13,1,"EIS-1"],
+];
+const TPL_RECUR=[
+  ["PLAN","Cycle","Define recurrent cycle & syllabus","High",0,0,3,"-"],
+  ["PLAN","Cycle","Annual training plan approval","High",1,3,2,"PLAN-1"],
+  ["REG","Compliance","Regulatory requirement review","High",0,1,2,"-"],
+  ["CON","Update","Update recurrent content & scenarios","Medium",0,3,4,"PLAN-2"],
+  ["CON","Update","Content QA & release","Medium",1,7,2,"CON-1"],
+  ["INS","Briefing","Instructor standardisation briefing","Medium",0,5,2,"CON-1"],
+  ["SCH","Plan","Crew scheduling & sim slot booking","High",0,4,4,"PLAN-2"],
+  ["DEL","Run","Conduct recurrent sessions","High",0,8,16,"SCH-1"],
+  ["DEL","Run","Training cycle completion","High",1,24,1,"DEL-1"],
+  ["REC","Records","Record results & licence endorsements","Medium",0,8,16,"DEL-1"],
+  ["REC","Compliance","Compliance reporting","Medium",0,24,2,"DEL-2"],
+];
+const TPL_ATO=[
+  ["APP","Submit","Prepare application package","High",0,0,4,"-"],
+  ["APP","Submit","Submit application to authority","High",1,4,1,"APP-1"],
+  ["GAP","Analysis","Regulatory gap analysis","High",0,1,4,"-"],
+  ["DOC","Manuals","Compile manuals & exposition","High",0,2,8,"GAP-1"],
+  ["CMP","System","Compliance-monitoring system setup","Medium",0,4,6,"-"],
+  ["AUTH","Liaison","Authority audit preparation","High",0,8,4,"DOC-1"],
+  ["AUTH","Liaison","Authority audit / inspection","High",1,12,2,"AUTH-1"],
+  ["AUTH","Liaison","Resolve findings","High",0,14,4,"AUTH-2"],
+  ["APR","Grant","Corrective actions accepted","Medium",0,18,3,"AUTH-3"],
+  ["APR","Grant","Approval / certificate granted","High",1,21,2,"APR-1"],
+];
+const TPL_GEN=[
+  ["INIT","Charter","Define project scope & objectives","High",0,0,2,"-"],
+  ["INIT","Charter","Stakeholder alignment & charter sign-off","High",1,2,1,"INIT-1"],
+  ["PLAN","Plan","Work breakdown & schedule","High",0,2,3,"INIT-2"],
+  ["PLAN","Plan","Resource & budget plan","Medium",0,3,2,"INIT-2"],
+  ["PLAN","Plan","Plan baseline approved","High",1,5,1,"PLAN-1"],
+  ["EXE","Build","Execute deliverable – workstream 1","Medium",0,5,8,"PLAN-3"],
+  ["EXE","Build","Execute deliverable – workstream 2","Medium",0,7,8,"PLAN-3"],
+  ["EXE","Build","Key deliverable complete","High",1,15,1,"EXE-1"],
+  ["MON","Control","Quality & risk reviews","Medium",0,5,12,"PLAN-3"],
+  ["MON","Control","Status reporting","Low",0,5,12,"-"],
+  ["CLO","Close","Acceptance & handover","High",0,16,2,"EXE-3"],
+  ["CLO","Close","Project closure & lessons learned","Medium",1,18,1,"CLO-1"],
+];
+const TEMPLATES=[
+  {id:"blank", icon:"📄", name:"Blank project", desc:"Empty project with the standard 10 workstreams. Build everything from scratch.", ws:null, tasks:[]},
+  {id:"eis", icon:"✈️", name:"New Aircraft Type – Entry Into Service", desc:"Full type-rating introduction: regulatory, OM-D, instructors, examiners, simulator, material and EIS milestones.", ws:null, tasks:TPL_EIS},
+  {id:"diff", icon:"🔁", name:"Differences / Conversion Training", desc:"Variant or sub-type differences programme (e.g. CEO→NEO) with a lean workstream set.", ws:WS_DIFF, tasks:TPL_DIFF},
+  {id:"recur", icon:"♻️", name:"Recurrent / Refresher Cycle", desc:"Annual recurrent training cycle: planning, content update, scheduling, delivery and records.", ws:WS_RECUR, tasks:TPL_RECUR},
+  {id:"ato", icon:"🏛️", name:"ATO / Authority Approval", desc:"Regulatory approval project: application, gap analysis, documentation, audit and certificate.", ws:WS_ATO, tasks:TPL_ATO},
+  {id:"generic", icon:"📋", name:"Generic Phased Project", desc:"All-purpose project: Initiation · Planning · Execution · Monitoring · Closure.", ws:WS_GEN, tasks:TPL_GEN},
+];
+function tplCountMs(tpl){ return tpl.tasks.filter(r=>r[4]).length; }
+function tplWsCount(tpl){ return (tpl.ws||WS).length; }
+function tplTasks(rows){
+  const today=new Date(); today.setHours(0,0,0,0);
+  const iso=off=>{ const x=new Date(today); x.setDate(x.getDate()+off); return x.toISOString().slice(0,10); };
+  const noBy={};
+  return rows.map((r,i)=>{ const [ws,sub,title,prio,ms,sw,dw,deps]=r; noBy[ws]=(noBy[ws]||0)+1;
+    return { uid:i, ws, sub:sub||"–", no:noBy[ws], task:title, desc:"", resp:"", support:"",
+      start:iso(sw*7), due:iso((sw+Math.max(dw,1))*7), prio:prio||"Medium", status:"Not Started", pct:0,
+      ms:ms?"Yes":"No", deps:deps||"-", risk:"-", upd:iso(0), comment:"", format:"", revision:"", todos:[] }; });
+}
+function tplTargetDate(tpl){ const today=new Date(); today.setHours(0,0,0,0);
+  let wk=tpl.tasks.reduce((m,r)=>Math.max(m,r[5]+r[6]),0); if(!wk) wk=78;   // ~18 months for a blank project
+  const d=new Date(today); d.setDate(d.getDate()+wk*7); return d.toISOString().slice(0,10); }
+
+let NP_SEL="eis", NP_FORM={};
+function newProject(){ NP_SEL="eis"; NP_FORM={}; renderNewProject(); }
+function npCapture(){ const g=id=>{ const e=document.getElementById(id); return e?e.value:undefined; };
+  NP_FORM={ name:g("npName"), fleet:g("npFleet"), lead:g("npLead") }; }
+function selectTpl(id){ npCapture(); NP_SEL=id; renderNewProject(); }
+function closeNewProject(){ const m=document.getElementById("npModal"); if(m) m.style.display="none"; }
+function renderNewProject(){
+  const tpl=TEMPLATES.find(t=>t.id===NP_SEL)||TEMPLATES[0];
+  const cards=TEMPLATES.map(t=>{ const n=t.tasks.length, ms=tplCountMs(t), wsn=tplWsCount(t);
+    const meta=n?`${n} tasks · ${ms} milestones · ${wsn} workstreams`:`empty · ${wsn} workstreams`;
+    return `<div class="tpl-card ${t.id===NP_SEL?'sel':''}" onclick="selectTpl('${t.id}')">
+      <div class="tpl-ico">${t.icon}</div><div class="tpl-name">${h(t.name)}</div>
+      <div class="tpl-desc">${h(t.desc)}</div><div class="tpl-meta">${meta}</div></div>`; }).join("");
+  const defName=tpl.id==="blank"?"New project":tpl.name;
+  const prev=NP_FORM.name;
+  const nameVal=(prev===undefined||prev===""||prev==="New project"||TEMPLATES.some(t=>t.name===prev))?defName:prev;
+  const fleetVal=NP_FORM.fleet||"";
+  const leadVal=NP_FORM.lead!==undefined?NP_FORM.lead:"Chief Training Captain";
+  const html=`<div class="imp-card" style="width:min(880px,96vw);max-height:92vh;display:flex;flex-direction:column">
+    <div class="imp-head"><b>✚ New project</b><button class="iconbtn" onclick="closeNewProject()">✕</button></div>
+    <div class="imp-body" style="overflow:auto">
+      <p class="note" style="margin-top:0">Choose a template to start from. Templates pre-fill the workstreams plus a skeleton of tasks &amp; milestones — dates are set relative to today and everything stays fully editable.</p>
+      <div class="tpl-grid">${cards}</div>
+      <div class="np-form">
+        <label>Project name<input id="npName" value="${h(nameVal)}"></label>
+        <label>Fleet / type<input id="npFleet" value="${h(fleetVal)}" placeholder="e.g. Boeing 737-8 MAX"></label>
+        <label>Project lead<input id="npLead" value="${h(leadVal)}"></label>
+        <label>Target date<input id="npTarget" type="date" value="${tplTargetDate(tpl)}"></label>
+      </div>
+    </div>
+    <div class="imp-foot"><span class="note">Workstreams can be renamed / re-coded later via 🗂 Workstreams.</span>
+      <span style="flex:1"></span>
+      <button class="btn ghost" onclick="closeNewProject()">Cancel</button>
+      <button class="btn" onclick="createFromTpl()">Create project</button></div></div>`;
+  let m=document.getElementById("npModal");
+  if(!m){ m=document.createElement("div"); m.id="npModal"; m.className="imp-overlay"; document.body.appendChild(m); }
+  m.innerHTML=html; m.style.display="flex";
+}
+function createFromTpl(){
+  const tpl=TEMPLATES.find(t=>t.id===NP_SEL)||TEMPLATES[0];
+  const name=(document.getElementById("npName").value||tpl.name||"New project").trim()||"New project";
+  const fleet=(document.getElementById("npFleet").value||"").trim()||"–";
+  const lead=(document.getElementById("npLead").value||"").trim()||"Chief Training Captain";
+  const target=document.getElementById("npTarget").value||tplTargetDate(tpl);
+  const proj={ id:"p-"+Date.now(), name, fleet, lead, phase:"Planning", eis:target, tasks:tplTasks(tpl.tasks) };
+  if(tpl.ws) proj.ws=tpl.ws.map(w=>[w[0],w[1]]);
+  PROJECTS.push(proj); recomputeProject(proj);
+  save(); closeNewProject(); openProject(PROJECTS.length-1);
 }
 function renameProject(i){
   const p=PROJECTS[i];

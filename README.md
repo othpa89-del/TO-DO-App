@@ -22,6 +22,12 @@ multi‑project tool** that works for any kind of project.
 - **Portfolio home page** — every project as a status card (RAG health, progress ring,
   open / critical / milestone / task counts, status mini‑bar, target date) plus
   portfolio‑level KPIs. Create / rename / delete projects.
+- **Project templates** — *New project* opens a template chooser: **Blank**, **New
+  Aircraft Type – Entry Into Service**, **Differences / Conversion Training**,
+  **Recurrent / Refresher Cycle**, **ATO / Authority Approval** and **Generic Phased
+  Project**. Each template pre‑fills the workstreams plus a skeleton of tasks,
+  dependencies and milestones; dates are generated **relative to today** and everything
+  stays fully editable (name / fleet / lead / target date set in the same dialog).
 - **Per‑project workspace** — independent **Dashboard**, **Tasks** table, **Gantt**
   timeline, **To‑Do** checklists and **Report** for each project.
 - **To‑Do tab** — a checklist per task (the Gantt sub‑items), grouped by workstream:
