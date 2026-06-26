@@ -103,6 +103,7 @@
   .pill{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;display:inline-block}
   .s-comp{background:#e3f6ec;color:var(--green)} .s-prog{background:var(--blue-soft);color:#0a7d9c}
   .s-not{background:#eef0f4;color:var(--muted)} .s-del{background:#fde7e7;color:var(--red)}
+  .s-rev{background:#efe7fb;color:#6b3fa0} .s-hold{background:#fff3da;color:#b9810b} .s-na{background:#eef0f4;color:#9aa3b1}
   .p-high{background:#fde7e7;color:var(--red)} .p-med{background:#fff3da;color:#b9810b} .p-low{background:#eef0f4;color:var(--muted)}
   .mini{height:7px;background:#eef1f6;border-radius:5px;overflow:hidden;min-width:60px}
   .mini i{display:block;height:100%;background:var(--ew-magenta)}
@@ -433,10 +434,14 @@
       <div class="card">
         <h3><span class="dot"></span>Status overview (RAG)</h3>
         <div class="traffic" id="traffic"></div>
-        <div class="note">Colours reflect task status: Green = Completed, Blue = In Progress, Yellow = Not Started (planned), Red = Delayed / critical.</div>
+        <div class="note">Colours reflect task status: Green = Completed, Blue = In Progress, Yellow = Not Started (planned), Red = Overdue / critical.</div>
       </div>
     </div>
     <div class="card" id="cpCard"></div>
+    <div class="card">
+      <h3><span class="dot"></span>Workload per person</h3>
+      <div id="workload"></div>
+    </div>
     <div class="card">
       <h3><span class="dot"></span>Milestone tracking</h3>
       <div id="milestones"></div>
@@ -449,7 +454,6 @@
       <select id="fWs"><option value="">All workstreams</option></select>
       <select id="fStatus">
         <option value="">All statuses</option>
-        <option>Not Started</option><option>In Progress</option><option>Completed</option><option>Delayed</option>
       </select>
       <select id="fPrio"><option value="">All priorities</option><option>High</option><option>Medium</option><option>Low</option></select>
       <input id="fSearch" placeholder="🔍 Search task / owner…" style="min-width:240px"/>
@@ -470,7 +474,7 @@
           <th>Workstream</th><th>Sub-Workstream</th><th>Task-ID</th><th>Task / Deliverable</th>
           <th>Description</th><th>Owner</th><th>Supporting depts</th><th>Start</th>
           <th>Due Date</th><th>Duration (days)</th><th>Priority</th><th>Status</th><th>% Compl.</th>
-          <th>Milestone</th><th>Dependencies</th><th>Risks / Issues</th><th>Last update</th><th>Comment</th><th>Action</th>
+          <th>Milestone</th><th>Dependencies</th><th>Risks / Issues</th><th>Format</th><th>Revision</th><th>Last update</th><th>Comment</th><th>Action</th>
         </tr></thead>
         <tbody id="tbody"></tbody>
       </table>
@@ -483,7 +487,7 @@
     <div class="leg">
       <span><i style="background:linear-gradient(90deg,var(--ew-magenta),#D41370)"></i> Task (ongoing/planned)</span>
       <span><i style="background:linear-gradient(90deg,var(--green),#46c285)"></i> Completed</span>
-      <span><i style="background:linear-gradient(90deg,var(--red),#ef6b6b)"></i> Delayed</span>
+      <span><i style="background:linear-gradient(90deg,var(--red),#ef6b6b)"></i> Overdue</span>
       <span><i style="transform:rotate(45deg);background:var(--amber);width:12px;height:12px"></i> Milestone</span>
       <span><i style="background:var(--blue);width:3px;height:14px"></i> Today (25 Jun 2026)</span>
       <span><i style="outline:2px solid #d23b3b;background:transparent;width:14px;height:8px"></i> Critical path</span>
@@ -703,8 +707,22 @@ const TODAY = new Date("2026-06-25");
 const TODAY_ISO = "2026-06-25";
 const KEY = "ew_pm_portfolio_v1";
 const COPYRIGHT = "© Copyright by Patrick Thorn";
-const STATUSES = ["Not Started","In Progress","Completed","Delayed"];
+// Full Eurowings status set. rag buckets: g=done · b=in progress · a=planned/hold · r=overdue · x=excluded(N/A)
+const STATUS_META = {
+  "Not Started":    {cls:"s-not",  rag:"a", done:false},
+  "In Progress":    {cls:"s-prog", rag:"b", done:false},
+  "Needs Review":   {cls:"s-rev",  rag:"b", done:false},
+  "On Hold":        {cls:"s-hold", rag:"a", done:false},
+  "Completed":      {cls:"s-comp", rag:"g", done:true },
+  "Approved":       {cls:"s-comp", rag:"g", done:true },
+  "Not Applicable": {cls:"s-na",   rag:"x", done:true },
+  "Overdue":        {cls:"s-del",  rag:"r", done:false}
+};
+const STATUSES = Object.keys(STATUS_META);
+const FORMATS = ["","Articulate 360","PDF","PPT","SCORM only","WBT","WBT + PDF","WBT + PPT","WORD","WORD + PDF"];
 const PRIOS = ["High","Medium","Low"];
+const statusDone = s => !!(STATUS_META[s]||{}).done;
+const statusRag  = s => (STATUS_META[s]||{}).rag || "a";
 const VIEWLBL = {portfolio:"Portfolio overview",dash:"Dashboard",table:"Master Task List",gantt:"Gantt / Timeline",todo:"To-Do",report:"Status report"};
 const MONTHS_EN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -715,9 +733,11 @@ const pad = n => String(n).padStart(2,"0");
 const days = (s,e) => Math.round((new Date(e)-new Date(s))/864e5);
 const de = iso => { if(!iso) return ""; const d=new Date(iso); return pad(d.getDate())+" "+MONTHS_EN[d.getMonth()]+" "+d.getFullYear(); };
 const h = s => String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-const statusClass = s => ({"Completed":"s-comp","In Progress":"s-prog","Not Started":"s-not","Delayed":"s-del"}[s]||"s-not");
+const statusClass = s => (STATUS_META[s]||{}).cls || "s-not";
 const prioClass = p => ({"High":"p-high","Medium":"p-med","Low":"p-low"}[p]||"p-med");
 const opt = (arr,v) => arr.map(o=>`<option ${o===v?"selected":""}>${h(o)}</option>`).join("");
+// like opt(), but guarantees the current value is selectable even if it is not in the preset list
+const optWith = (arr,v) => opt(arr.includes(v||"")?arr:[...arr,v],v);
 // Workstreams are freely definable per project (p.ws); default = global WS list
 function pWS(p){ return (p&&p.ws&&p.ws.length)?p.ws:WS; }
 const wsNameFor = (p,a) => { const w=pWS(p).find(x=>x[1]===a); return w?w[0]:a; };
@@ -736,13 +756,15 @@ function wsFromTasks(tasks){ const seen=[]; tasks.forEach(d=>{ if(!seen.includes
 
 /* ---------- data model + persistence ---------- */
 function mkTasks(arr){ return arr.map((r,i)=>{ const o={}; COLS.forEach((c,j)=>o[c]=r[j]); o.uid=i; return o; }); }
-// Status automation: overdue, non-completed tasks -> Delayed (and back when the due date is in the future again)
+// Status automation: overdue, not-done tasks -> Overdue (and back when the due date is in the future again)
 function autoStatus(d){
-  if(d.status==="Completed") return;
-  if(new Date(d.due) < TODAY) d.status="Delayed";
-  else if(d.status==="Delayed") d.status = (d.pct>0 ? "In Progress" : "Not Started");
+  if(statusDone(d.status)) return;                 // Completed / Approved / Not Applicable: leave
+  if(new Date(d.due) < TODAY) d.status="Overdue";
+  else if(d.status==="Overdue") d.status = (d.pct>0 ? "In Progress" : "Not Started");
 }
-function recomputeProject(p){ p.tasks.forEach(d=>{ if(d.ms==="Ja")d.ms="Yes"; else if(d.ms==="Nein")d.ms="No"; if(!Array.isArray(d.todos)) d.todos=[];
+function recomputeProject(p){ p.tasks.forEach(d=>{ if(d.ms==="Ja")d.ms="Yes"; else if(d.ms==="Nein")d.ms="No";
+  if(d.status==="Delayed") d.status="Overdue";     // migrate old status value
+  if(!Array.isArray(d.todos)) d.todos=[]; if(d.format==null) d.format=""; if(d.revision==null) d.revision="";
   if(d.todos.length){ d.pct=Math.round(d.todos.filter(t=>t.done).length/d.todos.length*100); }   // % auto-derived from to-dos
   d.tid=d.ws+"-"+pad(d.no); d.dur=days(d.start,d.due); autoStatus(d); }); }
 function recompute(){ recomputeProject(PROJECTS[ACTIVE]); }
@@ -797,14 +819,15 @@ function load(){
 /* ---------- portfolio statistics ---------- */
 function projStats(p){
   const t=p.tasks, n=t.length||1;
-  const done=t.filter(d=>d.status==="Completed").length;
-  const open=t.filter(d=>d.status!=="Completed").length;
-  const delayed=t.filter(d=>d.status==="Delayed").length;
-  const crit=t.filter(d=>d.status==="Delayed"||(d.prio==="High"&&d.status!=="Completed")).length;
-  const msAll=t.filter(d=>d.ms==="Yes"), msDone=msAll.filter(d=>d.status==="Completed").length;
-  const overdueMs=msAll.filter(d=>d.status!=="Completed" && new Date(d.due)<TODAY).length;
+  const done=t.filter(d=>statusDone(d.status)).length;
+  const open=t.length-done;
+  const delayed=t.filter(d=>d.status==="Overdue").length;
+  const crit=t.filter(d=>d.status==="Overdue"||(d.prio==="High"&&!statusDone(d.status))).length;
+  const msAll=t.filter(d=>d.ms==="Yes"), msDone=msAll.filter(d=>statusDone(d.status)).length;
+  const overdueMs=msAll.filter(d=>!statusDone(d.status) && new Date(d.due)<TODAY).length;
   const overall=Math.round(t.reduce((a,d)=>a+d.pct,0)/n);
-  const g=done, b=t.filter(d=>d.status==="In Progress").length, a=t.filter(d=>d.status==="Not Started").length, r=delayed;
+  const g=t.filter(d=>statusRag(d.status)==="g").length, b=t.filter(d=>statusRag(d.status)==="b").length,
+        a=t.filter(d=>statusRag(d.status)==="a").length, r=t.filter(d=>statusRag(d.status)==="r").length;
   let health="g"; if(delayed>0) health="a"; if(delayed>=3||overdueMs>0) health="r";
   return {n:t.length,done,open,delayed,crit,ms:msAll.length,msDone,overall,g,b,a,r,health};
 }
@@ -853,20 +876,20 @@ function projectReportHTML(p){
     const pr=Math.round(items.reduce((a,d)=>a+d.pct,0)/items.length);
     return `<div class="repws"><span title="${name}">${name}</span><div class="rtrack"><i style="width:${pr}%"></i></div><b>${pr}%</b></div>`; }).join("");
   const ms=p.tasks.filter(d=>d.ms==="Yes").sort((a,b)=>new Date(a.due)-new Date(b.due));
-  const msRows=ms.map(m=>{ const od=m.status!=="Completed"&&new Date(m.due)<TODAY;
-    const col=m.status==="Completed"?"var(--green)":od?"var(--red)":m.status==="In Progress"?"var(--blue)":"var(--grey)";
-    const sym=m.status==="Completed"?"✓":od?"!":"◆";
+  const msRows=ms.map(m=>{ const done=statusDone(m.status); const od=!done&&new Date(m.due)<TODAY;
+    const col=done?"var(--green)":od?"var(--red)":statusRag(m.status)==="b"?"var(--blue)":"var(--grey)";
+    const sym=done?"✓":od?"!":"◆";
     return `<div class="rep-ms"><span class="rdot" style="background:${col}">${sym}</span><span style="flex:1">${h(m.task)}</span><span class="rdate">${de(m.due)}</span></div>`; }).join("");
   const risks=p.tasks.filter(d=>d.risk&&d.risk!=="-").sort((a,b)=>{
-    const ra=a.status==="Delayed"?0:1, rb=b.status==="Delayed"?0:1; if(ra!==rb) return ra-rb;
+    const ra=statusRag(a.status)==="r"?0:1, rb=statusRag(b.status)==="r"?0:1; if(ra!==rb) return ra-rb;
     const pa=a.prio==="High"?0:a.prio==="Medium"?1:2, pb=b.prio==="High"?0:b.prio==="Medium"?1:2; if(pa!==pb) return pa-pb;
     return new Date(a.due)-new Date(b.due);
   }).slice(0,7);
   const riskRows=risks.length?risks.map(d=>`<div class="rep-risk"><span><b class="pill ${statusClass(d.status)}" style="font-size:9px">${d.tid}</b> ${h(d.risk)}</span><span class="rdate">${de(d.due)}</span></div>`).join("")
     :'<div class="note">No open risks / issues recorded.</div>';
-  const soon=p.tasks.filter(d=>d.status!=="Completed").filter(d=>{ const due=new Date(d.due); return due>=TODAY && (due-TODAY)<=30*864e5; }).sort((a,b)=>new Date(a.due)-new Date(b.due));
+  const soon=p.tasks.filter(d=>!statusDone(d.status)).filter(d=>{ const due=new Date(d.due); return due>=TODAY && (due-TODAY)<=30*864e5; }).sort((a,b)=>new Date(a.due)-new Date(b.due));
   const endTask=cmap[cp.endTid];
-  const cpDelayed=cp.order.filter(t=>cmap[t]&&cmap[t].status==="Delayed").length;
+  const cpDelayed=cp.order.filter(t=>cmap[t]&&cmap[t].status==="Overdue").length;
   return `
   <div class="rep-actions no-print">
     <button class="btn" onclick="window.print()">🖨 Print as PDF</button>
@@ -888,7 +911,7 @@ function projectReportHTML(p){
           <div class="b"><span>Target date</span><b style="font-size:14px">${de(p.eis)}</b></div>
           <div class="b"><span>Open</span><b>${s.open}</b></div>
           <div class="b"><span>Critical</span><b style="color:${s.crit?'var(--red)':'inherit'}">${s.crit}</b></div>
-          <div class="b"><span>Delayed</span><b style="color:${s.r?'var(--red)':'inherit'}">${s.r}</b></div>
+          <div class="b"><span>Overdue</span><b style="color:${s.r?'var(--red)':'inherit'}">${s.r}</b></div>
           <div class="b"><span>Milestones</span><b>${s.msDone}/${s.ms}</b></div>
           <div class="b"><span>Tasks</span><b>${s.n}</b></div>
         </div>
@@ -916,7 +939,7 @@ function portfolioReportHTML(){
   const rows=PROJECTS.map(p=>{ const s=projStats(p);
     const hc={g:"var(--green)",a:"var(--amber)",r:"var(--red)"}[s.health];
     const ht={g:"On Track",a:"At Risk",r:"Critical"}[s.health];
-    const nm=p.tasks.filter(d=>d.ms==="Yes"&&d.status!=="Completed").sort((a,b)=>new Date(a.due)-new Date(b.due))[0];
+    const nm=p.tasks.filter(d=>d.ms==="Yes"&&!statusDone(d.status)).sort((a,b)=>new Date(a.due)-new Date(b.due))[0];
     return `<tr><td><b>${h(p.name)}</b><br><span class="note">${h(p.fleet)}</span></td>
       <td><span class="phealth" style="background:${hc}">${ht}</span></td>
       <td><div class="rtrack" style="width:90px;display:inline-block;vertical-align:middle"><i style="width:${s.overall}%;background:${hc}"></i></div> ${s.overall}%</td>
@@ -1020,19 +1043,19 @@ function renderPortfolio(){
 /* ---------- DASHBOARD ---------- */
 function buildDashboard(){
   const total=DATA.length;
-  const open=DATA.filter(d=>d.status!=="Completed").length;
-  const done=DATA.filter(d=>d.status==="Completed").length;
-  const crit=DATA.filter(d=>d.status==="Delayed" || (d.prio==="High" && d.status!=="Completed")).length;
-  const delayed=DATA.filter(d=>d.status==="Delayed").length;
+  const done=DATA.filter(d=>statusDone(d.status)).length;
+  const open=total-done;
+  const crit=DATA.filter(d=>d.status==="Overdue" || (d.prio==="High" && !statusDone(d.status))).length;
+  const delayed=DATA.filter(d=>d.status==="Overdue").length;
   const ms=DATA.filter(d=>d.ms==="Yes");
-  const msDone=ms.filter(d=>d.status==="Completed").length;
+  const msDone=ms.filter(d=>statusDone(d.status)).length;
   const overall=Math.round(DATA.reduce((a,d)=>a+d.pct,0)/total);
 
   document.getElementById("kpis").innerHTML = [
     kpi("Open tasks",open,`of ${total} total · ${done} done`),
-    kpi("Critical tasks",crit,`${delayed} delayed · high-prio open`,crit>0?"red":""),
+    kpi("Critical tasks",crit,`${delayed} overdue · high-prio open`,crit>0?"red":""),
     kpi("Milestones",`${msDone}/${ms.length}`,"programme milestones reached"),
-    kpi("Delayed",delayed,"past due date",delayed>0?"red":""),
+    kpi("Overdue",delayed,"past due date",delayed>0?"red":""),
     kpi("High priority total",DATA.filter(d=>d.prio==="High").length,"strategic / critical path"),
     `<div class="kpi accent"><div class="ring" style="--p:${overall}"><b>${overall}%</b></div>
        <div class="lbl">Overall progress</div><div class="val">${overall}%</div>
@@ -1048,24 +1071,41 @@ function buildDashboard(){
       <div class="pct">${p}%</div></div>`;
   }).join("");
 
-  // traffic light
-  const g=DATA.filter(d=>d.status==="Completed").length;
-  const b=DATA.filter(d=>d.status==="In Progress").length;
-  const a=DATA.filter(d=>d.status==="Not Started").length;
-  const r=DATA.filter(d=>d.status==="Delayed").length;
+  // traffic light (RAG buckets)
+  const g=DATA.filter(d=>statusRag(d.status)==="g").length;
+  const b=DATA.filter(d=>statusRag(d.status)==="b").length;
+  const a=DATA.filter(d=>statusRag(d.status)==="a").length;
+  const r=DATA.filter(d=>statusRag(d.status)==="r").length;
+  const na=DATA.filter(d=>statusRag(d.status)==="x").length;
   document.getElementById("traffic").innerHTML = `
-    <div class="tl g"><b>${g}</b><span>Completed</span></div>
-    <div class="tl b" style="background:var(--blue)"><b>${b}</b><span>In Progress</span></div>
-    <div class="tl a"><b>${a}</b><span>Not Started</span></div>
-    <div class="tl r"><b>${r}</b><span>Delayed</span></div>`;
+    <div class="tl g"><b>${g}</b><span>Done</span></div>
+    <div class="tl b" style="background:var(--blue)"><b>${b}</b><span>In Progress / Review</span></div>
+    <div class="tl a"><b>${a}</b><span>Not Started / On Hold</span></div>
+    <div class="tl r"><b>${r}</b><span>Overdue</span></div>
+    ${na?`<div class="tl b" style="background:var(--grey)"><b>${na}</b><span>Not Applicable</span></div>`:""}`;
+
+  // workload per person (by owner)
+  const byPerson={};
+  DATA.forEach(d=>{ const name=(d.resp||"").trim()||"— unassigned —";
+    const w=byPerson[name] || (byPerson[name]={name,total:0,open:0,overdue:0,pctSum:0});
+    w.total++; w.pctSum+=d.pct; if(!statusDone(d.status)) w.open++; if(d.status==="Overdue") w.overdue++; });
+  const people=Object.values(byPerson).sort((x,y)=>y.open-x.open || y.total-x.total);
+  const maxTotal=Math.max(1,...people.map(p=>p.total));
+  document.getElementById("workload").innerHTML = people.length ? people.map(p=>{
+    const avg=Math.round(p.pctSum/p.total), barW=Math.round(p.total/maxTotal*100);
+    const od=p.overdue?` · <span style="color:var(--red)">${p.overdue} overdue</span>`:"";
+    return `<div class="wsrow"><div class="name" title="${h(p.name)}">${h(p.name)}</div>
+      <div class="track" title="${p.total} tasks"><div class="fill" style="width:${barW}%;background:${p.overdue?'var(--red)':'var(--ew-magenta)'}"></div></div>
+      <div class="pct" style="min-width:160px;text-align:left">${p.open}/${p.total} open${od} · ${avg}%</div></div>`;
+  }).join("") : '<div class="note">No owners assigned yet.</div>';
 
   // milestones
   document.getElementById("milestones").innerHTML = ms
     .sort((x,y)=>new Date(x.due)-new Date(y.due))
     .map(m=>{
-      const st=m.status, c=statusClass(st);
-      const ico = st==="Completed"?"var(--green)": st==="Delayed"?"var(--red)": st==="In Progress"?"var(--blue)":"var(--grey)";
-      const sym = st==="Completed"?"✓": st==="Delayed"?"!":"◆";
+      const st=m.status, c=statusClass(st), rag=statusRag(st);
+      const ico = rag==="g"?"var(--green)": rag==="r"?"var(--red)": rag==="b"?"var(--blue)":"var(--grey)";
+      const sym = statusDone(st)?"✓": rag==="r"?"!":"◆";
       return `<div class="ms"><div class="ico" style="background:${ico}">${sym}</div>
         <div class="mtxt"><b>${m.task}</b><small>${wsName(m.ws)} · Target: ${de(m.due)} · ${m.tid}</small></div>
         <span class="badge ${c}">${st}</span></div>`;
@@ -1093,6 +1133,8 @@ function rebuildWsFilter(){
   const opts=`<option value="">All workstreams</option>`+wsCodes(PROJECTS[ACTIVE]).map(([n,a])=>`<option value="${a}">${h(n)}</option>`).join("");
   [fWs, document.getElementById("tdWs")].forEach(sel=>{ if(!sel) return; const cur=sel.value;
     sel.innerHTML=opts; if([...sel.options].some(o=>o.value===cur)) sel.value=cur; }); }
+(function(){ const fs=document.getElementById("fStatus");
+  fs.innerHTML=`<option value="">All statuses</option>`+STATUSES.map(s=>`<option>${s}</option>`).join(""); })();
 ["fWs","fStatus","fPrio","fSearch","fMs","fCp"].forEach(id=>document.getElementById(id).addEventListener("input",renderTable));
 
 function currentRows(){
@@ -1126,6 +1168,8 @@ function renderTable(){
       <td style="text-align:center"><select class="cell-input msedit" data-field="ms">${opt(["Yes","No"],d.ms)}</select></td>
       <td><div class="ce" contenteditable data-field="deps">${h(d.deps)}</div></td>
       <td class="${d.risk&&d.risk!=="-"?"risk":""}"><div class="ce" contenteditable data-field="risk">${h(d.risk)}</div></td>
+      <td><select class="cell-input" data-field="format">${optWith(FORMATS,d.format||"")}</select></td>
+      <td><div class="ce" contenteditable data-field="revision">${h(d.revision)}</div></td>
       <td><input type="date" class="cell-input cell-date" data-field="upd" value="${d.upd}"></td>
       <td><div class="ce" contenteditable data-field="comment">${h(d.comment)}</div></td>
       <td><div class="rowact"><button class="iconbtn" data-act="dup" title="Duplicate">⧉</button><button class="iconbtn" data-act="del" title="Delete">✕</button></div></td>
@@ -1137,10 +1181,10 @@ function renderTable(){
 function exportCSV(){
   const head=["Workstream","Sub-Workstream","Task-ID","Task / Deliverable","Description","Owner",
     "Supporting departments","Start date","Due Date","Duration (days)","Priority","Status","% Completion",
-    "Milestone","Dependencies","Risks / Issues","Last update","Comment"];
+    "Milestone","Dependencies","Risks / Issues","Format","Revision","Last update","Comment"];
   const esc=v=>`"${String(v).replace(/"/g,'""')}"`;
   const rows=currentRows().map(d=>[wsName(d.ws),d.sub,d.tid,d.task,d.desc,d.resp,d.support,de(d.start),de(d.due),
-    d.dur,d.prio,d.status,d.pct+"%",d.ms,d.deps,d.risk,de(d.upd),d.comment].map(esc).join(";"));
+    d.dur,d.prio,d.status,d.pct+"%",d.ms,d.deps,d.risk,d.format||"",d.revision||"",de(d.upd),d.comment].map(esc).join(";"));
   const csv="﻿"+[head.map(esc).join(";"),...rows,"",esc(COPYRIGHT)].join("\r\n");
   const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
   const a=document.createElement("a");
@@ -1232,11 +1276,11 @@ function buildXlsx(sheets){
 }
 function sheetNames(names){ const seen={}, out=[]; names.forEach(n=>{ let b=String(n||"Sheet").replace(/[\[\]:*?\/\\]/g," ").trim().slice(0,28)||"Sheet";
   let nm=b,k=2; while(seen[nm.toLowerCase()]){ nm=b.slice(0,28-(""+k).length-1)+" "+k; k++; } seen[nm.toLowerCase()]=1; out.push(nm); }); return out; }
-const TASK_HEAD=["Workstream","Sub-Workstream","Task-ID","Task / Deliverable","Description","Owner","Supporting departments","Start date","Due Date","Duration (days)","Priority","Status","% Completion","Milestone","Dependencies","Risks / Issues","Last update","Comment"];
+const TASK_HEAD=["Workstream","Sub-Workstream","Task-ID","Task / Deliverable","Description","Owner","Supporting departments","Start date","Due Date","Duration (days)","Priority","Status","% Completion","Milestone","Dependencies","Risks / Issues","Format","Revision","Last update","Comment"];
 function projectRows(p){ const rows=[TASK_HEAD.slice()];
-  p.tasks.forEach(d=>rows.push([wsNameFor(p,d.ws),d.sub,d.tid,d.task,d.desc,d.resp,d.support,de(d.start),de(d.due),d.dur,d.prio,d.status,d.pct,d.ms,d.deps,d.risk,de(d.upd),d.comment]));
+  p.tasks.forEach(d=>rows.push([wsNameFor(p,d.ws),d.sub,d.tid,d.task,d.desc,d.resp,d.support,de(d.start),de(d.due),d.dur,d.prio,d.status,d.pct,d.ms,d.deps,d.risk,d.format||"",d.revision||"",de(d.upd),d.comment]));
   return rows; }
-function summaryRows(){ const rows=[["Project","Fleet","Project Lead","Phase","Target date","Tasks","Open","Critical","Delayed","MS reached","MS total","Overall progress %","Status"]];
+function summaryRows(){ const rows=[["Project","Fleet","Project Lead","Phase","Target date","Tasks","Open","Critical","Overdue","MS reached","MS total","Overall progress %","Status"]];
   PROJECTS.forEach(p=>{ const s=projStats(p), ht={g:"On Track",a:"At Risk",r:"Critical"}[s.health];
     rows.push([p.name,p.fleet,p.lead,p.phase,de(p.eis),s.n,s.open,s.crit,s.r,s.msDone,s.ms,s.overall,ht]); });
   return rows; }
@@ -1257,7 +1301,8 @@ const IMPORT_FIELDS=[
   ["task","Task / Deliverable *"],["ws","Workstream"],["sub","Sub-Workstream"],["desc","Description"],
   ["resp","Owner"],["support","Supporting departments"],["start","Start date"],["due","Due Date"],
   ["prio","Priority"],["status","Status"],["pct","% Completion"],["ms","Milestone"],
-  ["deps","Dependencies"],["risk","Risks / Issues"],["upd","Last update"],["comment","Comment"]
+  ["deps","Dependencies"],["risk","Risks / Issues"],["format","Format"],["revision","Revision"],
+  ["upd","Last update"],["comment","Comment"]
 ];
 const SYN={
   task:["aufgabe","deliverable","task","tätigkeit","taetigkeit","activity","titel","title","maßnahme","massnahme","thema","dokument","document"],
@@ -1274,8 +1319,10 @@ const SYN={
   ms:["milestone","meilenstein"],
   deps:["abhängigkeit","abhaengigkeit","abhängigkeiten","dependencies","dependency","predecessor","vorgänger","vorgaenger"],
   risk:["risiko","risiken","issue","issues","risk","problem"],
+  format:["format","dateiformat","file format","medium","media type","typ","type","art"],
+  revision:["revision","rev","version","revision no","rev no","revisionsstand","stand version","ausgabe","edition"],
   upd:["letztes update","last update","aktualisiert","updated","stand","änderungsdatum","revision date","rev date","revisionsdatum"],
-  comment:["kommentar","comment","bemerkung","notiz","notes","anmerkung","info","filename","storage","filename/storage","format","revision","remark"]
+  comment:["kommentar","comment","bemerkung","notiz","notes","anmerkung","info","filename","storage","filename/storage","remark"]
 };
 
 // --- file readers ---
@@ -1382,15 +1429,20 @@ function normWS(v,def){ if(!v) return def; const s=String(v).trim();
   const n=WS.find(w=>w[0].toLowerCase()===s.toLowerCase()||w[0].toLowerCase().includes(s.toLowerCase())||s.toLowerCase().includes(w[0].toLowerCase())); if(n) return n[1];
   return s.slice(0,24); }
 function normStatus(v,pct){ const s=String(v||"").toLowerCase().trim();
-  if(/(overdue|verzög|verzoeg|delay|überfäll|ueberfaell)/.test(s)) return "Delayed";
-  if(/(needs review|review|in progress|in arbeit|in bearbeitung|laufend|ongoing|wip|begonnen|started)/.test(s)) return "In Progress";
-  if(/(on hold|hold|angehalten|pausiert|on-hold)/.test(s)) return "Not Started";
-  if(/(abgeschlossen|erledigt|fertig|done|complete|completed|closed|approved|not applicable|n\/a|entfällt|^100$)/.test(s)) return "Completed";
+  if(/(not applicable|n\/a|^na$|entfällt|entfaellt|nicht zutreffend|nicht anwendbar)/.test(s)) return "Not Applicable";
+  if(/(approved|genehmigt|freigegeben|abgenommen)/.test(s)) return "Approved";
+  if(/(overdue|verzög|verzoeg|delay|überfäll|ueberfaell)/.test(s)) return "Overdue";
+  if(/(on hold|on-hold|hold|angehalten|pausiert|zurückgestellt|zurueckgestellt)/.test(s)) return "On Hold";
+  if(/(needs review|in review|review|prüfung|pruefung|zur prüfung|zur pruefung|to review)/.test(s)) return "Needs Review";
+  if(/(in progress|in arbeit|in bearbeitung|laufend|ongoing|wip|begonnen|started)/.test(s)) return "In Progress";
+  if(/(abgeschlossen|erledigt|fertig|done|complete|completed|closed|^100$)/.test(s)) return "Completed";
   if(/(not started|nicht begonnen|offen|geplant|^neu|todo|to do|^open$|backlog)/.test(s)) return "Not Started";
   if(pct>=100) return "Completed"; if(pct>0) return "In Progress"; return "Not Started"; }
 function normPrio(v){ const s=String(v||"").toLowerCase();
   if(/(hoch|high|kritisch|urgent|^1$|^a$)/.test(s)) return "High";
   if(/(niedrig|low|gering|^3$|^c$)/.test(s)) return "Low"; return "Medium"; }
+function normFormat(v){ const s=String(v||"").trim(); if(!s) return "";
+  const hit=FORMATS.find(f=>f && f.toLowerCase()===s.toLowerCase()); return hit||s; }   // canonicalise known formats, keep unknown values verbatim
 function normYesNo(v){ return /(ja|yes|^y$|^x$|true|wahr|^1$|meilenstein|milestone)/.test(String(v||"").toLowerCase().trim())?"Yes":"No"; }
 function parsePct(v){ if(v==null||v==="") return 0; let n=parseFloat(String(v).replace("%","").replace(",",".").trim()); if(!isFinite(n)) return 0; if(n<=1) n*=100; return Math.max(0,Math.min(100,Math.round(n))); }
 function parseDateVal(v){ if(v==null||v==="") return ""; const s=String(v).trim(); if(!s) return "";
@@ -1490,7 +1542,8 @@ function doImport(){
     const t={ ws:normWS(get("ws"),defWs), sub:get("sub")||"–", task:task||"(untitled)", desc:get("desc"),
       resp:get("resp"), support:get("support"), start:parseDateVal(get("start")), due:parseDateVal(get("due")),
       prio:normPrio(get("prio")), status, pct, ms:normYesNo(get("ms")), deps:get("deps")||"-",
-      risk:get("risk")||"-", upd:parseDateVal(get("upd"))||TODAY_ISO, comment:get("comment") };
+      risk:get("risk")||"-", format:normFormat(get("format")), revision:get("revision"),
+      upd:parseDateVal(get("upd"))||TODAY_ISO, comment:get("comment") };
     if(!t.start&&t.due) t.start=t.due; if(!t.due&&t.start) t.due=t.start;
     if(!t.start&&!t.due){ t.start=TODAY_ISO; t.due=TODAY_ISO; }
     tasks.push(t);
@@ -1578,7 +1631,7 @@ function buildGantt(){
     DATA.filter(d=>d.ws===abbr).forEach(d=>{
       const s=new Date(d.start), e=new Date(d.due);
       const left=((s-g0)/span)*100, width=Math.max(((e-s)/span)*100,0.8);
-      const cls = d.status==="Completed"?"done": d.status==="Delayed"?"delay":"";
+      const cls = statusDone(d.status)?"done": d.status==="Overdue"?"delay":"";
       const cr = CP.has(normId(d.tid))?"crit":"";
       const bar = d.ms==="Yes"
         ? `<div class="gdiamond ${cr}" data-tid="${normId(d.tid)}" style="left:${left+width/2}%" title="${d.task} – ${de(d.due)}"></div>`

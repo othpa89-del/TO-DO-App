@@ -31,13 +31,19 @@ multi‑project tool** that works for any kind of project.
   if it has none yet). When a task has to‑dos, its **% Completion is derived automatically**
   from the checklist (done/total) and shown read‑only (☑) in the Tasks table; tasks without
   to‑dos keep a manually editable %.
-- **Master task list** — 18 columns (Workstream, Sub‑Workstream, Task‑ID, Task/Deliverable,
+- **Master task list** — 20 columns (Workstream, Sub‑Workstream, Task‑ID, Task/Deliverable,
   Description, Owner, Supporting depts, Start, Due, Duration, Priority, Status,
-  % Completion, Milestone, Dependencies, Risks/Issues, Last update, Comment).
-  Every row is **editable inline**; add / duplicate / delete rows.
-- **Live statistics** — KPIs, RAG overview, per‑workstream progress and overall progress
+  % Completion, Milestone, Dependencies, Risks/Issues, **Format**, **Revision**,
+  Last update, Comment). Every row is **editable inline**; add / duplicate / delete rows.
+  *Format* (Articulate 360, SCORM, WBT, PDF, PPT, WORD, …) and *Revision* mirror the fields
+  used in the real Eurowings training lists.
+- **Full status set** — Not Started, In Progress, Needs Review, On Hold, Completed,
+  Approved, Not Applicable, Overdue — matching the status drop‑downs of the working Excel
+  sheets; each status feeds the RAG buckets, KPIs, Gantt and reports consistently.
+- **Live statistics** — KPIs, RAG overview, per‑workstream progress, **workload per person**
+  (open/total tasks, overdue count and average progress per owner) and overall progress
   recompute on every edit.
-- **Status automation** — overdue, non‑completed tasks flip to **Delayed** automatically
+- **Status automation** — overdue, non‑completed tasks flip to **Overdue** automatically
   (and back when the due date moves forward); *Last update* is stamped automatically.
 - **Critical path** — binding dependency chain to the latest milestone, highlighted in the
   table (flag + filter), on the dashboard, and in the Gantt (red bars + **dependency arrows**).
