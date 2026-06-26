@@ -1692,7 +1692,8 @@ const nextNo = ws => { const ns=DATA.filter(x=>x.ws===ws).map(x=>x.no); return n
 function touchUpd(d,tr){ d.upd=TODAY_ISO; const u=tr.querySelector('input[data-field=upd]'); if(u) u.value=TODAY_ISO; }
 tbody.addEventListener("input", e=>{
   const el=e.target, tr=el.closest("tr"); if(!tr) return; const d=byUid(tr.dataset.uid); if(!d) return;
-  if(el.dataset.field && el.isContentEditable){ d[el.dataset.field]=el.textContent; touchUpd(d,tr); markSaved(); saveDebounced(); }
+  if(el.dataset.field && el.isContentEditable){ d[el.dataset.field]=el.textContent; touchUpd(d,tr); markSaved(); saveDebounced();
+    if(el.dataset.field==="deps") refreshStatsDebounced(); }   // dependencies drive the critical path
   else if(el.dataset.field==="pct"){ const v=Math.max(0,Math.min(100,parseInt(el.value,10)||0)); d.pct=v;
     const b=tr.querySelector(".mini i"); if(b) b.style.width=v+"%"; touchUpd(d,tr); markSaved(); saveDebounced(); refreshStatsDebounced(); }
 });
@@ -1713,7 +1714,7 @@ tbody.addEventListener("click", e=>{
     const i=DATA.findIndex(x=>x.uid===d.uid); if(i>=0) DATA.splice(i,1); save(); renderTable(); refreshStats(); markSaved(); }
   if(b.dataset.act==="dup"){
     const c=JSON.parse(JSON.stringify(d)); c.uid=UID++; c.no=nextNo(c.ws);
-    c.task=d.task+" (Kopie)"; c.status="Not Started"; c.pct=0; c.ms="No";
+    c.task=d.task+" (copy)"; c.status="Not Started"; c.pct=0; c.ms="No"; c.todos=[];
     DATA.push(c); recompute(); save(); renderTable(); refreshStats(); markSaved(); }
 });
 
