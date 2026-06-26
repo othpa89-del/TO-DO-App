@@ -51,6 +51,12 @@ multi‑project tool** that works for any kind of project.
 - **One‑page status reports** — branded **project** and **portfolio** reports, print‑ready.
 - **Custom workstreams per project** — add / rename / re‑code / remove workstreams;
   renaming a code remaps that project's task IDs. Defaults to a standard list.
+- **Managed drop‑down lists** — *Owner*, *Sub‑Workstream*, *Supporting department* and
+  *Format* are inline drop‑downs in the task table, backed by **editable per‑project
+  vocabularies** (the **🏷 Lists** editor): add / rename / remove options, *renaming
+  updates every task that uses the value*, and **➕ New…** adds an option straight from a
+  cell. Imported values are folded into the lists automatically. *Status* and *Priority*
+  use the standard project‑management vocabulary; *Workstreams* have their own editor.
 - **Import existing Excel/CSV lists** — `.xlsx` / `.csv` reader with a **column‑mapping**
   dialog (auto‑maps German *and* English headers), value normalisation
   (status / priority / %, dates), into a new or existing project. The header row is
