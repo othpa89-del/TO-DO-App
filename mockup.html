@@ -348,6 +348,7 @@
       <button class="btn ghost" onclick="doSignUp()">Create account</button>
     </div>
     <button class="auth-link" onclick="useOffline()">Continue offline on this device only</button>
+    <div style="text-align:center;font-size:11px;color:var(--muted);margin-top:2px">© Copyright by Patrick Thorn</div>
   </div>
 </div>
 <header>
@@ -503,7 +504,7 @@
   <!-- STATUS REPORT (one-page PDF) -->
   <section class="panel" id="report"></section>
 
-  <footer id="screenFooter">Mockup · Eurowings Flight Training · Multi-Project PM Cockpit · Sample data for concept demonstration · created for the Chief Training Captain</footer>
+  <footer id="screenFooter"><b>© Copyright by Patrick Thorn</b> · Eurowings Flight Training · Multi-Project PM Cockpit · Mockup</footer>
   <div class="print-footer" id="pfFoot"></div>
 </div>
 <input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="importBackup(this)"/>
@@ -693,6 +694,7 @@ const COLS = ["ws","sub","no","task","desc","resp","support","start","due","prio
 const TODAY = new Date("2026-06-25");
 const TODAY_ISO = "2026-06-25";
 const KEY = "ew_pm_portfolio_v1";
+const COPYRIGHT = "© Copyright by Patrick Thorn";
 const STATUSES = ["Not Started","In Progress","Completed","Delayed"];
 const PRIOS = ["High","Medium","Low"];
 const VIEWLBL = {portfolio:"Portfolio overview",dash:"Dashboard",table:"Master Task List",gantt:"Gantt / Timeline",todo:"To-Do",report:"Status report"};
@@ -830,7 +832,7 @@ function updateHeader(){
   }
   document.getElementById("phProject").textContent = portfolioCtx ? "Portfolio · all projects" : (p.fleet+" · "+p.name);
   document.getElementById("phView").textContent = VIEWLBL[VIEW];
-  document.getElementById("pfFoot").textContent = "Eurowings Flight Training · PM Cockpit · "+(portfolioCtx?"Portfolio":p.name)+" · Confidential / Mockup";
+  document.getElementById("pfFoot").textContent = COPYRIGHT+" · Eurowings Flight Training · PM Cockpit · "+(portfolioCtx?"Portfolio":p.name)+" · Confidential / Mockup";
 }
 
 /* ---------- STATUS REPORT (1-Seiten-PDF) ---------- */
@@ -1131,7 +1133,7 @@ function exportCSV(){
   const esc=v=>`"${String(v).replace(/"/g,'""')}"`;
   const rows=currentRows().map(d=>[wsName(d.ws),d.sub,d.tid,d.task,d.desc,d.resp,d.support,de(d.start),de(d.due),
     d.dur,d.prio,d.status,d.pct+"%",d.ms,d.deps,d.risk,de(d.upd),d.comment].map(esc).join(";"));
-  const csv="﻿"+[head.map(esc).join(";"),...rows].join("\r\n");
+  const csv="﻿"+[head.map(esc).join(";"),...rows,"",esc(COPYRIGHT)].join("\r\n");
   const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
@@ -1231,13 +1233,14 @@ function summaryRows(){ const rows=[["Project","Fleet","Project Lead","Phase","T
     rows.push([p.name,p.fleet,p.lead,p.phase,de(p.eis),s.n,s.open,s.crit,s.r,s.msDone,s.ms,s.overall,ht]); });
   return rows; }
 const fnSafe=s=>String(s||"Project").replace(/[^a-z0-9]+/gi,"_").replace(/^_|_$/g,"");
+const withCopyright = rows => [...rows, [], [COPYRIGHT]];   // append a copyright row to each sheet
 function exportXLSXPortfolio(){
   const names=sheetNames(["Portfolio",...PROJECTS.map(p=>p.name)]);
-  const sheets=[{name:names[0],rows:summaryRows()},...PROJECTS.map((p,i)=>({name:names[i+1],rows:projectRows(p)}))];
+  const sheets=[{name:names[0],rows:withCopyright(summaryRows())},...PROJECTS.map((p,i)=>({name:names[i+1],rows:withCopyright(projectRows(p))}))];
   download(buildXlsx(sheets),"Eurowings_Training-Portfolio.xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 }
 function exportXLSXProject(p){
-  download(buildXlsx([{name:sheetNames([p.name])[0],rows:projectRows(p)}]),"Eurowings_"+fnSafe(p.name)+".xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  download(buildXlsx([{name:sheetNames([p.name])[0],rows:withCopyright(projectRows(p))}]),"Eurowings_"+fnSafe(p.name)+".xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 }
 
 /* ---------- EXCEL / CSV IMPORT ---------- */
