@@ -139,6 +139,7 @@
   select.wsedit{max-width:165px;font-size:11px;font-weight:600;color:var(--ew-magenta-dark);background-color:var(--ew-magenta-soft);border-radius:6px}
   .cell-date{min-width:120px;font-size:11.5px}
   .cell-num{width:54px;text-align:center;font-weight:700}
+  .pct-auto{display:inline-block;width:54px;text-align:center;color:var(--ew-magenta-dark);font-weight:700;font-size:11px;cursor:help}
   .rowact{display:flex;gap:4px}
   .iconbtn{border:1px solid var(--line);background:#fff;border-radius:6px;cursor:pointer;padding:3px 7px;font-size:12px;line-height:1.3;color:var(--muted)}
   .iconbtn:hover{background:var(--ew-magenta-soft);border-color:var(--ew-magenta);color:var(--ew-magenta-dark)}
@@ -731,7 +732,9 @@ function autoStatus(d){
   if(new Date(d.due) < TODAY) d.status="Delayed";
   else if(d.status==="Delayed") d.status = (d.pct>0 ? "In Progress" : "Not Started");
 }
-function recomputeProject(p){ p.tasks.forEach(d=>{ if(d.ms==="Ja")d.ms="Yes"; else if(d.ms==="Nein")d.ms="No"; if(!Array.isArray(d.todos)) d.todos=[]; d.tid=d.ws+"-"+pad(d.no); d.dur=days(d.start,d.due); autoStatus(d); }); }
+function recomputeProject(p){ p.tasks.forEach(d=>{ if(d.ms==="Ja")d.ms="Yes"; else if(d.ms==="Nein")d.ms="No"; if(!Array.isArray(d.todos)) d.todos=[];
+  if(d.todos.length){ d.pct=Math.round(d.todos.filter(t=>t.done).length/d.todos.length*100); }   // % auto-derived from to-dos
+  d.tid=d.ws+"-"+pad(d.no); d.dur=days(d.start,d.due); autoStatus(d); }); }
 function recompute(){ recomputeProject(PROJECTS[ACTIVE]); }
 function seedPortfolio(){
   PROJECTS = [
@@ -802,8 +805,10 @@ function showView(v){
   document.querySelectorAll("#nav .tab").forEach(x=>x.classList.toggle("active",x.dataset.tab===v));
   ["portfolio","dash","table","gantt","todo","report"].forEach(id=>document.getElementById(id).classList.toggle("active",id===v));
   if(v==="portfolio") renderPortfolio();
-  if(v==="todo") buildTodos();
-  if(v==="gantt") requestAnimationFrame(()=>{ try{drawDeps();}catch(e){} });
+  else if(v==="dash") buildDashboard();
+  else if(v==="table") renderTable();
+  else if(v==="gantt"){ buildGantt(); requestAnimationFrame(()=>{ try{drawDeps();}catch(e){} }); }
+  else if(v==="todo") buildTodos();
   updateHeader();
   window.scrollTo(0,0);
 }
@@ -1104,7 +1109,10 @@ function renderTable(){
       <td style="text-align:center" class="durcell">${d.dur}</td>
       <td><select class="cell-input pill ${prioClass(d.prio)}" data-field="prio">${opt(PRIOS,d.prio)}</select></td>
       <td><select class="cell-input pill ${statusClass(d.status)}" data-field="status">${opt(STATUSES,d.status)}</select></td>
-      <td><div class="pillbar"><input type="number" min="0" max="100" step="5" class="cell-input cell-num" data-field="pct" value="${d.pct}"><div class="mini" style="flex:1"><i style="width:${d.pct}%"></i></div></div></td>
+      <td><div class="pillbar">${(d.todos&&d.todos.length)
+          ? `<span class="cell-num pct-auto" title="Auto from to-dos (${d.todos.filter(t=>t.done).length}/${d.todos.length})">☑${d.pct}</span>`
+          : `<input type="number" min="0" max="100" step="5" class="cell-input cell-num" data-field="pct" value="${d.pct}">`
+        }<div class="mini" style="flex:1"><i style="width:${d.pct}%"></i></div></div></td>
       <td style="text-align:center"><select class="cell-input msedit" data-field="ms">${opt(["Yes","No"],d.ms)}</select></td>
       <td><div class="ce" contenteditable data-field="deps">${h(d.deps)}</div></td>
       <td class="${d.risk&&d.risk!=="-"?"risk":""}"><div class="ce" contenteditable data-field="risk">${h(d.risk)}</div></td>
@@ -1631,9 +1639,10 @@ function buildTodos(){
 function tdTask(card){ return DATA.find(d=>String(d.uid)===String(card.dataset.uid)); }
 function tdRerender(focusUid){ const y=window.scrollY; buildTodos(); window.scrollTo(0,y);
   if(focusUid){ const c=document.querySelector(`#todoList .todo-task[data-uid="${focusUid}"]`); const i=c&&c.querySelector("[data-act=addinput]"); if(i) i.focus(); } }
+function tdCommit(){ recompute(); save(); markSaved(); refreshStats(); }   // recompute() re-derives task % from to-dos
 function tdAdd(inp){ const card=inp.closest(".todo-task"), d=tdTask(card), text=inp.value.trim(); if(!d||!text) return;
   if(!Array.isArray(d.todos)) d.todos=[]; d.todos.push({id:"td"+Date.now()+Math.floor(Math.random()*1e4),text,done:false});
-  save(); markSaved(); tdRerender(d.uid); }
+  tdCommit(); tdRerender(d.uid); }
 // Jump from a Gantt task to its to-do checklist
 function openTaskTodos(uid){
   document.getElementById("tdSearch").value=""; document.getElementById("tdOpen").checked=false;
@@ -1654,7 +1663,7 @@ function openTaskTodos(uid){
   const list=document.getElementById("todoList");
   list.addEventListener("change",e=>{ if(e.target.dataset.act!=="toggle") return;
     const card=e.target.closest(".todo-task"), d=tdTask(card), ti=+e.target.closest(".todo-item").dataset.ti;
-    if(d&&d.todos[ti]){ d.todos[ti].done=e.target.checked; save(); markSaved(); tdRerender(); } });
+    if(d&&d.todos[ti]){ d.todos[ti].done=e.target.checked; tdCommit(); tdRerender(); } });
   list.addEventListener("input",e=>{ if(e.target.dataset.act!=="edit") return;
     const card=e.target.closest(".todo-task"), d=tdTask(card), ti=+e.target.closest(".todo-item").dataset.ti;
     if(d&&d.todos[ti]){ d.todos[ti].text=e.target.textContent; markSaved(); saveDebounced(); } });
@@ -1664,7 +1673,7 @@ function openTaskTodos(uid){
       box.style.display="flex"; b.style.display="none"; const inp=box.querySelector("[data-act=addinput]"); if(inp) inp.focus(); }
     if(b.dataset.act==="add"){ tdAdd(b.closest(".todo-add").querySelector("[data-act=addinput]")); }
     if(b.dataset.act==="del"){ const card=b.closest(".todo-task"), d=tdTask(card), ti=+b.closest(".todo-item").dataset.ti;
-      if(d&&d.todos[ti]){ d.todos.splice(ti,1); save(); markSaved(); tdRerender(); } } });
+      if(d&&d.todos[ti]){ d.todos.splice(ti,1); tdCommit(); tdRerender(); } } });
 })();
 
 /* ---------- EDITING, ADD/DELETE, PERSISTENCE ---------- */

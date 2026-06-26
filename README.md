@@ -28,7 +28,9 @@ multi‑project tool** that works for any kind of project.
   add / tick off / edit / delete to‑dos, with per‑task progress, filters (workstream,
   search, open‑only, hide empty) and a summary. Synced and backed up with everything else.
   **Click any task row in the Gantt to jump straight to its to‑do list** (and start typing
-  if it has none yet).
+  if it has none yet). When a task has to‑dos, its **% Completion is derived automatically**
+  from the checklist (done/total) and shown read‑only (☑) in the Tasks table; tasks without
+  to‑dos keep a manually editable %.
 - **Master task list** — 18 columns (Workstream, Sub‑Workstream, Task‑ID, Task/Deliverable,
   Description, Owner, Supporting depts, Start, Due, Duration, Priority, Status,
   % Completion, Milestone, Dependencies, Risks/Issues, Last update, Comment).
