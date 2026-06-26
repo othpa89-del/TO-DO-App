@@ -22,8 +22,11 @@ multi‑project tool** that works for any kind of project.
 - **Portfolio home page** — every project as a status card (RAG health, progress ring,
   open / critical / milestone / task counts, status mini‑bar, target date) plus
   portfolio‑level KPIs. Create / rename / delete projects.
-- **Per‑project workspace** — independent **Dashboard**, **Tasks** table and **Gantt**
-  timeline for each project.
+- **Per‑project workspace** — independent **Dashboard**, **Tasks** table, **Gantt**
+  timeline, **To‑Do** checklists and **Report** for each project.
+- **To‑Do tab** — a checklist per task (the Gantt sub‑items), grouped by workstream:
+  add / tick off / edit / delete to‑dos, with per‑task progress, filters (workstream,
+  search, open‑only, hide empty) and a summary. Synced and backed up with everything else.
 - **Master task list** — 18 columns (Workstream, Sub‑Workstream, Task‑ID, Task/Deliverable,
   Description, Owner, Supporting depts, Start, Due, Duration, Priority, Status,
   % Completion, Milestone, Dependencies, Risks/Issues, Last update, Comment).

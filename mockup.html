@@ -219,6 +219,30 @@
   .rep-table{width:100%;min-width:0;border-collapse:collapse;font-size:11px}
   .rep-table th{background:var(--ew-magenta-dark);color:#fff;text-align:left;padding:6px 8px;font-size:10px;white-space:nowrap}
   .rep-table td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+  /* To-Do tab */
+  .todo-ws{margin-bottom:18px}
+  .todo-ws-head{font-size:13px;font-weight:700;color:var(--ew-magenta-dark);padding:8px 2px;border-bottom:2px solid var(--ew-magenta-soft);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+  .todo-ws-head .c{font-size:11.5px;font-weight:600;color:var(--muted)}
+  .todo-task{background:#fff;border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin-bottom:10px;box-shadow:var(--shadow)}
+  .todo-task.compact{padding:7px 14px;margin-bottom:7px}
+  .todo-task.compact .todo-task-head{margin-bottom:0}
+  .iconbtn[data-act=expand]{font-weight:600;color:var(--ew-magenta-dark)}
+  .todo-task-head{display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+  .todo-task-head .tid{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;color:var(--ew-magenta-dark);font-size:12px}
+  .todo-task-head .tt{font-weight:600;flex:1;min-width:140px}
+  .todo-count{font-size:11.5px;color:var(--muted);white-space:nowrap;font-weight:600}
+  .todo-mini{width:64px;height:6px;background:#eef1f6;border-radius:4px;overflow:hidden}
+  .todo-mini i{display:block;height:100%;background:var(--green)}
+  .todo-item{display:flex;align-items:center;gap:9px;padding:4px 0;border-bottom:1px dashed var(--line)}
+  .todo-item:last-of-type{border-bottom:0}
+  .todo-item input[type=checkbox]{width:16px;height:16px;accent-color:var(--green);cursor:pointer;flex-shrink:0}
+  .todo-text{flex:1;outline:none;font-size:13px;padding:3px 5px;border-radius:6px;min-height:18px}
+  .todo-text:focus{background:var(--ew-magenta-soft)}
+  .todo-item.done .todo-text{text-decoration:line-through;color:var(--muted)}
+  .todo-add{display:flex;gap:8px;margin-top:9px}
+  .todo-add input{flex:1;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px}
+  .todo-add input:focus{outline:none;border-color:var(--ew-magenta);box-shadow:0 0 0 2px var(--ew-magenta-soft)}
+  .todo-empty{color:var(--muted);font-size:12.5px;font-style:italic;padding:3px 0}
   /* Auth gate */
   .auth-overlay{position:fixed;inset:0;background:linear-gradient(135deg,var(--ew-magenta),var(--ew-magenta-dark));display:none;align-items:center;justify-content:center;z-index:2000;padding:20px}
   .auth-card{background:#fff;border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.35);width:min(380px,94vw);padding:24px;display:flex;flex-direction:column;gap:12px}
@@ -350,6 +374,7 @@
     <div class="tab" data-tab="dash">📊 Dashboard</div>
     <div class="tab" data-tab="table">📋 Tasks</div>
     <div class="tab" data-tab="gantt">📅 Gantt</div>
+    <div class="tab" data-tab="todo">✅ To-Do</div>
     <div class="tab" data-tab="report">📄 Report</div>
     <span style="flex:1"></span>
     <span id="syncBadge" class="syncbadge s-off" title="Sync status"></span>
@@ -452,6 +477,19 @@
     </div>
     <div class="gantt"><table class="gtable" id="gtbl"></table></div>
     <div class="note">Simplified monthly timeline. Bar length & position derived from start/due dates. In the final app: zoomable (day/week/month) with dependency arrows.</div>
+  </section>
+
+  <!-- TO-DO (checklists per task / sub-item) -->
+  <section class="panel" id="todo">
+    <div class="toolbar">
+      <select id="tdWs"><option value="">All workstreams</option></select>
+      <input id="tdSearch" placeholder="🔍 Search task…" style="min-width:220px"/>
+      <label style="font-size:12.5px;color:var(--muted)"><input type="checkbox" id="tdOpen"/> open to-dos only</label>
+      <label style="font-size:12.5px;color:var(--muted)"><input type="checkbox" id="tdHideEmpty"/> hide tasks without to-dos</label>
+      <span style="flex:1"></span>
+      <span id="tdSummary" class="note" style="margin:0"></span>
+    </div>
+    <div id="todoList"></div>
   </section>
 
   <!-- STATUS REPORT (one-page PDF) -->
@@ -649,7 +687,7 @@ const TODAY_ISO = "2026-06-25";
 const KEY = "ew_pm_portfolio_v1";
 const STATUSES = ["Not Started","In Progress","Completed","Delayed"];
 const PRIOS = ["High","Medium","Low"];
-const VIEWLBL = {portfolio:"Portfolio overview",dash:"Dashboard",table:"Master Task List",gantt:"Gantt / Timeline",report:"Status report"};
+const VIEWLBL = {portfolio:"Portfolio overview",dash:"Dashboard",table:"Master Task List",gantt:"Gantt / Timeline",todo:"To-Do",report:"Status report"};
 const MONTHS_EN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 let PROJECTS = [], ACTIVE = 0, DATA = [], UID = 0, VIEW = "portfolio", REPORTTYPE = "project";
@@ -686,7 +724,7 @@ function autoStatus(d){
   if(new Date(d.due) < TODAY) d.status="Delayed";
   else if(d.status==="Delayed") d.status = (d.pct>0 ? "In Progress" : "Not Started");
 }
-function recomputeProject(p){ p.tasks.forEach(d=>{ if(d.ms==="Ja")d.ms="Yes"; else if(d.ms==="Nein")d.ms="No"; d.tid=d.ws+"-"+pad(d.no); d.dur=days(d.start,d.due); autoStatus(d); }); }
+function recomputeProject(p){ p.tasks.forEach(d=>{ if(d.ms==="Ja")d.ms="Yes"; else if(d.ms==="Nein")d.ms="No"; if(!Array.isArray(d.todos)) d.todos=[]; d.tid=d.ws+"-"+pad(d.no); d.dur=days(d.start,d.due); autoStatus(d); }); }
 function recompute(){ recomputeProject(PROJECTS[ACTIVE]); }
 function seedPortfolio(){
   PROJECTS = [
@@ -695,6 +733,11 @@ function seedPortfolio(){
     {id:"p-e195e2",name:"Embraer E195-E2 – New Type Introduction",fleet:"Embraer E195-E2",lead:"Project Captain E2",phase:"Planning",eis:"2027-11-01",tasks:mkTasks(T_E2)},
   ];
   PROJECTS.forEach(recomputeProject);
+  // a few demo to-dos so the To-Do tab shows how it works
+  const demo={ "OMD-3":["Draft syllabus outline","Align with OEB differences","Internal review with Standards"],
+    "SIM-2":["Finalise commercial terms","Confirm slot calendar","Legal sign-off"],
+    "INS-4":["Request Boeing slots","Nominate attendees","Prepare pre-reading"] };
+  PROJECTS[0].tasks.forEach(d=>{ const k=demo[normId(d.tid)]; if(k) d.todos=k.map((t,i)=>({id:"sd"+normId(d.tid)+i,text:t,done:i===0})); });
   ACTIVE = 0;
 }
 /* ---------- critical path ----------
@@ -750,8 +793,9 @@ function projStats(p){
 function showView(v){
   VIEW=v;
   document.querySelectorAll("#nav .tab").forEach(x=>x.classList.toggle("active",x.dataset.tab===v));
-  ["portfolio","dash","table","gantt","report"].forEach(id=>document.getElementById(id).classList.toggle("active",id===v));
+  ["portfolio","dash","table","gantt","todo","report"].forEach(id=>document.getElementById(id).classList.toggle("active",id===v));
   if(v==="portfolio") renderPortfolio();
+  if(v==="todo") buildTodos();
   if(v==="gantt") requestAnimationFrame(()=>{ try{drawDeps();}catch(e){} });
   updateHeader();
   window.scrollTo(0,0);
@@ -1023,9 +1067,10 @@ function kpi(lbl,val,foot,color){
 
 /* ---------- TABLE ---------- */
 const fWs=document.getElementById("fWs");
-function rebuildWsFilter(){ const cur=fWs.value;
-  fWs.innerHTML=`<option value="">Alle Workstreams</option>`+wsCodes(PROJECTS[ACTIVE]).map(([n,a])=>`<option value="${a}">${h(n)}</option>`).join("");
-  if([...fWs.options].some(o=>o.value===cur)) fWs.value=cur; }
+function rebuildWsFilter(){
+  const opts=`<option value="">All workstreams</option>`+wsCodes(PROJECTS[ACTIVE]).map(([n,a])=>`<option value="${a}">${h(n)}</option>`).join("");
+  [fWs, document.getElementById("tdWs")].forEach(sel=>{ if(!sel) return; const cur=sel.value;
+    sel.innerHTML=opts; if([...sel.options].some(o=>o.value===cur)) sel.value=cur; }); }
 ["fWs","fStatus","fPrio","fSearch","fMs","fCp"].forEach(id=>document.getElementById(id).addEventListener("input",renderTable));
 
 function currentRows(){
@@ -1541,6 +1586,64 @@ function drawDeps(){
   });
   gantt.appendChild(svg);
 }
+
+/* ---------- TO-DO TAB (checklists per task / Gantt sub-item) ---------- */
+function buildTodos(){
+  const wsF=document.getElementById("tdWs").value, q=document.getElementById("tdSearch").value.toLowerCase();
+  const onlyOpen=document.getElementById("tdOpen").checked, hideEmpty=document.getElementById("tdHideEmpty").checked;
+  let totOpen=0, totDone=0, tasksWith=0, html="";
+  wsCodes(PROJECTS[ACTIVE]).forEach(([name,abbr])=>{
+    if(wsF&&abbr!==wsF) return;
+    const items=DATA.filter(d=>d.ws===abbr && (!q||(d.task+" "+d.tid+" "+(d.sub||"")).toLowerCase().includes(q)));
+    if(!items.length) return;
+    let sec="";
+    items.forEach(d=>{
+      const todos=d.todos||[]; const done=todos.filter(t=>t.done).length;
+      totOpen+=todos.length-done; totDone+=done; if(todos.length) tasksWith++;
+      if(hideEmpty && !todos.length) return;
+      const shown = todos.map((t,i)=>({t,i})).filter(x=>!onlyOpen || !x.t.done);
+      if(onlyOpen && todos.length && !shown.length) return;     // all done -> hide when "open only"
+      const pct = todos.length?Math.round(done/todos.length*100):0;
+      const head=`<div class="todo-task-head"><span class="tid">${d.tid}</span><span class="tt">${h(d.task)}</span>
+          <span class="pill ${statusClass(d.status)}">${d.status}</span>
+          ${todos.length?`<span class="todo-count">${done}/${todos.length}</span><span class="todo-mini"><i style="width:${pct}%"></i></span>`
+            :`<button class="iconbtn" data-act="expand" title="Add to-do">＋ to-do</button>`}</div>`;
+      const itemsHtml = todos.length ? (shown.length?shown.map(({t,i})=>`<div class="todo-item ${t.done?'done':''}" data-ti="${i}">
+            <input type="checkbox" data-act="toggle" ${t.done?'checked':''}>
+            <div class="todo-text" contenteditable data-act="edit">${h(t.text)}</div>
+            <button class="iconbtn" data-act="del" title="Remove">✕</button></div>`).join("") : `<div class="todo-empty">All done 🎉</div>`) : "";
+      const addBox=`<div class="todo-add" ${todos.length?"":'style="display:none"'}><input placeholder="Add a to-do and press Enter…" data-act="addinput">
+          <button class="btn ghost" data-act="add">Add</button></div>`;
+      sec+=`<div class="todo-task ${todos.length?"":"compact"}" data-uid="${d.uid}">${head}${itemsHtml}${addBox}</div>`;
+    });
+    if(sec) html+=`<div class="todo-ws"><div class="todo-ws-head"><span>${h(name)}</span><span class="c">${items.length} task(s)</span></div>${sec}</div>`;
+  });
+  document.getElementById("todoList").innerHTML = html || `<div class="note">No tasks match the filters.</div>`;
+  document.getElementById("tdSummary").textContent = `${totOpen} open · ${totDone} done · ${tasksWith} task(s) with to-dos`;
+}
+function tdTask(card){ return DATA.find(d=>String(d.uid)===String(card.dataset.uid)); }
+function tdRerender(focusUid){ const y=window.scrollY; buildTodos(); window.scrollTo(0,y);
+  if(focusUid){ const c=document.querySelector(`#todoList .todo-task[data-uid="${focusUid}"]`); const i=c&&c.querySelector("[data-act=addinput]"); if(i) i.focus(); } }
+function tdAdd(inp){ const card=inp.closest(".todo-task"), d=tdTask(card), text=inp.value.trim(); if(!d||!text) return;
+  if(!Array.isArray(d.todos)) d.todos=[]; d.todos.push({id:"td"+Date.now()+Math.floor(Math.random()*1e4),text,done:false});
+  save(); markSaved(); tdRerender(d.uid); }
+(function wireTodos(){
+  ["tdWs","tdSearch","tdOpen","tdHideEmpty"].forEach(id=>document.getElementById(id).addEventListener("input",buildTodos));
+  const list=document.getElementById("todoList");
+  list.addEventListener("change",e=>{ if(e.target.dataset.act!=="toggle") return;
+    const card=e.target.closest(".todo-task"), d=tdTask(card), ti=+e.target.closest(".todo-item").dataset.ti;
+    if(d&&d.todos[ti]){ d.todos[ti].done=e.target.checked; save(); markSaved(); tdRerender(); } });
+  list.addEventListener("input",e=>{ if(e.target.dataset.act!=="edit") return;
+    const card=e.target.closest(".todo-task"), d=tdTask(card), ti=+e.target.closest(".todo-item").dataset.ti;
+    if(d&&d.todos[ti]){ d.todos[ti].text=e.target.textContent; markSaved(); saveDebounced(); } });
+  list.addEventListener("keydown",e=>{ if(e.target.dataset.act==="addinput"&&e.key==="Enter"){ e.preventDefault(); tdAdd(e.target); } });
+  list.addEventListener("click",e=>{ const b=e.target.closest("[data-act]"); if(!b) return;
+    if(b.dataset.act==="expand"){ const card=b.closest(".todo-task"), box=card.querySelector(".todo-add");
+      box.style.display="flex"; b.style.display="none"; const inp=box.querySelector("[data-act=addinput]"); if(inp) inp.focus(); }
+    if(b.dataset.act==="add"){ tdAdd(b.closest(".todo-add").querySelector("[data-act=addinput]")); }
+    if(b.dataset.act==="del"){ const card=b.closest(".todo-task"), d=tdTask(card), ti=+b.closest(".todo-item").dataset.ti;
+      if(d&&d.todos[ti]){ d.todos.splice(ti,1); save(); markSaved(); tdRerender(); } } });
+})();
 
 /* ---------- EDITING, ADD/DELETE, PERSISTENCE ---------- */
 const tbody = document.getElementById("tbody");
