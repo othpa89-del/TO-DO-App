@@ -1327,7 +1327,7 @@ const IMPORT_FIELDS=[
   ["upd","Last update"],["comment","Comment"]
 ];
 const SYN={
-  task:["aufgabe","deliverable","task","tätigkeit","taetigkeit","activity","titel","title","maßnahme","massnahme","thema","dokument","document"],
+  task:["task / deliverable","task/deliverable","aufgabe / deliverable","aufgabe/deliverable","aufgabe","deliverable","task","tätigkeit","taetigkeit","activity","titel","title","maßnahme","massnahme","thema","dokument","document"],
   ws:["workstream","work stream","arbeitspaket","arbeitspaket beschreibung","bereich","stream","kategorie","modul","gewerk","course","kurs","chapter group"],
   sub:["sub-workstream","sub workstream","om-d reference","om-d ref","omd reference","reference","ref","chapter","kapitel","unterbereich","teilbereich","subkategorie","sub","section","abschnitt"],
   desc:["beschreibung","description","details","detail","inhalt","scope","content"],
@@ -1474,13 +1474,19 @@ function parseDateVal(v){ if(v==null||v==="") return ""; const s=String(v).trim(
   const dt=new Date(s); return isNaN(dt)?"":dt.toISOString().slice(0,10); }
 
 // --- mapping UI ---
+// headers that must never be mapped to a given field (e.g. a "Task-ID" column is not the task name)
+const SYN_NEG={ task:/task[\s\-_]*id|aufgaben[\s\-_]*nr|^id$|^nr\.?$|^no\.?$|^code$/ };
 function autoMap(headers){
-  const norm=headers.map(x=>String(x||"").trim().toLowerCase()); const used=new Set(), map={};
-  IMPORT_FIELDS.forEach(([f])=>{ const syns=SYN[f]||[]; let bi=-1,bs=0;
-    norm.forEach((hh,i)=>{ if(used.has(i)||!hh) return; let sc=0;
+  const norm=headers.map(x=>String(x||"").trim().toLowerCase());
+  // score every field × column, then assign greedily by descending score so exact matches beat substrings
+  const cand=[];
+  IMPORT_FIELDS.forEach(([f])=>{ const syns=SYN[f]||[], neg=SYN_NEG[f];
+    norm.forEach((hh,i)=>{ if(!hh || (neg&&neg.test(hh))) return; let sc=0;
       syns.forEach(s=>{ if(hh===s) sc=Math.max(sc,3); else if(hh.includes(s)||s.includes(hh)) sc=Math.max(sc,2); });
-      if(sc>bs){ bs=sc; bi=i; } });
-    if(bi>=0){ map[f]=bi; used.add(bi); } });
+      if(sc>0) cand.push([sc,f,i]); }); });
+  cand.sort((a,b)=> b[0]-a[0] || a[1].localeCompare(b[1]) || a[2]-b[2]);
+  const usedF=new Set(), usedC=new Set(), map={};
+  cand.forEach(([sc,f,i])=>{ if(usedF.has(f)||usedC.has(i)) return; map[f]=i; usedF.add(f); usedC.add(i); });
   return map;
 }
 // Find the header row automatically (it isn't always row 1 — e.g. logo/title rows above)
