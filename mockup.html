@@ -6,10 +6,18 @@
 <title>Eurowings · Training Portfolio | Multi-Project PM Cockpit (Mockup)</title>
 <style>
   :root{
-    --ew-magenta:#AF1E65; --ew-magenta-dark:#7d1548; --ew-magenta-soft:#fbeaf2;
-    --ink:#1f2733; --muted:#6b7686; --line:#e6e9ef; --bg:#f4f6f9; --card:#ffffff;
-    --green:#1e9e63; --amber:#e8a317; --red:#d23b3b; --blue:#2f6fed; --grey:#9aa3b1;
-    --shadow:0 1px 3px rgba(20,30,50,.08),0 6px 20px rgba(20,30,50,.06);
+    /* Eurowings brand palette (from corporate colour guide) */
+    --ew-magenta:#AF1E65;        /* Light Burgundy (primary) */
+    --ew-magenta-dark:#871C54;   /* Dark Burgundy */
+    --ew-magenta-deep:#701745;   /* Darker Burgundy */
+    --ew-magenta-accent:#D41370; /* Lighter Burgundy (accents/bars) */
+    --ew-magenta-soft:#f7e6ef;   /* soft burgundy tint */
+    --blue:#00A6CF;              /* Skyblue (secondary) */
+    --blue-light:#6BCCE0; --blue-soft:#E6F5F9;
+    --ink:#212529; --muted:#5f6469; --line:#e2e4e7; --bg:#F1F3F5; --card:#ffffff;
+    --grey:#787878;
+    --green:#1e9e63; --amber:#e8a317; --red:#d23b3b;
+    --shadow:0 1px 3px rgba(33,37,41,.08),0 6px 20px rgba(33,37,41,.06);
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0}
@@ -60,7 +68,7 @@
   .wsrow{display:flex;align-items:center;gap:12px;margin-bottom:11px}
   .wsrow .name{width:230px;font-size:12.5px;font-weight:600;flex-shrink:0}
   .wsrow .track{flex:1;height:14px;background:#eef1f6;border-radius:8px;overflow:hidden}
-  .wsrow .fill{height:100%;border-radius:8px;background:linear-gradient(90deg,var(--ew-magenta),#d8447f)}
+  .wsrow .fill{height:100%;border-radius:8px;background:linear-gradient(90deg,var(--ew-magenta),#D41370)}
   .wsrow .pct{width:42px;text-align:right;font-size:12px;font-weight:700;color:var(--muted)}
   /* Traffic light */
   .traffic{display:flex;gap:14px;flex-wrap:wrap}
@@ -93,7 +101,7 @@
   td.tid{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;color:var(--ew-magenta-dark);white-space:nowrap}
   .wschip{font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:var(--ew-magenta-soft);color:var(--ew-magenta-dark);white-space:nowrap}
   .pill{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;display:inline-block}
-  .s-comp{background:#e3f6ec;color:var(--green)} .s-prog{background:#e7f0ff;color:var(--blue)}
+  .s-comp{background:#e3f6ec;color:var(--green)} .s-prog{background:var(--blue-soft);color:#0a7d9c}
   .s-not{background:#eef0f4;color:var(--muted)} .s-del{background:#fde7e7;color:var(--red)}
   .p-high{background:#fde7e7;color:var(--red)} .p-med{background:#fff3da;color:#b9810b} .p-low{background:#eef0f4;color:var(--muted)}
   .mini{height:7px;background:#eef1f6;border-radius:5px;overflow:hidden;min-width:60px}
@@ -111,7 +119,7 @@
   .gtable td.gname{position:sticky;left:0;background:#fff;font-weight:600;padding:6px 10px;border-bottom:1px solid var(--line);z-index:2;min-width:240px}
   .gtable td.gcell{border-left:1px solid #eef1f6;border-bottom:1px solid var(--line);padding:0;height:30px;position:relative}
   .gbar{position:absolute;top:6px;height:16px;border-radius:5px;left:2%;right:2%;
-    background:linear-gradient(90deg,var(--ew-magenta),#d8447f);box-shadow:var(--shadow)}
+    background:linear-gradient(90deg,var(--ew-magenta),#D41370);box-shadow:var(--shadow)}
   .gbar.done{background:linear-gradient(90deg,var(--green),#46c285)}
   .gbar.delay{background:linear-gradient(90deg,var(--red),#ef6b6b)}
   .gbar.ms{background:transparent;box-shadow:none}
@@ -211,7 +219,7 @@
   .repws{display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:6px}
   .repws span{width:150px;flex-shrink:0}
   .rtrack{flex:1;height:9px;background:#eef1f6;border-radius:5px;overflow:hidden}
-  .rtrack i{display:block;height:100%;background:linear-gradient(90deg,var(--ew-magenta),#d8447f)}
+  .rtrack i{display:block;height:100%;background:linear-gradient(90deg,var(--ew-magenta),#D41370)}
   .repws b{width:34px;text-align:right;color:var(--muted)}
   .rep-ms{font-size:11px;display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px dashed var(--line)}
   .rdot{width:18px;height:18px;border-radius:50%;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0}
@@ -266,7 +274,7 @@
   .syncbadge.s-ok{background:rgba(30,158,99,.22)} .syncbadge.s-syncing{background:rgba(255,255,255,.22)}
   .syncbadge.s-err{background:rgba(210,59,59,.25)} .syncbadge.s-off{background:rgba(255,255,255,.14)}
   #nav .syncbadge{background:#eef1f6;color:var(--muted)}
-  #nav .syncbadge.s-ok{background:#e3f6ec;color:var(--green)} #nav .syncbadge.s-syncing{background:#e7f0ff;color:var(--blue)}
+  #nav .syncbadge.s-ok{background:#e3f6ec;color:var(--green)} #nav .syncbadge.s-syncing{background:var(--blue-soft);color:#0a7d9c}
   #nav .syncbadge.s-err{background:#fde7e7;color:var(--red)} #nav .syncbadge.s-off{background:#eef0f4;color:var(--muted)}
   .acct{font-size:12px;color:var(--muted)} .acct b{color:var(--ink)}
   /* Import dialog */
@@ -473,7 +481,7 @@
   <!-- GANTT -->
   <section class="panel" id="gantt">
     <div class="leg">
-      <span><i style="background:linear-gradient(90deg,var(--ew-magenta),#d8447f)"></i> Task (ongoing/planned)</span>
+      <span><i style="background:linear-gradient(90deg,var(--ew-magenta),#D41370)"></i> Task (ongoing/planned)</span>
       <span><i style="background:linear-gradient(90deg,var(--green),#46c285)"></i> Completed</span>
       <span><i style="background:linear-gradient(90deg,var(--red),#ef6b6b)"></i> Delayed</span>
       <span><i style="transform:rotate(45deg);background:var(--amber);width:12px;height:12px"></i> Milestone</span>
@@ -1200,7 +1208,7 @@ function zipStore(files){
 const xesc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 function colL(i){let s="";i++;while(i>0){const m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=Math.floor((i-1)/26);}return s;}
 const STYLES_XML=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF7D1548"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF871C54"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
 function sheetXml(rows){
   let body="";
   rows.forEach((row,ri)=>{ const r=ri+1, head=ri===0; let cells="";
