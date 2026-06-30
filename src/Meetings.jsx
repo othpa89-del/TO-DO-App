@@ -675,22 +675,19 @@ export function meetingToMarkdown(m) {
   LINES.push("");
   if ((m.participants || []).length) { LINES.push(`## ${L("Teilnehmer", "Participants")}`); m.participants.forEach((p) => LINES.push(`- ${p.name}${p.company ? ` (${p.company})` : ""}${p.role ? `, ${p.role}` : ""}`)); LINES.push(""); }
   if ((m.absentees || []).length) { LINES.push(`## ${L("Abwesend", "Absent")}`); m.absentees.forEach((p) => LINES.push(`- ${p.name}`)); LINES.push(""); }
-  const noneMd = L("— keine —", "— none —");
-  LINES.push(`## ${L("Agenda & Mitschrift", "Agenda & minutes")}`);
   if ((m.agenda || []).length) {
+    LINES.push(`## ${L("Agenda & Mitschrift", "Agenda & minutes")}`);
     m.agenda.forEach((a, i) => {
-      LINES.push(`### ${i + 1}.${a.title ? " " + a.title : " " + L("(ohne Titel)", "(untitled)")}${a.done ? " ✓" : ""}`);
+      LINES.push(`### ${i + 1}. ${a.title || ""}${a.done ? " ✓" : ""}`);
       if (a.desc) LINES.push(a.desc);
       const notes = htmlToPlain(a.notesHtml); if (notes) LINES.push("", notes);
       [[L("Entscheidungen", "Decisions"), a.decisions], [L("Diskussion", "Discussion"), a.discussion], [L("Risiken", "Risks"), a.risks], [L("Offene Fragen", "Open questions"), a.openQuestions]]
         .filter((x) => x[1]).forEach(([k, v]) => LINES.push(`- **${k}:** ${v}`));
       LINES.push("");
     });
-  } else { LINES.push(noneMd, ""); }
-  LINES.push(`## ${L("Entscheidungen", "Decisions")}`);
-  if ((m.decisions || []).length) { m.decisions.forEach((d) => LINES.push(`- **${d.title}** (${decisionStatusLabel(d.status)}${d.owner ? ", " + d.owner : ""}${d.date ? ", " + fmtDay(d.date) : ""})${d.desc ? " – " + d.desc : ""}`)); LINES.push(""); } else { LINES.push(noneMd, ""); }
-  LINES.push(`## ${L("Aufgaben", "Tasks")}`);
-  if ((m.actionItems || []).length) { m.actionItems.forEach((a) => LINES.push(`- [ ] ${a.text}`)); LINES.push(""); } else { LINES.push(noneMd, ""); }
+  }
+  if ((m.decisions || []).length) { LINES.push(`## ${L("Entscheidungen", "Decisions")}`); m.decisions.forEach((d) => LINES.push(`- **${d.title}** (${decisionStatusLabel(d.status)}${d.owner ? ", " + d.owner : ""}${d.date ? ", " + fmtDay(d.date) : ""})${d.desc ? " – " + d.desc : ""}`)); LINES.push(""); }
+  if ((m.actionItems || []).length) { LINES.push(`## ${L("Aufgaben", "Tasks")}`); m.actionItems.forEach((a) => LINES.push(`- [ ] ${a.text}`)); LINES.push(""); }
   if (m.openPoints) { LINES.push(`## ${L("Offene Punkte", "Open points")}`, m.openPoints, ""); }
   if (m.nextMeeting && (m.nextMeeting.date || m.nextMeeting.note)) LINES.push(`## ${L("Nächstes Meeting", "Next meeting")}`, `${fmtDay(m.nextMeeting.date)} ${m.nextMeeting.note || ""}`.trim(), "");
   if ((m.images || []).length) { LINES.push(`## ${L("Bilder", "Images")}`); m.images.forEach((im) => LINES.push(`- ${im.name || L("Bild", "Image")}`)); LINES.push(""); }
@@ -711,7 +708,7 @@ function meetingHTML(m, forWord) {
   const parts = (m.participants || []).map((p) => `<li><b>${esc(p.name)}</b>${p.company ? " – " + esc(p.company) : ""}${p.role ? ", " + esc(p.role) : ""}${p.phone ? " · " + esc(p.phone) : ""}${p.email ? " · " + esc(p.email) : ""}</li>`).join("");
   const absent = (m.absentees || []).map((p) => `<li>${esc(p.name)}</li>`).join("");
   const agenda = (m.agenda || []).map((a, i) => `
-    <div class="ag"><h3>${i + 1}.${a.title ? " " + esc(a.title) : " " + L("(ohne Titel)", "(untitled)")}${a.done ? " ✓" : ""}</h3>
+    <div class="ag"><h3>${i + 1}. ${esc(a.title)}${a.done ? " ✓" : ""}</h3>
     ${a.desc ? `<p class="muted">${esc(a.desc)}</p>` : ""}
     ${a.notesHtml ? `<div class="notes">${sanitizeHtml(a.notesHtml)}</div>` : ""}
     ${[[L("Entscheidungen", "Decisions"), a.decisions], [L("Diskussion", "Discussion"), a.discussion], [L("Risiken", "Risks"), a.risks], [L("Offene Fragen", "Open questions"), a.openQuestions]].filter((x) => x[1]).map(([k, v]) => `<p><b>${k}:</b> ${esc(v)}</p>`).join("")}
@@ -721,7 +718,6 @@ function meetingHTML(m, forWord) {
   const imgs = (m.images || []).map((im) => `<a href="${im.dataUrl}" download="${esc(im.name) || "bild"}"><img class="ph" src="${im.dataUrl}" alt="${esc(im.name)}" /></a>`).join("");
   const att = (m.attachments || []).map((f) => `<li><a href="${f.dataUrl}" download="${esc(f.name) || "datei"}">${esc(f.name)}</a></li>`).join("");
   const voc = (m.voice || []).map((v) => `<li>${esc(v.name)}</li>`).join("");
-  const none = `<p class="muted">${L("— keine —", "— none —")}</p>`;
   const style = `
     body{font-family:'Mulish',Arial,sans-serif;color:#1f2937;margin:0;padding:${forWord ? "28px 32px" : "14mm 16mm"};}
     .hd{display:flex;align-items:center;gap:14px;border-bottom:3px solid ${C.burgundy};padding-bottom:12px;margin-bottom:16px;}
@@ -752,9 +748,9 @@ function meetingHTML(m, forWord) {
     <h2>${L("Eckdaten", "Key data")}</h2><table>${meta}</table>
     ${parts ? `<h2>${L("Teilnehmer", "Participants")}</h2><ul>${parts}</ul>` : ""}
     ${absent ? `<h2>${L("Abwesend", "Absent")}</h2><ul>${absent}</ul>` : ""}
-    <h2>${L("Agenda & Mitschrift", "Agenda & minutes")}</h2>${agenda || none}
-    <h2>${L("Entscheidungen", "Decisions")}</h2>${decisions ? `<table><tr><th>${L("Titel", "Title")}</th><th>${L("Verantwortlich", "Responsible")}</th><th>${L("Datum", "Date")}</th><th>${L("Status", "Status")}</th></tr>${decisions}</table>` : none}
-    <h2>${L("Aufgaben", "Tasks")}</h2>${actions ? `<ul>${actions}</ul>` : none}
+    ${agenda ? `<h2>${L("Agenda & Mitschrift", "Agenda & minutes")}</h2>${agenda}` : ""}
+    ${decisions ? `<h2>${L("Entscheidungen", "Decisions")}</h2><table><tr><th>${L("Titel", "Title")}</th><th>${L("Verantwortlich", "Responsible")}</th><th>${L("Datum", "Date")}</th><th>${L("Status", "Status")}</th></tr>${decisions}</table>` : ""}
+    ${actions ? `<h2>${L("Aufgaben", "Tasks")}</h2><ul>${actions}</ul>` : ""}
     ${m.openPoints ? `<h2>${L("Offene Punkte", "Open points")}</h2><p>${esc(m.openPoints)}</p>` : ""}
     ${(m.nextMeeting && (m.nextMeeting.date || m.nextMeeting.note)) ? `<h2>${L("Nächstes Meeting", "Next meeting")}</h2><p>${esc(fmtDay(m.nextMeeting.date))} ${esc(m.nextMeeting.note)}</p>` : ""}
     ${imgs ? `<h2>${L("Bilder", "Images")}</h2>${imgs}` : ""}
@@ -803,7 +799,7 @@ export function meetingToEmailHtml(m) {
   if ((m.agenda || []).length) {
     o.push(`<div style="${H}">${L("Agenda &amp; Mitschrift", "Agenda &amp; minutes")}</div>`);
     m.agenda.forEach((a, i) => {
-      o.push(`<div style="margin:0 0 8px;"><div style="font-weight:bold;">${i + 1}.${a.title ? " " + esc(a.title) : " " + L("(ohne Titel)", "(untitled)")}${a.done ? " ✓" : ""}</div>`);
+      o.push(`<div style="margin:0 0 8px;"><div style="font-weight:bold;">${i + 1}. ${esc(a.title)}${a.done ? " ✓" : ""}</div>`);
       if (a.desc) o.push(`<div style="color:#6b7280;font-size:12px;">${esc(a.desc)}</div>`);
       if (a.notesHtml) o.push(`<div style="font-size:13px;margin:3px 0;">${sanitizeHtml(a.notesHtml)}</div>`);
       [[L("Entscheidungen", "Decisions"), a.decisions], [L("Diskussion", "Discussion"), a.discussion], [L("Risiken", "Risks"), a.risks], [L("Offene Fragen", "Open questions"), a.openQuestions]]
