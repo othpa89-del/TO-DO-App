@@ -37,7 +37,7 @@ const decisionStatusLabel = (s) => ({
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const todayISO = () => new Date().toISOString().slice(0, 10);
-const fmtDay = (d) => (d ? new Date(d + "T00:00:00").toLocaleDateString(getLang() === "en" ? "en-GB" : "de-DE") : "");
+const fmtDay = (d) => (d ? new Date(d + "T00:00:00").toLocaleDateString(getLang() === "en" ? "en-GB" : "de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "");
 
 export async function loadMeetings() {
   try { const r = await window.storage.get("meetings", true); return r && r.value ? JSON.parse(r.value) : []; }
@@ -678,7 +678,7 @@ export function meetingToMarkdown(m) {
   if ((m.agenda || []).length) {
     LINES.push(`## ${L("Agenda & Mitschrift", "Agenda & minutes")}`);
     m.agenda.forEach((a, i) => {
-      LINES.push(`### ${i + 1}. ${a.title || ""}${a.done ? " ✓" : ""}`);
+      LINES.push(`### ${i + 1}.${a.title ? " " + a.title : " " + L("(ohne Titel)", "(untitled)")}${a.done ? " ✓" : ""}`);
       if (a.desc) LINES.push(a.desc);
       const notes = htmlToPlain(a.notesHtml); if (notes) LINES.push("", notes);
       [[L("Entscheidungen", "Decisions"), a.decisions], [L("Diskussion", "Discussion"), a.discussion], [L("Risiken", "Risks"), a.risks], [L("Offene Fragen", "Open questions"), a.openQuestions]]
@@ -708,7 +708,7 @@ function meetingHTML(m, forWord) {
   const parts = (m.participants || []).map((p) => `<li><b>${esc(p.name)}</b>${p.company ? " – " + esc(p.company) : ""}${p.role ? ", " + esc(p.role) : ""}${p.phone ? " · " + esc(p.phone) : ""}${p.email ? " · " + esc(p.email) : ""}</li>`).join("");
   const absent = (m.absentees || []).map((p) => `<li>${esc(p.name)}</li>`).join("");
   const agenda = (m.agenda || []).map((a, i) => `
-    <div class="ag"><h3>${i + 1}. ${esc(a.title)}${a.done ? " ✓" : ""}</h3>
+    <div class="ag"><h3>${i + 1}.${a.title ? " " + esc(a.title) : " " + L("(ohne Titel)", "(untitled)")}${a.done ? " ✓" : ""}</h3>
     ${a.desc ? `<p class="muted">${esc(a.desc)}</p>` : ""}
     ${a.notesHtml ? `<div class="notes">${sanitizeHtml(a.notesHtml)}</div>` : ""}
     ${[[L("Entscheidungen", "Decisions"), a.decisions], [L("Diskussion", "Discussion"), a.discussion], [L("Risiken", "Risks"), a.risks], [L("Offene Fragen", "Open questions"), a.openQuestions]].filter((x) => x[1]).map(([k, v]) => `<p><b>${k}:</b> ${esc(v)}</p>`).join("")}
@@ -788,7 +788,7 @@ export function meetingToEmailHtml(m) {
   if ((m.agenda || []).length) {
     o.push(`<div style="${H}">${L("Agenda &amp; Mitschrift", "Agenda &amp; minutes")}</div>`);
     m.agenda.forEach((a, i) => {
-      o.push(`<div style="margin:0 0 8px;"><div style="font-weight:bold;">${i + 1}. ${esc(a.title)}${a.done ? " ✓" : ""}</div>`);
+      o.push(`<div style="margin:0 0 8px;"><div style="font-weight:bold;">${i + 1}.${a.title ? " " + esc(a.title) : " " + L("(ohne Titel)", "(untitled)")}${a.done ? " ✓" : ""}</div>`);
       if (a.desc) o.push(`<div style="color:#6b7280;font-size:12px;">${esc(a.desc)}</div>`);
       if (a.notesHtml) o.push(`<div style="font-size:13px;margin:3px 0;">${sanitizeHtml(a.notesHtml)}</div>`);
       [[L("Entscheidungen", "Decisions"), a.decisions], [L("Diskussion", "Discussion"), a.discussion], [L("Risiken", "Risks"), a.risks], [L("Offene Fragen", "Open questions"), a.openQuestions]]

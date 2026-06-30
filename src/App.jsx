@@ -141,7 +141,7 @@ function shiftDate(iso, rec) {
   return d.toISOString().slice(0, 10);
 }
 const dt = (iso) => (iso ? new Date(iso).toLocaleDateString(getLang() === "en" ? "en-GB" : "de-DE") : "");
-const fmtDay = (d) => (d ? new Date(d + "T00:00:00").toLocaleDateString(getLang() === "en" ? "en-GB" : "de-DE") : "");
+const fmtDay = (d) => (d ? new Date(d + "T00:00:00").toLocaleDateString(getLang() === "en" ? "en-GB" : "de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "");
 function downloadBlob(data, filename, type) {
   const blob = new Blob([data], { type });
   const url = URL.createObjectURL(blob);
