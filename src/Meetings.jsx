@@ -649,6 +649,9 @@ export function meetingToMarkdown(m) {
   if ((m.actionItems || []).length) { L.push("## Aufgaben"); m.actionItems.forEach((a) => L.push(`- [ ] ${a.text}`)); L.push(""); }
   if (m.openPoints) { L.push("## Offene Punkte", m.openPoints, ""); }
   if (m.nextMeeting && (m.nextMeeting.date || m.nextMeeting.note)) L.push(`## Nächstes Meeting`, `${fmtDay(m.nextMeeting.date)} ${m.nextMeeting.note || ""}`.trim(), "");
+  if ((m.images || []).length) { L.push("## Bilder"); m.images.forEach((im) => L.push(`- ${im.name || "Bild"}`)); L.push(""); }
+  if ((m.attachments || []).length) { L.push("## Anlagen"); m.attachments.forEach((f) => L.push(`- ${f.name}`)); L.push(""); }
+  if ((m.voice || []).length) { L.push("## Sprachmemos"); m.voice.forEach((v) => L.push(`- ${v.name}`)); L.push(""); }
   L.push("", "© Copyright by Patrick Thorn");
   return L.join("\n");
 }
@@ -671,7 +674,9 @@ function meetingHTML(m, forWord) {
     </div>`).join("");
   const decisions = (m.decisions || []).map((d) => `<tr><td>${esc(d.title)}</td><td>${esc(d.owner)}</td><td>${esc(fmtDay(d.date))}</td><td>${esc(d.status)}</td></tr>`).join("");
   const actions = (m.actionItems || []).map((a) => `<li>☐ ${esc(a.text)}</li>`).join("");
-  const imgs = (m.images || []).map((im) => `<img class="ph" src="${im.dataUrl}" alt="${esc(im.name)}" />`).join("");
+  const imgs = (m.images || []).map((im) => `<a href="${im.dataUrl}" download="${esc(im.name) || "bild"}"><img class="ph" src="${im.dataUrl}" alt="${esc(im.name)}" /></a>`).join("");
+  const att = (m.attachments || []).map((f) => `<li><a href="${f.dataUrl}" download="${esc(f.name) || "datei"}">${esc(f.name)}</a></li>`).join("");
+  const voc = (m.voice || []).map((v) => `<li>${esc(v.name)}</li>`).join("");
   const style = `
     body{font-family:'Mulish',Arial,sans-serif;color:#1f2937;margin:0;padding:28px 32px;}
     .hd{display:flex;align-items:center;gap:14px;border-bottom:3px solid ${C.burgundy};padding-bottom:12px;margin-bottom:16px;}
@@ -706,6 +711,8 @@ function meetingHTML(m, forWord) {
     ${m.openPoints ? `<h2>Offene Punkte</h2><p>${esc(m.openPoints)}</p>` : ""}
     ${(m.nextMeeting && (m.nextMeeting.date || m.nextMeeting.note)) ? `<h2>Nächstes Meeting</h2><p>${esc(fmtDay(m.nextMeeting.date))} ${esc(m.nextMeeting.note)}</p>` : ""}
     ${imgs ? `<h2>Bilder</h2>${imgs}` : ""}
+    ${att ? `<h2>Anlagen</h2><ul>${att}</ul>` : ""}
+    ${voc ? `<h2>Sprachmemos</h2><ul>${voc}</ul>` : ""}
     <div class="sign"><div>Organisator${m.organizer ? " – " + esc(m.organizer) : ""}</div><div>Protokollführer${m.recorder ? " – " + esc(m.recorder) : ""}</div></div>
     <div class="cpr">© Copyright by Patrick Thorn</div>
     </body></html>`;
@@ -751,6 +758,8 @@ export function meetingToEmailHtml(m) {
   if ((m.actionItems || []).length) { o.push(`<div style="${H}">Aufgaben</div>`); m.actionItems.forEach((a) => o.push(`<div style="${P}">☐ ${esc(a.text)}</div>`)); }
   if (m.openPoints) o.push(`<div style="${H}">Offene Punkte</div><div style="${P}">${esc(m.openPoints).replace(/\n/g, "<br>")}</div>`);
   if (m.nextMeeting && (m.nextMeeting.date || m.nextMeeting.note)) o.push(`<div style="${H}">Nächstes Meeting</div><div style="${P}">${esc(fmtDay(m.nextMeeting.date))} ${esc(m.nextMeeting.note || "")}</div>`);
+  if ((m.attachments || []).length) o.push(`<div style="${H}">Anlagen</div><div style="${P}">${m.attachments.map((f) => esc(f.name)).join(", ")}</div>`);
+  if ((m.voice || []).length) o.push(`<div style="${H}">Sprachmemos</div><div style="${P}">${m.voice.map((v) => esc(v.name)).join(", ")}</div>`);
   o.push(`<div style="margin-top:16px;color:#9ca3af;font-size:11px;">© Copyright by Patrick Thorn</div>`);
   o.push(`</div>`);
   return o.join("");

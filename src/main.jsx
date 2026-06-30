@@ -52,12 +52,19 @@ let currentUserId = null;
 const LS_CACHE = "kv_cache_v1";
 const LS_QUEUE = "kv_queue_v1";
 const lsGet = (k, def) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; } catch { return def; } };
-const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
 const isOffline = () => (typeof navigator !== "undefined" && navigator.onLine === false);
 const cKey = (key) => currentUserId + ":" + key;
 const cacheRead = (key) => { const c = lsGet(LS_CACHE, {}); const k = cKey(key); return k in c ? c[k] : null; };
-const cacheWrite = (key, value) => { const c = lsGet(LS_CACHE, {}); c[cKey(key)] = value; lsSet(LS_CACHE, c); };
-const cacheDelete = (key) => { const c = lsGet(LS_CACHE, {}); delete c[cKey(key)]; lsSet(LS_CACHE, c); };
+const cacheWrite = (key, value) => { const c = lsGet(LS_CACHE, {}); c[cKey(key)] = value; return lsSet(LS_CACHE, c); };
+const cacheDelete = (key) => { const c = lsGet(LS_CACHE, {}); delete c[cKey(key)]; return lsSet(LS_CACHE, c); };
+
+// Zeitstempel des letzten EIGENEN Schreibvorgangs. Eigene Cloud-Writes erzeugen
+// ebenfalls ein Realtime-Event (Self-Echo); innerhalb dieses Fensters ignorieren
+// wir es, damit nicht nach jeder lokalen Änderung alle Daten neu geladen werden
+// (vermeidet Mehrfach-Reloads und das Überschreiben frischer lokaler Änderungen).
+let lastSelfWrite = 0;
+const markSelfWrite = () => { lastSelfWrite = Date.now(); };
 
 function emitSync(state) {
   const pending = lsGet(LS_QUEUE, []).length;
@@ -66,12 +73,18 @@ function emitSync(state) {
 function enqueue(op, key, value) {
   const q = lsGet(LS_QUEUE, []).filter((x) => !(x.userId === currentUserId && x.key === key));
   q.push({ op, key, value, userId: currentUserId });
-  lsSet(LS_QUEUE, q);
+  const ok = lsSet(LS_QUEUE, q);
   emitSync("pending");
+  return ok;
 }
 let syncing = false;
+let rerunQueued = false;
 async function flushQueue() {
-  if (syncing || isOffline()) { emitSync(isOffline() ? "offline" : "idle"); return; }
+  // Läuft bereits ein Flush, nicht abbrechen und vergessen, sondern danach
+  // einmal nachfeuern (z. B. wenn "online"-Event oder Login während eines
+  // laufenden Uploads erneut flushen will).
+  if (syncing) { rerunQueued = true; return; }
+  if (isOffline()) { emitSync("offline"); return; }
   let q = lsGet(LS_QUEUE, []);
   if (!q.length) { emitSync("synced"); return; }
   syncing = true; emitSync("syncing");
@@ -87,12 +100,15 @@ async function flushQueue() {
           const { error } = await supabase.from("kv").delete().eq("user_id", item.userId).eq("key", item.key);
           if (error) throw error;
         }
+        markSelfWrite();
         q.shift(); lsSet(LS_QUEUE, q);
       } catch { break; } // weiter offline -> später erneut
     }
   } finally {
     syncing = false;
     emitSync(lsGet(LS_QUEUE, []).length ? "pending" : "synced");
+    if (rerunQueued && !isOffline() && lsGet(LS_QUEUE, []).length) { rerunQueued = false; flushQueue(); }
+    else rerunQueued = false;
   }
 }
 if (typeof window !== "undefined") {
@@ -114,14 +130,22 @@ window.storage = {
   },
   async set(key, value) {
     if (!currentUserId) throw new Error("Nicht angemeldet");
-    cacheWrite(key, value); // sofort lokal sichern
+    const cached = cacheWrite(key, value); // sofort lokal sichern
     try {
       if (isOffline()) throw new Error("offline");
       const { error } = await supabase.from("kv").upsert(
         { user_id: currentUserId, key, value, updated_at: new Date().toISOString() }, { onConflict: "user_id,key" });
       if (error) throw error;
+      markSelfWrite();
       return { key, value };
-    } catch { enqueue("set", key, value); return { key, value }; } // optimistischer Erfolg
+    } catch {
+      // Offline/Fehler: in Queue legen. Konnten WEDER Cache NOCH Queue gespeichert
+      // werden (z. B. localStorage voll wegen großer Base64-Anhänge), ist die
+      // Änderung NICHT gesichert -> Fehler werfen, statt Erfolg vorzutäuschen.
+      const queued = enqueue("set", key, value);
+      if (!cached && !queued) throw new Error("Lokaler Speicher voll – Änderung nicht gesichert. Bitte Anhänge verkleinern oder online speichern.");
+      return { key, value }; // optimistischer Erfolg
+    }
   },
   async delete(key) {
     if (!currentUserId) return { key, deleted: true };
@@ -130,6 +154,7 @@ window.storage = {
       if (isOffline()) throw new Error("offline");
       const { error } = await supabase.from("kv").delete().eq("user_id", currentUserId).eq("key", key);
       if (error) throw error;
+      markSelfWrite();
     } catch { enqueue("delete", key, null); }
     return { key, deleted: true };
   },
@@ -150,6 +175,10 @@ window.storage = {
 let channel = null;
 let debounce = null;
 function notifyRemote() {
+  // Self-Echo unterdrücken: kommt das Realtime-Event direkt nach einem eigenen
+  // Schreibvorgang, ist es nur das Echo der eigenen Änderung – kein Reload nötig.
+  // Änderungen von ANDEREN Geräten liegen außerhalb dieses Fensters und laden neu.
+  if (Date.now() - lastSelfWrite < 4000) return;
   clearTimeout(debounce);
   debounce = setTimeout(() => window.dispatchEvent(new CustomEvent("ctc:remote")), 150);
 }

@@ -634,12 +634,16 @@ export default function App() {
       "Fällig am": t.due ? dt(t.due + "T00:00:00") : "", Erinnerung: t.due ? leadLabel(t.remindLead) : "",
       Wiederholung: RECUR[t.recurrence] || "Keine", Ansprechperson: t.contact || "", Company: t.company || "",
       Referenz: t.link || "", Notiz: t.notes || "",
+      Checkliste: (t.checklist || []).length ? `${t.checklist.filter((c) => c.done).length}/${t.checklist.length}` : "",
+      Unteraufgaben: (t.checklist || []).map((c) => `${c.done ? "☑" : "☐"} ${c.text}`).join(" | "),
+      Anhänge: (t.attachments || []).map((a) => a.name).join(", "),
+      Bilder: (t.images || []).length || "",
       Verlauf: (t.log || []).map((e) => `${dt(e.date)}${e.by ? " " + e.by : ""}: ${e.text}`).join(" | "),
       "Erstellt am": dt(t.createdAt), "Erledigt am": dt(t.completedAt),
     }));
     try {
       const ws = XLSX.utils.json_to_sheet(rows);
-      ws["!cols"] = [{ wch: 34 }, { wch: 24 }, { wch: 9 }, { wch: 18 }, { wch: 11 }, { wch: 14 }, { wch: 13 }, { wch: 13 }, { wch: 15 }, { wch: 13 }, { wch: 18 }, { wch: 22 }, { wch: 30 }, { wch: 40 }, { wch: 50 }, { wch: 12 }, { wch: 12 }];
+      ws["!cols"] = [{ wch: 34 }, { wch: 24 }, { wch: 9 }, { wch: 18 }, { wch: 11 }, { wch: 14 }, { wch: 13 }, { wch: 13 }, { wch: 15 }, { wch: 13 }, { wch: 18 }, { wch: 22 }, { wch: 30 }, { wch: 40 }, { wch: 9 }, { wch: 40 }, { wch: 30 }, { wch: 7 }, { wch: 50 }, { wch: 12 }, { wch: 12 }];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "TO DO");
       const out = XLSX.write(wb, { bookType: "xlsx", type: "array" });
@@ -1472,6 +1476,9 @@ function PrintDoc({ items }) {
               <td><strong>{t.title}</strong>{t.notes ? <div className="p-note">{t.notes}</div> : null}
                 {t.start && <div className="p-note">Start: {fmtDay(t.start)}</div>}
                 {t.updatedAt && <div className="p-note">Letztes Update: {fmtDay(t.updatedAt)}</div>}
+                {(t.checklist || []).length > 0 && <div className="p-note">Checkliste ({t.checklist.filter((c) => c.done).length}/{t.checklist.length}): {t.checklist.map((c) => `${c.done ? "☑" : "☐"} ${c.text}`).join("  ·  ")}</div>}
+                {(t.attachments || []).length > 0 && <div className="p-note">Anhänge: {t.attachments.map((a) => a.name).join(", ")}</div>}
+                {(t.images || []).length > 0 && <div className="p-note">Bilder: {t.images.length}</div>}
                 {(t.log || []).length > 0 && <div className="p-note">{(t.log || []).map((e) => `${dt(e.date)}: ${e.text}`).join("  •  ")}</div>}</td>
               <td>{catDisplay(t.category) || "—"}</td>
               <td>{(PRIORITIES[t.priority] || PRIORITIES[""]).label || "—"}</td>
