@@ -467,6 +467,12 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
   function cancelEdit() { setEditId(null); setEditScope(null); setForm(blank); setClOpen(false); setAtOpen(false); setView(returnView); }
+  function openNewTask() {
+    setEditId(null); setEditScope(null); setForm({ ...blank });
+    setClOpen(false); setAtOpen(false);
+    setReturnView(view === "new" ? "all" : view); setView("new");
+    window.scrollTo({ top: 0 });
+  }
 
   // Persons handlers
   function submitPerson() {
@@ -816,14 +822,14 @@ export default function App() {
             <Plane className="hd-mark" strokeWidth={2.2} />
             <div><h1>TO DO APP</h1></div>
             <div className="hd-profile">
-              <label>Dein Kürzel</label>
-              <input value={profile} onChange={(e) => saveProfile(e.target.value)} placeholder="z. B. PB" maxLength={6} />
+              <label>Dein Name</label>
+              <input value={profile} onChange={(e) => saveProfile(e.target.value)} placeholder="z. B. Patrick Thorn" maxLength={60} />
             </div>
           </div>
           <nav className="tabs">
-            {["dash", "new", "all", "meetings", "persons", "export"].map((v) => (
+            {["dash", "all", "meetings", "persons", "export"].map((v) => (
               <button key={v} className={"tab" + (view === v ? " on" : "")} onClick={() => setView(v)}>
-                {v === "dash" ? "Dashboard" : v === "all" ? "Aufgaben" : v === "meetings" ? "Meeting Minutes" : v === "persons" ? "Persons" : v === "export" ? "Druck & Export" : "Neue Aufgabe"}
+                {v === "dash" ? "Dashboard" : v === "all" ? "Aufgaben" : v === "meetings" ? "Meeting Minutes" : v === "persons" ? "Persons" : "Druck & Export"}
               </button>
             ))}
           </nav>
@@ -846,7 +852,7 @@ export default function App() {
                 <div className="dash-date">{new Date().toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
               </div>
               <div className="dash-quick">
-                <button className="btn primary" onClick={() => { setEditId(null); setEditScope(null); setForm(blank); setReturnView("all"); setView("new"); }}><Plus size={15} /> Aufgabe</button>
+                <button className="btn primary" onClick={openNewTask}><Plus size={15} /> Aufgabe</button>
                 <button className="btn out" onClick={() => setView("meetings")}><Plane size={15} /> Meeting</button>
               </div>
             </div>
@@ -1239,7 +1245,7 @@ export default function App() {
 
                 <div className="actions">
                   <button className="btn primary" onClick={submit}>{editId ? "Aktualisieren" : "Hinzufügen"}</button>
-                  {editId && <button className="btn ghost" onClick={cancelEdit}>Abbrechen</button>}
+                  <button className="btn ghost" onClick={cancelEdit}>{editId ? "Abbrechen" : "Zurück"}</button>
                 </div>
               </div>
           </div>
@@ -1247,6 +1253,10 @@ export default function App() {
           /* ============ AUFGABEN-LISTE ============ */
           <div className="listwrap">
             <main className="panel">
+              <div className="list-head">
+                <h2>Aufgaben</h2>
+                <button className="btn primary" onClick={openNewTask}><Plus size={16} /> Neue Aufgabe</button>
+              </div>
               <div className="toolbar">
                 <div className="tb-group"><span>Bereich</span>
                   <select value={filterCat} onChange={(e) => setFilterCat(e.target.value)}>
@@ -1328,7 +1338,7 @@ export default function App() {
                 <>
                   {loaded && list.length === 0 && (
                     <div className="empty">
-                      {search ? "Keine Treffer." : filterStatus === "erledigt" ? "Noch nichts erledigt." : "Keine Aufgaben in dieser Ansicht. Über den Tab „Neue Aufgabe“ anlegen."}
+                      {search ? "Keine Treffer." : filterStatus === "erledigt" ? "Noch nichts erledigt." : "Keine Aufgaben in dieser Ansicht. Oben „+ Neue Aufgabe“ anlegen."}
                     </div>
                   )}
                   {!groupByCat && <ul className="tasks" ref={tasksUlRef}>{list.map(renderTask)}</ul>}
@@ -1523,7 +1533,7 @@ const css = `
 .hd h1{color:${C.white};font-size:24px;line-height:1.1;letter-spacing:.04em;}
 .hd-profile{margin-left:auto;text-align:right;}
 .hd-profile label{display:block;color:rgba(255,255,255,.82);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;}
-.hd-profile input{width:88px;text-align:center;border:none;border-radius:7px;padding:7px 8px;font-size:14px;font-weight:700;color:${C.burgundyDark};background:${C.white};}
+.hd-profile input{width:190px;max-width:46vw;text-align:center;border:none;border-radius:7px;padding:7px 10px;font-size:14px;font-weight:700;color:${C.burgundyDark};background:${C.white};}
 .tabs{display:flex;align-items:center;gap:4px;padding:0 24px;background:${C.burgundyDark};}
 .tab{background:transparent;border:none;color:rgba(255,255,255,.78);font-family:inherit;font-size:14px;font-weight:700;padding:13px 16px;cursor:pointer;border-bottom:3px solid transparent;transition:.15s;}
 .tab:hover{color:${C.white};}
@@ -1710,6 +1720,8 @@ aside.panel .card{position:sticky;top:16px;}
 .card-att-img{display:block;width:40px;height:40px;border:1px solid ${C.line};border-radius:6px;overflow:hidden;}
 .card-att-img img{width:100%;height:100%;object-fit:cover;}
 .card-att-file{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:${C.sky};text-decoration:none;background:${C.fill};border-radius:6px;padding:3px 7px;}
+.list-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;}
+.list-head h2{font-size:20px;font-weight:900;color:${C.ink};margin:0;}
 .viewtog{margin-left:auto;flex:none;}
 .viewtog .seg-b{padding:7px 11px;}
 .kboard{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;align-items:start;}
