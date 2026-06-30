@@ -965,6 +965,7 @@ export default function App() {
                         <div className="prow-main" onClick={() => editPerson(p)}>
                           <span className="prow-name">{p.name}</span>
                           <span className="prow-sub">{[p.role, p.company].filter(Boolean).join(" · ")}</span>
+                          {p.notes && <span className="prow-notes">Notizen: {p.notes}</span>}
                         </div>
                         <div className="prow-contact">
                           {p.email && <a href={"mailto:" + p.email}><Mail size={12} /> {p.email}</a>}
@@ -1749,6 +1750,7 @@ aside.panel .card{position:sticky;top:16px;}
 .prow-main{cursor:pointer;min-width:150px;flex:1;}
 .prow-name{display:block;font-weight:800;color:${C.ink};font-size:14px;}
 .prow-sub{font-size:12px;color:${C.cool};}
+.prow-notes{display:block;font-size:12px;color:${C.grey};margin-top:3px;white-space:pre-wrap;}
 .prow-contact{display:flex;flex-direction:column;gap:2px;}
 .prow-contact a{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:${C.sky};text-decoration:none;font-weight:600;}
 .prow-topics{display:flex;flex-wrap:wrap;gap:4px;max-width:260px;}
