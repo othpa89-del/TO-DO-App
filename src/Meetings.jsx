@@ -701,7 +701,7 @@ function meetingHTML(m, forWord) {
   const att = (m.attachments || []).map((f) => `<li><a href="${f.dataUrl}" download="${esc(f.name) || "datei"}">${esc(f.name)}</a></li>`).join("");
   const voc = (m.voice || []).map((v) => `<li>${esc(v.name)}</li>`).join("");
   const style = `
-    body{font-family:'Mulish',Arial,sans-serif;color:#1f2937;margin:0;padding:28px 32px;}
+    body{font-family:'Mulish',Arial,sans-serif;color:#1f2937;margin:0;padding:${forWord ? "28px 32px" : "14mm 16mm"};}
     .hd{display:flex;align-items:center;gap:14px;border-bottom:3px solid ${C.burgundy};padding-bottom:12px;margin-bottom:16px;}
     .logo{width:40px;height:40px;color:${C.burgundy};}
     .hd h1{font-size:22px;margin:0;color:${C.burgundyDark};letter-spacing:.02em;}
@@ -718,7 +718,8 @@ function meetingHTML(m, forWord) {
     .ph{max-width:46%;margin:6px 6px 0 0;border:1px solid #e5e7eb;border-radius:6px;vertical-align:top;}
     .sign{display:flex;gap:40px;margin-top:36px;} .sign div{flex:1;border-top:1px solid #9ca3af;padding-top:5px;font-size:11px;color:#6b7280;text-align:center;}
     .cpr{margin-top:22px;text-align:center;font-size:9px;color:#9ca3af;}
-    @media print{@page{margin:14mm;}}
+    @page{margin:${forWord ? "14mm" : "0"};}
+    @media print{@page{margin:${forWord ? "14mm" : "0"};}}
   `;
   const planeSvg = `<svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>`;
   return `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Protokoll ${esc(m.title)}</title>

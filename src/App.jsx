@@ -1846,9 +1846,9 @@ aside.panel .card{position:sticky;top:16px;}
 }
 @media print{
   .screen{display:none !important;}
-  .printable{display:block !important;}
+  .printable{display:block !important;padding:14mm 14mm;}
   .ctc-root{background:#fff;max-width:none;}
-  @page{margin:14mm;}
+  @page{margin:0;}
   .p-head{display:flex;align-items:center;gap:12px;border-bottom:3px solid ${C.burgundy};padding-bottom:10px;margin-bottom:14px;}
   .p-mark{width:28px;height:28px;color:${C.burgundy};flex:none;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   .p-title{font-size:20px;font-weight:900;color:${C.burgundyDark};letter-spacing:.04em;}
