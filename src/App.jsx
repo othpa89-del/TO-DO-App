@@ -3,7 +3,7 @@ import * as XLSX from "xlsx";
 import {
   User, Building2, Printer, FileSpreadsheet, Check, Pencil, X, Square, CheckSquare,
   Bell, Settings, Search, ExternalLink, Repeat, Download, Upload, Database, Plus, Mail, Phone,
-  MessageSquare, ChevronUp, ChevronDown, Plane, FileText, Copy, GripVertical,
+  MessageSquare, ChevronUp, ChevronDown, Plane, FileText, Copy, GripVertical, Paperclip, Image as ImageIcon, ListChecks,
 } from "lucide-react";
 import Sortable from "sortablejs";
 import Meetings, { loadMeetings, meetingToMarkdown, meetingToText, exportWord, printMeeting, copyMeetingToClipboard, emailMeeting } from "./Meetings.jsx";
@@ -71,8 +71,31 @@ function normalizeTask(t) {
     ...t, status, recurrence: t.recurrence || "none",
     link: t.link || "", notes: t.notes || "", contact: t.contact || "", company: t.company || "", category: t.category || "",
     log: Array.isArray(t.log) ? t.log : [],
+    checklist: Array.isArray(t.checklist) ? t.checklist : [],
+    attachments: Array.isArray(t.attachments) ? t.attachments : [],
+    images: Array.isArray(t.images) ? t.images : [],
     escalation: t.escalation || "", updatedAt: t.updatedAt || "", start: t.start || "",
   };
+}
+function fileToDataUrl(file) { return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(file); }); }
+function compressImage(file, maxDim = 1280, quality = 0.72) {
+  return new Promise((res) => {
+    const fr = new FileReader();
+    fr.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > height) { if (width > maxDim) { height = Math.round(height * maxDim / width); width = maxDim; } }
+        else { if (height > maxDim) { width = Math.round(width * maxDim / height); height = maxDim; } }
+        const cv = document.createElement("canvas"); cv.width = width; cv.height = height;
+        cv.getContext("2d").drawImage(img, 0, 0, width, height);
+        res(cv.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = () => res(null);
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
 }
 function dayDiff(due) {
   if (!due) return null;
@@ -143,6 +166,10 @@ export default function App() {
   const [sortBy, setSortBy] = useState("due");
   const [groupByCat, setGroupByCat] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [clOpen, setClOpen] = useState(false);  // Checkliste-Abschnitt offen
+  const [atOpen, setAtOpen] = useState(false);  // Anhänge-Abschnitt offen
+  const [pLayout, setPLayout] = useState("cards"); // Persons: cards | list
+  const [taskLayout, setTaskLayout] = useState("list"); // Aufgaben: list | board
   const [editScope, setEditScope] = useState(null);
   const [profile, setProfile] = useState("");
   const [toast, setToast] = useState(null);
@@ -171,8 +198,9 @@ export default function App() {
   const tasksUlRef = useRef(null);  // <ul> für Drag&Drop
   const listRef = useRef([]);       // aktuelle sichtbare Liste (manuelle Reihenfolge)
   const tasksRef = useRef(tasks);   // aktuelle Aufgaben
+  const kcolRefs = useRef({});      // Kanban-Spalten-Container
 
-  const blank = { title: "", notes: "", category: "", priority: "", status: "offen", start: "", due: "", remindLead: 3, contact: "", company: "", link: "", recurrence: "none", escalation: "", updatedAt: new Date().toISOString().slice(0, 10), scope: "personal" };
+  const blank = { title: "", notes: "", category: "", priority: "", status: "offen", start: "", due: "", remindLead: 3, contact: "", company: "", link: "", recurrence: "none", escalation: "", updatedAt: new Date().toISOString().slice(0, 10), scope: "personal", checklist: [], attachments: [], images: [] };
   const [form, setForm] = useState(blank);
   const sortedCats = sortCats(categories);
   const sortedCompanies = sortCats(companies);
@@ -240,13 +268,34 @@ export default function App() {
 
   // Drag & Drop (nur bei view "all", sortBy "manual", ohne Gruppierung)
   useEffect(() => {
-    if (view !== "all" || sortBy !== "manual" || groupByCat || !tasksUlRef.current) return;
+    if (view !== "all" || taskLayout !== "list" || sortBy !== "manual" || groupByCat || !tasksUlRef.current) return;
     const s = Sortable.create(tasksUlRef.current, {
       handle: ".drag-handle", animation: 150, delay: 60, delayOnTouchOnly: true, forceFallback: true,
       onEnd: (evt) => { if (evt.oldIndex != null && evt.newIndex != null) reorderManual(evt.oldIndex, evt.newIndex); },
     });
     return () => { try { s.destroy(); } catch {} };
-  }, [view, sortBy, groupByCat, loaded]);
+  }, [view, taskLayout, sortBy, groupByCat, loaded]);
+
+  // Kanban-Board: Karten per Drag&Drop zwischen Status-Spalten verschieben
+  useEffect(() => {
+    if (view !== "all" || taskLayout !== "board") return;
+    const cols = ["offen", "inArbeit", "onHold", "erledigt"];
+    const inst = [];
+    cols.forEach((key) => {
+      const el = kcolRefs.current[key];
+      if (!el) return;
+      inst.push(Sortable.create(el, {
+        group: "kanban", sort: false, animation: 150, delay: 70, delayOnTouchOnly: true, forceFallback: true,
+        onAdd: (evt) => {
+          const id = evt.item.getAttribute("data-id");
+          const toCol = evt.to.getAttribute("data-col");
+          try { evt.from.insertBefore(evt.item, evt.from.children[evt.oldIndex] ?? null); } catch {}
+          if (id && toCol) changeStatus("personal", id, toCol);
+        },
+      }));
+    });
+    return () => inst.forEach((s) => { try { s.destroy(); } catch {} });
+  }, [view, taskLayout, loaded]);
 
   useEffect(() => {
     if (printNonce > 0) {
@@ -332,6 +381,7 @@ export default function App() {
         ...x, title, notes: form.notes.trim(), category: form.category, priority: form.priority, status: form.status,
         start: form.start, due: form.due, remindLead: Number(form.remindLead), contact: form.contact.trim(), company: form.company.trim(),
         link: form.link.trim(), recurrence: form.recurrence, escalation: form.escalation, updatedAt: new Date().toISOString().slice(0, 10),
+        checklist: form.checklist || [], attachments: form.attachments || [], images: form.images || [],
         completedAt: form.status === "erledigt" ? (x.completedAt || new Date().toISOString()) : null,
       } : x);
       persist(scope, arr); flash("Aufgabe aktualisiert."); cancelEdit();
@@ -341,19 +391,48 @@ export default function App() {
         id: uid(), title, notes: form.notes.trim(), category: form.category, priority: form.priority, status: form.status,
         start: form.start, due: form.due, remindLead: Number(form.remindLead), contact: form.contact.trim(), company: form.company.trim(),
         link: form.link.trim(), recurrence: form.recurrence, escalation: form.escalation, updatedAt: new Date().toISOString().slice(0, 10),
+        checklist: form.checklist || [], attachments: form.attachments || [], images: form.images || [],
         createdAt: new Date().toISOString(),
         createdBy: "", completedAt: form.status === "erledigt" ? new Date().toISOString() : null,
       });
       persist(scope, [task, ...tasks[scope]]);
       flash("Aufgabe hinzugefügt.");
       setForm({ ...blank, scope, category: form.category, company: form.company });
+      setClOpen(false); setAtOpen(false);
     }
   }
+  // --- Checkliste/Unteraufgaben im Formular ---
+  function chkAdd() { setForm((f) => ({ ...f, checklist: [...(f.checklist || []), { id: uid(), text: "", done: false }] })); }
+  function chkUpd(id, patch) { setForm((f) => ({ ...f, checklist: (f.checklist || []).map((c) => (c.id === id ? { ...c, ...patch } : c)) })); }
+  function chkDel(id) { setForm((f) => ({ ...f, checklist: (f.checklist || []).filter((c) => c.id !== id) })); }
+  // --- Checkliste direkt in der Aufgabenkarte abhaken ---
+  function toggleChecklistItem(scope, taskId, itemId) {
+    persist(scope, tasks[scope].map((t) => (t.id === taskId
+      ? { ...t, checklist: (t.checklist || []).map((c) => (c.id === itemId ? { ...c, done: !c.done } : c)), updatedAt: new Date().toISOString().slice(0, 10) }
+      : t)));
+  }
+  // --- Anhänge/Bilder im Formular ---
+  async function formAddFiles(e) {
+    const files = Array.from(e.target.files || []); e.target.value = ""; let added = 0;
+    for (const fl of files) {
+      if (fl.size > 3 * 1024 * 1024) { flash(`„${fl.name}“ > 3 MB – übersprungen.`); continue; }
+      const dataUrl = await fileToDataUrl(fl);
+      setForm((f) => ({ ...f, attachments: [...(f.attachments || []), { id: uid(), name: fl.name, type: fl.type, size: fl.size, dataUrl }] })); added++;
+    }
+    if (added) flash("Anhang hinzugefügt.");
+  }
+  async function formAddImages(e) {
+    const files = Array.from(e.target.files || []); e.target.value = ""; let added = 0;
+    for (const fl of files) { const dataUrl = await compressImage(fl); if (dataUrl) { setForm((f) => ({ ...f, images: [...(f.images || []), { id: uid(), name: fl.name, dataUrl }] })); added++; } }
+    if (added) flash("Bild gespeichert.");
+  }
+  function formRemoveAtt(field, id) { setForm((f) => ({ ...f, [field]: (f[field] || []).filter((x) => x.id !== id) })); }
   function changeStatus(scope, id, newStatus) {
-    const t = tasks[scope].find((x) => x.id === id);
+    const cur = tasksRef.current[scope] || tasks[scope];
+    const t = cur.find((x) => x.id === id);
     if (!t) return;
     const willDone = newStatus === "erledigt";
-    let arr = tasks[scope].map((x) => x.id === id ? {
+    let arr = cur.map((x) => x.id === id ? {
       ...x, status: newStatus, updatedAt: new Date().toISOString().slice(0, 10),
       completedAt: willDone ? (x.completedAt || new Date().toISOString()) : null,
       completedBy: willDone ? profile || "" : "",
@@ -379,12 +458,15 @@ export default function App() {
       title: t.title, notes: t.notes || "", category: t.category || "", priority: t.priority, status: t.status || "offen",
       start: t.start || "", due: t.due || "", remindLead: t.remindLead ?? 3, contact: t.contact || "", company: t.company || "",
       link: t.link || "", recurrence: t.recurrence || "none", escalation: t.escalation || "", updatedAt: t.updatedAt || "", scope,
+      checklist: Array.isArray(t.checklist) ? t.checklist : [], attachments: Array.isArray(t.attachments) ? t.attachments : [], images: Array.isArray(t.images) ? t.images : [],
     });
+    setClOpen((t.checklist || []).length > 0);
+    setAtOpen(((t.attachments || []).length + (t.images || []).length) > 0);
     setReturnView(isTaskView ? view : "all"); // aktuelle Liste merken
     setView("new");                            // ins Formular wechseln
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
-  function cancelEdit() { setEditId(null); setEditScope(null); setForm(blank); setView(returnView); }
+  function cancelEdit() { setEditId(null); setEditScope(null); setForm(blank); setClOpen(false); setAtOpen(false); setView(returnView); }
 
   // Persons handlers
   function submitPerson() {
@@ -478,6 +560,24 @@ export default function App() {
     return da - db;
   });
   listRef.current = list; tasksRef.current = tasks;
+
+  // Kanban-Board: nach allen Filtern AUSSER Status, dann nach Status in Spalten
+  const boardItems = taskViewPool.filter((t) => {
+    if (filterCat === "__none__") { if (t.category) return false; }
+    else if (filterCat !== "all") { if (t.category !== filterCat) return false; }
+    if (filterCompany === "__none__") { if (t.company) return false; }
+    else if (filterCompany !== "all") { if (t.company !== filterCompany) return false; }
+    if (filterContact === "__none__") { if (t.contact) return false; }
+    else if (filterContact !== "all") { if (t.contact !== filterContact) return false; }
+    if (search.trim()) { const q = search.toLowerCase(); const hay = [t.title, t.notes, t.contact, t.company, catDisplay(t.category)].join(" ").toLowerCase(); if (!hay.includes(q)) return false; }
+    return true;
+  });
+  const BOARD_COLS = [
+    { key: "offen", label: "Offen", match: (t) => !isDone(t) && (t.status === "offen" || !t.status) },
+    { key: "inArbeit", label: "In Arbeit", match: (t) => !isDone(t) && t.status === "inArbeit" },
+    { key: "onHold", label: "On Hold", match: (t) => !isDone(t) && t.status === "onHold" },
+    { key: "erledigt", label: "Erledigt", match: (t) => isDone(t) },
+  ];
 
   const contactFilterOptions = Array.from(new Set(merged.map((t) => t.contact).filter(Boolean))).sort((a, b) => a.localeCompare(b, "de"));
 
@@ -619,6 +719,32 @@ export default function App() {
             <div className="task-contact">
               {t.contact && <span><User size={12} /> {t.contact}</span>}
               {t.updatedAt && <span className="upd">Akt. {fmtDay(t.updatedAt)}</span>}
+            </div>
+          )}
+          {(t.checklist || []).length > 0 && (() => {
+            const done = t.checklist.filter((c) => c.done).length;
+            return (
+              <div className="card-chk">
+                <div className="card-chk-head"><ListChecks size={12} /> {done}/{t.checklist.length}
+                  <span className="card-chk-bar"><span style={{ width: (t.checklist.length ? Math.round(done / t.checklist.length * 100) : 0) + "%" }} /></span>
+                </div>
+                {t.checklist.map((c) => (
+                  <label key={c.id} className={"card-chk-item" + (c.done ? " done" : "")}>
+                    <input type="checkbox" checked={!!c.done} onChange={() => toggleChecklistItem(t._scope, t.id, c.id)} />
+                    <span>{c.text || "—"}</span>
+                  </label>
+                ))}
+              </div>
+            );
+          })()}
+          {((t.images || []).length > 0 || (t.attachments || []).length > 0) && (
+            <div className="card-att">
+              {(t.images || []).map((im) => (
+                <a key={im.id} href={im.dataUrl} target="_blank" rel="noreferrer" className="card-att-img"><img src={im.dataUrl} alt="" /></a>
+              ))}
+              {(t.attachments || []).map((fl) => (
+                <a key={fl.id} href={fl.dataUrl} download={fl.name} className="card-att-file"><Paperclip size={11} /> {fl.name}</a>
+              ))}
             </div>
           )}
           {(() => {
@@ -812,9 +938,38 @@ export default function App() {
                     {sortedCats.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
+                <div className="seg viewtog">
+                  <button className={"seg-b" + (pLayout === "cards" ? " on" : "")} onClick={() => setPLayout("cards")}>Karten</button>
+                  <button className={"seg-b" + (pLayout === "list" ? " on" : "")} onClick={() => setPLayout("list")}>Liste</button>
+                </div>
               </div>
               {persons.length === 0 && <div className="empty">Noch keine Ansprechpersonen. Links die erste anlegen.</div>}
               {persons.length > 0 && personsView.length === 0 && <div className="empty">Keine Treffer.</div>}
+              {pLayout === "list" ? (
+                <div className="plist">
+                  {personsView.map((p) => {
+                    const openP = merged.filter((t) => t.contact && t.contact.toLowerCase() === p.name.toLowerCase() && !isDone(t)).length;
+                    return (
+                      <div key={p.id} className="prow">
+                        <div className="prow-main" onClick={() => editPerson(p)}>
+                          <span className="prow-name">{p.name}</span>
+                          <span className="prow-sub">{[p.role, p.company].filter(Boolean).join(" · ")}</span>
+                        </div>
+                        <div className="prow-contact">
+                          {p.email && <a href={"mailto:" + p.email}><Mail size={12} /> {p.email}</a>}
+                          {p.phone && <a href={"tel:" + p.phone}><Phone size={12} /> {p.phone}</a>}
+                        </div>
+                        <div className="prow-topics">{(p.topics || []).map((c) => <span key={c} className="badge" style={{ color: catColor(c), borderColor: catColor(c) }}>{c}</span>)}</div>
+                        <span className="prow-count">{openP} offen</span>
+                        <div className="task-actions">
+                          <button className="icon" onClick={() => editPerson(p)} title="Bearbeiten"><Pencil size={15} /></button>
+                          <button className="icon" onClick={() => deletePerson(p.id)} title="Löschen"><X size={16} /></button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
               <div className="pgrid">
                 {personsView.map((p) => {
                   const pTasks = merged.filter((t) => t.contact && t.contact.toLowerCase() === p.name.toLowerCase());
@@ -864,6 +1019,7 @@ export default function App() {
                   );
                 })}
               </div>
+              )}
             </main>
           </div>
         ) : view === "export" ? (
@@ -1036,6 +1192,51 @@ export default function App() {
                 )}
                 <div className="field"><label>Referenz-Link (optional)</label>
                   <input value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} placeholder="https:// … (Reg, Drive-Dokument)" /></div>
+
+                {/* Optional: Unteraufgaben / Checkliste */}
+                {(clOpen || (form.checklist || []).length > 0) ? (
+                  <div className="opt-sec">
+                    <div className="opt-head"><label>Unteraufgaben / Checkliste</label>
+                      <button type="button" className="link sm" onClick={() => { setClOpen(false); }}>ausblenden</button></div>
+                    {(form.checklist || []).map((c) => (
+                      <div key={c.id} className="chk-row">
+                        <input type="checkbox" checked={!!c.done} onChange={(e) => chkUpd(c.id, { done: e.target.checked })} />
+                        <input className="chk-text" value={c.text} onChange={(e) => chkUpd(c.id, { text: e.target.value })} placeholder="Unteraufgabe …"
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); chkAdd(); } }} />
+                        <button type="button" className="icon" onClick={() => chkDel(c.id)}><X size={14} /></button>
+                      </div>
+                    ))}
+                    <button type="button" className="link sm" onClick={chkAdd}><Plus size={13} /> Punkt hinzufügen</button>
+                  </div>
+                ) : (
+                  <button type="button" className="opt-add" onClick={() => { setClOpen(true); chkAdd(); }}><Plus size={14} /> Unteraufgaben / Checkliste</button>
+                )}
+
+                {/* Optional: Anhänge / Bilder */}
+                {(atOpen || (form.attachments || []).length > 0 || (form.images || []).length > 0) ? (
+                  <div className="opt-sec">
+                    <div className="opt-head"><label>Anhänge & Bilder</label>
+                      <button type="button" className="link sm" onClick={() => setAtOpen(false)}>ausblenden</button></div>
+                    <div className="data-row">
+                      <label className="btn out filelbl"><Upload size={14} /> Datei <input type="file" hidden multiple onChange={formAddFiles} /></label>
+                      <label className="btn out filelbl"><Upload size={14} /> Bild <input type="file" hidden accept="image/*" multiple onChange={formAddImages} /></label>
+                      <span className="hint">max. 3 MB pro Datei</span>
+                    </div>
+                    {(form.images || []).length > 0 && (
+                      <div className="att-thumbs">
+                        {form.images.map((im) => (
+                          <div key={im.id} className="att-thumb"><img src={im.dataUrl} alt={im.name} /><button type="button" onClick={() => formRemoveAtt("images", im.id)}><X size={12} /></button></div>
+                        ))}
+                      </div>
+                    )}
+                    {(form.attachments || []).map((fl) => (
+                      <div key={fl.id} className="att-file"><a href={fl.dataUrl} download={fl.name}>{fl.name}</a><span className="hint">{Math.round((fl.size || 0) / 1024)} KB</span><button type="button" className="icon" onClick={() => formRemoveAtt("attachments", fl.id)}><X size={14} /></button></div>
+                    ))}
+                  </div>
+                ) : (
+                  <button type="button" className="opt-add" onClick={() => setAtOpen(true)}><Plus size={14} /> Anhänge & Bilder</button>
+                )}
+
                 <div className="actions">
                   <button className="btn primary" onClick={submit}>{editId ? "Aktualisieren" : "Hinzufügen"}</button>
                   {editId && <button className="btn ghost" onClick={cancelEdit}>Abbrechen</button>}
@@ -1075,6 +1276,10 @@ export default function App() {
                 <button className="link" onClick={() => setGroupByCat((g) => !g)}>
                   {groupByCat ? <CheckSquare size={15} /> : <Square size={15} />} Nach Bereich
                 </button>
+                <div className="seg viewtog">
+                  <button className={"seg-b" + (taskLayout === "list" ? " on" : "")} onClick={() => setTaskLayout("list")}>Liste</button>
+                  <button className={"seg-b" + (taskLayout === "board" ? " on" : "")} onClick={() => setTaskLayout("board")}>Board</button>
+                </div>
               </div>
 
               <div className="stats">
@@ -1093,19 +1298,48 @@ export default function App() {
               </div>
 
               {!loaded && <div className="empty">Aufgaben werden geladen …</div>}
-              {loaded && list.length === 0 && (
-                <div className="empty">
-                  {search ? "Keine Treffer." : filterStatus === "erledigt" ? "Noch nichts erledigt." : "Keine Aufgaben in dieser Ansicht. Über den Tab „Neue Aufgabe“ anlegen."}
-                </div>
-              )}
 
-              {!groupByCat && <ul className="tasks" ref={tasksUlRef}>{list.map(renderTask)}</ul>}
-              {groupByCat && groupNames.map((g) => (
-                <div key={g} className="grp">
-                  <div className="grp-head"><span>{g}</span><em>{groups[g].length}</em></div>
-                  <ul className="tasks">{groups[g].map(renderTask)}</ul>
+              {loaded && taskLayout === "board" ? (
+                <div className="kboard">
+                  {BOARD_COLS.map((col) => {
+                    const items = boardItems.filter(col.match);
+                    return (
+                      <div key={col.key} className="kcol">
+                        <div className="kcol-h" style={{ borderTopColor: (STATUS[col.key] || {}).color || C.cool }}>{col.label} <em>{items.length}</em></div>
+                        <div className="kcol-body" data-col={col.key} ref={(el) => { kcolRefs.current[col.key] = el; }}>
+                          {items.map((t) => (
+                            <div key={keyOf(t)} className={"kcard" + (isDone(t) ? " done" : "")} data-id={t.id} onClick={() => startEdit(t._scope, t)} style={{ borderLeftColor: companyColor(t.company) }}>
+                              <div className="kcard-title">{t.title}</div>
+                              <div className="kcard-meta">
+                                {catDisplay(t.category) && <span className="badge" style={{ color: catColor(t.category), borderColor: catColor(t.category) }}>{catDisplay(t.category)}</span>}
+                                {t.priority && <span className="dot" style={{ background: (PRIORITIES[t.priority] || PRIORITIES[""]).color }} />}
+                                {t.due && <span className="due">{fmtDate(t.due)}</span>}
+                                {(t.checklist || []).length > 0 && <span className="kchk">☑ {t.checklist.filter((c) => c.done).length}/{t.checklist.length}</span>}
+                              </div>
+                            </div>
+                          ))}
+                          {items.length === 0 && <div className="kcol-empty">—</div>}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
+              ) : (
+                <>
+                  {loaded && list.length === 0 && (
+                    <div className="empty">
+                      {search ? "Keine Treffer." : filterStatus === "erledigt" ? "Noch nichts erledigt." : "Keine Aufgaben in dieser Ansicht. Über den Tab „Neue Aufgabe“ anlegen."}
+                    </div>
+                  )}
+                  {!groupByCat && <ul className="tasks" ref={tasksUlRef}>{list.map(renderTask)}</ul>}
+                  {groupByCat && groupNames.map((g) => (
+                    <div key={g} className="grp">
+                      <div className="grp-head"><span>{g}</span><em>{groups[g].length}</em></div>
+                      <ul className="tasks">{groups[g].map(renderTask)}</ul>
+                    </div>
+                  ))}
+                </>
+              )}
 
               <div className="search-bottom">
                 <div className="search"><Search size={15} />
@@ -1451,6 +1685,54 @@ aside.panel .card{position:sticky;top:16px;}
 .mexp-meta{font-size:12px;color:${C.cool};}
 .mexp-actions{display:flex;gap:6px;flex-wrap:wrap;}
 .mexp-actions .btn.out{padding:6px 10px;font-size:12px;}
+.opt-add{display:inline-flex;align-items:center;gap:6px;background:${C.fill};border:1px dashed ${C.line};color:${C.grey};font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;border-radius:8px;padding:9px 12px;margin-top:2px;}
+.opt-add:hover{border-color:${C.burgundy};color:${C.burgundyDark};}
+.opt-sec{border:1px solid ${C.line};border-radius:9px;padding:10px 12px;margin-top:4px;background:${C.fill};}
+.opt-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.opt-head label{font-size:12px;font-weight:800;color:${C.grey};}
+.chk-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.chk-row input[type="checkbox"]{width:17px;height:17px;flex:none;accent-color:${C.burgundy};}
+.chk-text{flex:1;}
+.att-thumbs{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0;}
+.att-thumb{position:relative;width:84px;height:84px;border:1px solid ${C.line};border-radius:8px;overflow:hidden;}
+.att-thumb img{width:100%;height:100%;object-fit:cover;}
+.att-thumb button{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:5px;cursor:pointer;display:flex;padding:2px;}
+.att-file{display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 0;border-bottom:1px solid ${C.line};}
+.att-file a{color:${C.sky};font-weight:700;text-decoration:none;}
+.card-chk{margin-top:6px;}
+.card-chk-head{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:800;color:${C.grey};}
+.card-chk-bar{flex:1;height:5px;background:${C.fill};border-radius:3px;overflow:hidden;max-width:120px;margin-left:4px;}
+.card-chk-bar span{display:block;height:100%;background:${C.burgundy};}
+.card-chk-item{display:flex;align-items:center;gap:7px;font-size:12px;color:${C.body};margin-top:3px;cursor:pointer;}
+.card-chk-item input{width:15px;height:15px;accent-color:${C.burgundy};}
+.card-chk-item.done span{text-decoration:line-through;color:${C.cool};}
+.card-att{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center;}
+.card-att-img{display:block;width:40px;height:40px;border:1px solid ${C.line};border-radius:6px;overflow:hidden;}
+.card-att-img img{width:100%;height:100%;object-fit:cover;}
+.card-att-file{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:${C.sky};text-decoration:none;background:${C.fill};border-radius:6px;padding:3px 7px;}
+.viewtog{margin-left:auto;flex:none;}
+.viewtog .seg-b{padding:7px 11px;}
+.kboard{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;align-items:start;}
+.kcol{background:${C.panel};border:1px solid ${C.line};border-radius:11px;padding:8px;min-height:80px;}
+.kcol-h{font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.03em;color:${C.ink};border-top:3px solid ${C.cool};border-radius:3px;padding:7px 6px 8px;display:flex;align-items:center;gap:6px;}
+.kcol-h em{font-style:normal;color:${C.cool};font-weight:700;margin-left:auto;}
+.kcol-body{min-height:40px;display:flex;flex-direction:column;gap:7px;padding-top:4px;}
+.kcard{background:${C.white};border:1px solid ${C.line};border-left-width:4px;border-radius:9px;padding:9px 11px;cursor:pointer;transition:.12s;}
+.kcard:hover{box-shadow:0 3px 12px rgba(33,37,41,.1);}
+.kcard.done .kcard-title{text-decoration:line-through;color:${C.cool};}
+.kcard-title{font-size:13px;font-weight:700;color:${C.ink};line-height:1.3;}
+.kcard-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px;}
+.kchk{font-size:11px;font-weight:700;color:${C.grey};}
+.kcol-empty{color:${C.line};font-size:13px;text-align:center;padding:10px 0;}
+.plist{display:flex;flex-direction:column;gap:6px;}
+.prow{display:flex;align-items:center;gap:12px;background:${C.white};border:1px solid ${C.line};border-radius:9px;padding:9px 12px;flex-wrap:wrap;}
+.prow-main{cursor:pointer;min-width:150px;flex:1;}
+.prow-name{display:block;font-weight:800;color:${C.ink};font-size:14px;}
+.prow-sub{font-size:12px;color:${C.cool};}
+.prow-contact{display:flex;flex-direction:column;gap:2px;}
+.prow-contact a{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:${C.sky};text-decoration:none;font-weight:600;}
+.prow-topics{display:flex;flex-wrap:wrap;gap:4px;max-width:260px;}
+.prow-count{font-size:12px;font-weight:700;color:${C.grey};white-space:nowrap;}
 .app-foot{text-align:center;font-size:14px;font-weight:700;color:#8b93a7;border-top:1px solid ${C.fill};margin-top:6px;padding:18px 12px calc(22px + env(safe-area-inset-bottom));}
 .dash{padding:20px 24px 48px;max-width:1180px;margin:0 auto;}
 .dash-head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:16px;}
@@ -1511,6 +1793,9 @@ aside.panel .card{position:sticky;top:16px;}
   .dash{padding:16px 14px 48px;}
   .dash-tiles{grid-template-columns:repeat(2,1fr);}
   .dash-grid{grid-template-columns:1fr;}
+  .kboard{display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:6px;}
+  .kcol{min-width:82%;flex:none;}
+  .viewtog{margin-left:0;}
   aside.panel .card{position:static;}
   .hd-profile{display:none;}
   .hd-inner{padding:16px;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));}
