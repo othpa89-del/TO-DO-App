@@ -3,8 +3,9 @@ import * as XLSX from "xlsx";
 import {
   User, Building2, Printer, FileSpreadsheet, Check, Pencil, X, Square, CheckSquare,
   Bell, Settings, Search, ExternalLink, Repeat, Download, Upload, Database, Plus, Mail, Phone,
-  MessageSquare, ChevronUp, ChevronDown, Plane, FileText, Copy,
+  MessageSquare, ChevronUp, ChevronDown, Plane, FileText, Copy, GripVertical,
 } from "lucide-react";
+import Sortable from "sortablejs";
 import Meetings, { loadMeetings, meetingToMarkdown, meetingToText, exportWord, printMeeting, copyMeetingToClipboard, emailMeeting } from "./Meetings.jsx";
 
 // --- Markenfarben (Farbchapter) ---
@@ -131,7 +132,8 @@ export default function App() {
   const [meetings, setMeetings] = useState([]); // nur für den Export-Tab (read-only)
   const [loaded, setLoaded] = useState(false);
   const [remoteTick, setRemoteTick] = useState(0);
-  const [view, setView] = useState("all");
+  const [sync, setSync] = useState({ state: "synced", pending: 0, online: true });
+  const [view, setView] = useState("dash");
   const [returnView, setReturnView] = useState("all"); // wohin nach dem Bearbeiten zurück
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("all");
@@ -166,6 +168,9 @@ export default function App() {
   const [expandedPerson, setExpandedPerson] = useState(null);
 
   const formRef = useRef(null);
+  const tasksUlRef = useRef(null);  // <ul> für Drag&Drop
+  const listRef = useRef([]);       // aktuelle sichtbare Liste (manuelle Reihenfolge)
+  const tasksRef = useRef(tasks);   // aktuelle Aufgaben
 
   const blank = { title: "", notes: "", category: "", priority: "", status: "offen", start: "", due: "", remindLead: 3, contact: "", company: "", link: "", recurrence: "none", escalation: "", updatedAt: new Date().toISOString().slice(0, 10), scope: "personal" };
   const [form, setForm] = useState(blank);
@@ -213,6 +218,18 @@ export default function App() {
     return () => window.removeEventListener("ctc:remote", h);
   }, []);
 
+  // Offline-/Sync-Status
+  useEffect(() => {
+    const s = (e) => setSync({ state: e.detail.state, pending: e.detail.pending, online: e.detail.online });
+    const on = () => setSync((p) => ({ ...p, online: true }));
+    const off = () => setSync((p) => ({ ...p, online: false, state: "offline" }));
+    window.addEventListener("ctc:sync", s);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    if (typeof navigator !== "undefined" && navigator.onLine === false) off();
+    return () => { window.removeEventListener("ctc:sync", s); window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+  }, []);
+
   useEffect(() => {
     const l = document.createElement("link");
     l.rel = "stylesheet";
@@ -220,6 +237,16 @@ export default function App() {
     document.head.appendChild(l);
     return () => { try { document.head.removeChild(l); } catch {} };
   }, []);
+
+  // Drag & Drop (nur bei view "all", sortBy "manual", ohne Gruppierung)
+  useEffect(() => {
+    if (view !== "all" || sortBy !== "manual" || groupByCat || !tasksUlRef.current) return;
+    const s = Sortable.create(tasksUlRef.current, {
+      handle: ".drag-handle", animation: 150, delay: 60, delayOnTouchOnly: true, forceFallback: true,
+      onEnd: (evt) => { if (evt.oldIndex != null && evt.newIndex != null) reorderManual(evt.oldIndex, evt.newIndex); },
+    });
+    return () => { try { s.destroy(); } catch {} };
+  }, [view, sortBy, groupByCat, loaded]);
 
   useEffect(() => {
     if (printNonce > 0) {
@@ -232,6 +259,21 @@ export default function App() {
   async function persist(scope, arr) {
     setTasks((prev) => ({ ...prev, [scope]: arr }));
     try { await saveScope(scope, arr); } catch { flash("Speichern fehlgeschlagen – bitte erneut versuchen."); }
+  }
+  // Manuelle Reihenfolge per Drag&Drop: sichtbare Liste neu anordnen, Reihenfolge
+  // in tasks.personal übernehmen (versteckte/gefilterte Aufgaben behalten ihre Plätze).
+  function reorderManual(oldIndex, newIndex) {
+    if (oldIndex === newIndex) return;
+    const visible = listRef.current || [];
+    const ids = visible.map((t) => t.id);
+    if (oldIndex < 0 || oldIndex >= ids.length) return;
+    const [moved] = ids.splice(oldIndex, 1);
+    ids.splice(Math.min(newIndex, ids.length), 0, moved);
+    const visibleSet = new Set(visible.map((t) => t.id));
+    const byId = {}; (tasksRef.current.personal || []).forEach((t) => { byId[t.id] = t; });
+    let vi = 0;
+    const next = (tasksRef.current.personal || []).map((t) => (visibleSet.has(t.id) ? byId[ids[vi++]] : t));
+    persist("personal", next);
   }
   // Aufgabe aus einem Meeting-Action-Item erzeugen (für Meetings-Modul)
   function addExternalTask(partial = {}) {
@@ -426,7 +468,7 @@ export default function App() {
     }
     return true;
   });
-  list.sort((a, b) => {
+  if (sortBy !== "manual") list.sort((a, b) => {
     if (isDone(a) !== isDone(b)) return isDone(a) ? 1 : -1;
     if (sortBy === "prio") return (PRIORITIES[a.priority] || PRIORITIES[""]).rank - (PRIORITIES[b.priority] || PRIORITIES[""]).rank;
     if (sortBy === "created") return (b.createdAt || "").localeCompare(a.createdAt || "");
@@ -435,6 +477,7 @@ export default function App() {
     const da = a.due ? dayDiff(a.due) : Infinity; const db = b.due ? dayDiff(b.due) : Infinity;
     return da - db;
   });
+  listRef.current = list; tasksRef.current = tasks;
 
   const contactFilterOptions = Array.from(new Set(merged.map((t) => t.contact).filter(Boolean))).sort((a, b) => a.localeCompare(b, "de"));
 
@@ -544,6 +587,9 @@ export default function App() {
     const st = STATUS[t.status] || STATUS.offen;
     return (
       <li key={keyOf(t)} className={"task" + (isDone(t) ? " done" : "")} style={{ borderLeftColor: ccol }}>
+        {sortBy === "manual" && !groupByCat && view === "all" && (
+          <span className="drag-handle" title="Ziehen zum Sortieren"><GripVertical size={16} /></span>
+        )}
         <button className={"check" + (isDone(t) ? " on" : "")} style={isDone(t) ? { background: col, borderColor: col } : {}}
           onClick={() => changeStatus(t._scope, t.id, isDone(t) ? "offen" : "erledigt")} title={isDone(t) ? "Als offen markieren" : "Als erledigt markieren"}>
           {isDone(t) ? <Check size={14} strokeWidth={3} /> : null}
@@ -649,9 +695,9 @@ export default function App() {
             </div>
           </div>
           <nav className="tabs">
-            {["new", "all", "meetings", "persons", "export"].map((v) => (
+            {["dash", "new", "all", "meetings", "persons", "export"].map((v) => (
               <button key={v} className={"tab" + (view === v ? " on" : "")} onClick={() => setView(v)}>
-                {v === "all" ? "Aufgaben" : v === "meetings" ? "Meeting Minutes" : v === "persons" ? "Persons" : v === "export" ? "Druck & Export" : "Neue Aufgabe"}
+                {v === "dash" ? "Dashboard" : v === "all" ? "Aufgaben" : v === "meetings" ? "Meeting Minutes" : v === "persons" ? "Persons" : v === "export" ? "Druck & Export" : "Neue Aufgabe"}
               </button>
             ))}
           </nav>
@@ -665,8 +711,49 @@ export default function App() {
           </section>
         )}
 
-        {/* ===================== MEETINGS ===================== */}
-        {view === "meetings" ? (
+        {/* ===================== DASHBOARD ===================== */}
+        {view === "dash" ? (
+          <div className="dash">
+            <div className="dash-head">
+              <div>
+                <h2 className="dash-hi">Hallo{profile ? ", " + profile : ""} 👋</h2>
+                <div className="dash-date">{new Date().toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
+              </div>
+              <div className="dash-quick">
+                <button className="btn primary" onClick={() => { setEditId(null); setEditScope(null); setForm(blank); setReturnView("all"); setView("new"); }}><Plus size={15} /> Aufgabe</button>
+                <button className="btn out" onClick={() => setView("meetings")}><Plane size={15} /> Meeting</button>
+              </div>
+            </div>
+
+            <div className="dash-tiles">
+              <button className="dtile" onClick={() => { setFilterStatus("open"); setView("all"); }}><b>{stat.offen}</b><span>Offen</span></button>
+              <button className="dtile" onClick={() => { setFilterStatus("inArbeit"); setView("all"); }}><b style={{ color: C.sky }}>{stat.inArbeit}</b><span>In Arbeit</span></button>
+              <button className="dtile" onClick={() => { setFilterStatus("onHold"); setView("all"); }}><b style={{ color: C.burgundyLight }}>{stat.onHold}</b><span>On Hold</span></button>
+              <button className="dtile" onClick={() => { setFilterStatus("erledigt"); setView("all"); }}><b style={{ color: C.burgundyDark }}>{stat.erledigt}</b><span>Erledigt</span></button>
+              <button className="dtile over" onClick={() => { setFilterStatus("open"); setView("all"); }}><b style={{ color: C.burgundyDarker }}>{stat.overdue}</b><span>Überfällig</span></button>
+            </div>
+
+            <div className="dash-grid">
+              <DashList title="Überfällig" tone={C.burgundyDarker} items={overdue} onOpen={startEdit} />
+              <DashList title="Heute fällig" tone={C.burgundy} items={today} onOpen={startEdit} />
+              <DashList title="Demnächst" tone={C.sky} items={soon} onOpen={startEdit} />
+              <div className="dash-card">
+                <div className="dash-card-h" style={{ color: C.burgundyDark }}>Nächste Meetings</div>
+                {(() => {
+                  const ts = new Date().toISOString().slice(0, 10);
+                  const up = meetings.filter((m) => !m.archived && (m.date || "") >= ts).sort((a, b) => (a.date || "").localeCompare(b.date || "")).slice(0, 6);
+                  if (!up.length) return <div className="dash-empty">Keine anstehenden Meetings.</div>;
+                  return up.map((m) => (
+                    <button key={m.id} className="dash-row" style={{ borderLeftColor: C.burgundy }} onClick={() => setView("meetings")}>
+                      <span className="dash-row-t">{m.title || "(ohne Titel)"}</span>
+                      <span className="dash-row-m">{fmtDay(m.date)}{m.start ? " · " + m.start : ""}{m.type ? " · " + m.type : ""}</span>
+                    </button>
+                  ));
+                })()}
+              </div>
+            </div>
+          </div>
+        ) : view === "meetings" ? (
           <Meetings persons={persons} categories={sortedCats} profile={profile}
             companyColor={companyColor} onCreateTask={addExternalTask} />
         ) : view === "persons" ? (
@@ -982,7 +1069,7 @@ export default function App() {
                   </select></div>
                 <div className="tb-group"><span>Sortieren</span>
                   <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-                    <option value="due">Fälligkeit</option><option value="prio">Priorität</option><option value="created">Neueste</option>
+                    <option value="due">Fälligkeit</option><option value="prio">Priorität</option><option value="created">Neueste</option><option value="manual">Eigene Reihenfolge</option>
                     <option value="company">Company</option><option value="contact">Ansprechperson</option>
                   </select></div>
                 <button className="link" onClick={() => setGroupByCat((g) => !g)}>
@@ -1012,7 +1099,7 @@ export default function App() {
                 </div>
               )}
 
-              {!groupByCat && <ul className="tasks">{list.map(renderTask)}</ul>}
+              {!groupByCat && <ul className="tasks" ref={tasksUlRef}>{list.map(renderTask)}</ul>}
               {groupByCat && groupNames.map((g) => (
                 <div key={g} className="grp">
                   <div className="grp-head"><span>{g}</span><em>{groups[g].length}</em></div>
@@ -1030,6 +1117,14 @@ export default function App() {
           </div>
         )}
         {toast && <div className="toast">{toast}</div>}
+        {(!sync.online || sync.pending > 0 || sync.state === "syncing") && (
+          <div className={"sync-badge" + (!sync.online ? " off" : "")}>
+            <span className="sync-dot" />
+            {!sync.online ? "Offline – wird gespeichert"
+              : sync.state === "syncing" ? "Synchronisiere …"
+              : sync.pending + " Änderung(en) ausstehend"}
+          </div>
+        )}
         <footer className="app-foot">© Copyright by Patrick Thorn</footer>
       </div>
 
@@ -1082,6 +1177,22 @@ export default function App() {
       {printKind === "persons"
         ? <PersonsPrintDoc items={printPersons} openCount={openTaskCount} />
         : <PrintDoc items={printItems} />}
+    </div>
+  );
+}
+
+function DashList({ title, tone, items, onOpen }) {
+  return (
+    <div className="dash-card">
+      <div className="dash-card-h" style={{ color: tone }}>{title} <em>{items.length}</em></div>
+      {items.length === 0 ? <div className="dash-empty">Nichts offen.</div> :
+        items.slice(0, 6).map((t) => (
+          <button key={keyOf(t)} className="dash-row" style={{ borderLeftColor: tone }} onClick={() => onOpen(t._scope, t)}>
+            <span className="dash-row-t">{t.title}</span>
+            <span className="dash-row-m">{t.due ? fmtDate(t.due) + " · " + relLabel(t.due) : ""}</span>
+          </button>
+        ))}
+      {items.length > 6 && <div className="dash-more">+{items.length - 6} weitere</div>}
     </div>
   );
 }
@@ -1257,6 +1368,10 @@ aside.panel .card{position:sticky;top:16px;}
 .pick{flex:none;background:none;border:none;cursor:pointer;color:${C.line};padding:2px;margin-top:1px;transition:.15s;}
 .pick:hover{color:${C.sky};}
 .pick.on{color:${C.sky};}
+.drag-handle{flex:none;display:flex;align-items:center;color:${C.line};cursor:grab;margin-top:1px;touch-action:none;}
+.drag-handle:hover{color:${C.cool};}
+.sortable-ghost{opacity:.5;}
+.sortable-chosen{box-shadow:0 4px 16px rgba(33,37,41,.14);}
 .check{flex:none;width:18px;height:18px;border-radius:50%;border:2px solid ${C.line};background:${C.white};cursor:pointer;color:${C.white};display:flex;align-items:center;justify-content:center;margin-top:1px;transition:.15s;}
 .check:hover{border-color:${C.burgundy};}
 .task-body{flex:1;min-width:0;}
@@ -1337,6 +1452,31 @@ aside.panel .card{position:sticky;top:16px;}
 .mexp-actions{display:flex;gap:6px;flex-wrap:wrap;}
 .mexp-actions .btn.out{padding:6px 10px;font-size:12px;}
 .app-foot{text-align:center;font-size:14px;font-weight:700;color:#8b93a7;border-top:1px solid ${C.fill};margin-top:6px;padding:18px 12px calc(22px + env(safe-area-inset-bottom));}
+.dash{padding:20px 24px 48px;max-width:1180px;margin:0 auto;}
+.dash-head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:16px;}
+.dash-hi{font-size:24px;font-weight:900;color:${C.ink};margin:0;}
+.dash-date{font-size:13px;color:${C.cool};font-weight:600;margin-top:2px;text-transform:capitalize;}
+.dash-quick{display:flex;gap:8px;}
+.dash-tiles{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px;}
+.dtile{display:flex;flex-direction:column;align-items:flex-start;gap:2px;background:${C.white};border:1px solid ${C.line};border-radius:12px;padding:14px 16px;cursor:pointer;font-family:inherit;text-align:left;transition:.15s;}
+.dtile:hover{box-shadow:0 4px 16px rgba(33,37,41,.08);transform:translateY(-1px);}
+.dtile b{font-size:26px;font-weight:900;color:${C.ink};line-height:1;}
+.dtile span{font-size:12px;font-weight:700;color:${C.grey};}
+.dtile.over{background:${C.skyPale};border-color:${C.skyLight};}
+.dash-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+.dash-card{background:${C.white};border:1px solid ${C.line};border-radius:12px;padding:14px 16px;}
+.dash-card-h{font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;display:flex;align-items:center;gap:8px;}
+.dash-card-h em{font-style:normal;color:${C.cool};font-weight:700;}
+.dash-row{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;text-align:left;background:${C.fill};border:none;border-left:3px solid ${C.line};border-radius:7px;padding:8px 10px;margin-bottom:6px;cursor:pointer;font-family:inherit;}
+.dash-row:hover{background:#eceff3;}
+.dash-row-t{font-size:13px;font-weight:700;color:${C.ink};line-height:1.25;}
+.dash-row-m{font-size:11px;color:${C.cool};font-weight:600;}
+.dash-empty{font-size:13px;color:${C.cool};padding:6px 0;}
+.dash-more{font-size:12px;color:${C.cool};font-weight:600;padding-top:2px;}
+.sync-badge{position:fixed;left:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:70;display:inline-flex;align-items:center;gap:7px;background:${C.ink};color:#fff;font-size:12px;font-weight:700;padding:7px 12px;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,.22);}
+.sync-badge.off{background:${C.burgundyDarker};}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#ffd166;}
+.sync-badge.off .sync-dot{background:#ff6b6b;}
 .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:80;background:${C.ink};color:${C.white};font-size:14px;font-weight:600;padding:11px 18px;border-radius:9px;box-shadow:0 6px 24px rgba(0,0,0,.22);}
 .modal-bg{position:fixed;inset:0;background:rgba(33,37,41,.45);z-index:70;display:flex;align-items:center;justify-content:center;padding:20px;}
 .modal{background:${C.white};border-radius:14px;width:100%;max-width:480px;max-height:86vh;overflow:auto;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.3);}
@@ -1368,6 +1508,9 @@ aside.panel .card{position:sticky;top:16px;}
 @media(max-width:860px){
   .grid{grid-template-columns:1fr;padding:16px 16px 40px;}
   .formwrap,.listwrap{padding:16px 16px 40px;}
+  .dash{padding:16px 14px 48px;}
+  .dash-tiles{grid-template-columns:repeat(2,1fr);}
+  .dash-grid{grid-template-columns:1fr;}
   aside.panel .card{position:static;}
   .hd-profile{display:none;}
   .hd-inner{padding:16px;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));}

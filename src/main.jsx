@@ -42,33 +42,107 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 // ---------------------------------------------------------------------------
 let currentUserId = null;
 
+// ---------------------------------------------------------------------------
+//  Offline-Fähigkeit: lokaler Cache (localStorage) + Sync-Queue.
+//  - Schreibvorgänge gehen optimistisch sofort durch und werden lokal gespeichert.
+//  - Schlägt der Cloud-Write fehl (offline), landet er in einer Queue und wird
+//    automatisch synchronisiert, sobald wieder Verbindung besteht.
+//  - Lesevorgänge nutzen offline den lokalen Cache.
+// ---------------------------------------------------------------------------
+const LS_CACHE = "kv_cache_v1";
+const LS_QUEUE = "kv_queue_v1";
+const lsGet = (k, def) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; } catch { return def; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+const isOffline = () => (typeof navigator !== "undefined" && navigator.onLine === false);
+const cKey = (key) => currentUserId + ":" + key;
+const cacheRead = (key) => { const c = lsGet(LS_CACHE, {}); const k = cKey(key); return k in c ? c[k] : null; };
+const cacheWrite = (key, value) => { const c = lsGet(LS_CACHE, {}); c[cKey(key)] = value; lsSet(LS_CACHE, c); };
+const cacheDelete = (key) => { const c = lsGet(LS_CACHE, {}); delete c[cKey(key)]; lsSet(LS_CACHE, c); };
+
+function emitSync(state) {
+  const pending = lsGet(LS_QUEUE, []).length;
+  window.dispatchEvent(new CustomEvent("ctc:sync", { detail: { state, pending, online: !isOffline() } }));
+}
+function enqueue(op, key, value) {
+  const q = lsGet(LS_QUEUE, []).filter((x) => !(x.userId === currentUserId && x.key === key));
+  q.push({ op, key, value, userId: currentUserId });
+  lsSet(LS_QUEUE, q);
+  emitSync("pending");
+}
+let syncing = false;
+async function flushQueue() {
+  if (syncing || isOffline()) { emitSync(isOffline() ? "offline" : "idle"); return; }
+  let q = lsGet(LS_QUEUE, []);
+  if (!q.length) { emitSync("synced"); return; }
+  syncing = true; emitSync("syncing");
+  try {
+    while (q.length) {
+      const item = q[0];
+      try {
+        if (item.op === "set") {
+          const { error } = await supabase.from("kv").upsert(
+            { user_id: item.userId, key: item.key, value: item.value, updated_at: new Date().toISOString() }, { onConflict: "user_id,key" });
+          if (error) throw error;
+        } else if (item.op === "delete") {
+          const { error } = await supabase.from("kv").delete().eq("user_id", item.userId).eq("key", item.key);
+          if (error) throw error;
+        }
+        q.shift(); lsSet(LS_QUEUE, q);
+      } catch { break; } // weiter offline -> später erneut
+    }
+  } finally {
+    syncing = false;
+    emitSync(lsGet(LS_QUEUE, []).length ? "pending" : "synced");
+  }
+}
+if (typeof window !== "undefined") {
+  window.addEventListener("online", flushQueue);
+  setInterval(() => { if (currentUserId && !isOffline() && lsGet(LS_QUEUE, []).length) flushQueue(); }, 25000);
+}
+
 window.storage = {
   async get(key) {
     if (!currentUserId) return null;
-    const { data, error } = await supabase
-      .from("kv").select("value")
-      .eq("user_id", currentUserId).eq("key", key).maybeSingle();
-    if (error) throw error;
-    return data ? { key, value: data.value } : null;
+    if (isOffline()) { const v = cacheRead(key); return v == null ? null : { key, value: v }; }
+    try {
+      const { data, error } = await supabase.from("kv").select("value").eq("user_id", currentUserId).eq("key", key).maybeSingle();
+      if (error) throw error;
+      if (data) { cacheWrite(key, data.value); return { key, value: data.value }; }
+      const cv = cacheRead(key); // evtl. lokal angelegt, noch nicht synchronisiert
+      return cv == null ? null : { key, value: cv };
+    } catch { const v = cacheRead(key); return v == null ? null : { key, value: v }; }
   },
   async set(key, value) {
     if (!currentUserId) throw new Error("Nicht angemeldet");
-    const { error } = await supabase.from("kv").upsert(
-      { user_id: currentUserId, key, value, updated_at: new Date().toISOString() },
-      { onConflict: "user_id,key" }
-    );
-    if (error) throw error;
-    return { key, value };
+    cacheWrite(key, value); // sofort lokal sichern
+    try {
+      if (isOffline()) throw new Error("offline");
+      const { error } = await supabase.from("kv").upsert(
+        { user_id: currentUserId, key, value, updated_at: new Date().toISOString() }, { onConflict: "user_id,key" });
+      if (error) throw error;
+      return { key, value };
+    } catch { enqueue("set", key, value); return { key, value }; } // optimistischer Erfolg
   },
   async delete(key) {
     if (!currentUserId) return { key, deleted: true };
-    await supabase.from("kv").delete().eq("user_id", currentUserId).eq("key", key);
+    cacheDelete(key);
+    try {
+      if (isOffline()) throw new Error("offline");
+      const { error } = await supabase.from("kv").delete().eq("user_id", currentUserId).eq("key", key);
+      if (error) throw error;
+    } catch { enqueue("delete", key, null); }
     return { key, deleted: true };
   },
   async list(prefix = "") {
     if (!currentUserId) return { keys: [] };
-    const { data } = await supabase.from("kv").select("key").eq("user_id", currentUserId);
-    return { keys: (data || []).map((r) => r.key).filter((k) => k.startsWith(prefix)) };
+    try {
+      if (isOffline()) throw new Error("offline");
+      const { data } = await supabase.from("kv").select("key").eq("user_id", currentUserId);
+      return { keys: (data || []).map((r) => r.key).filter((k) => k.startsWith(prefix)) };
+    } catch {
+      const c = lsGet(LS_CACHE, {}); const pre = currentUserId + ":";
+      return { keys: Object.keys(c).filter((k) => k.startsWith(pre)).map((k) => k.slice(pre.length)).filter((k) => k.startsWith(prefix)) };
+    }
   },
 };
 
@@ -138,7 +212,7 @@ function Root() {
   }, []);
 
   useEffect(() => {
-    if (session) subscribeRealtime(session.access_token);
+    if (session) { subscribeRealtime(session.access_token); flushQueue(); }
     else unsubscribeRealtime();
   }, [session]);
 
