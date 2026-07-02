@@ -4,6 +4,14 @@ import { createClient } from "@supabase/supabase-js";
 import App from "./App.jsx";
 import Login from "./Login.jsx";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
+import { registerSW } from "virtual:pwa-register";
+
+// PWA-Update: neue Version im Hintergrund vorbereiten und dem Nutzer per Banner
+// anbieten (statt still zu warten, bis die App irgendwann neu gestartet wird).
+const updateSW = registerSW({
+  onNeedRefresh() { try { window.dispatchEvent(new CustomEvent("ctc:sw-update")); } catch {} },
+});
+if (typeof window !== "undefined") window.__ctcUpdateSW = updateSW;
 
 // "Angemeldet bleiben": Bei aktiviertem Flag wird die Session in localStorage
 // gespeichert (bleibt dauerhaft erhalten), sonst nur in sessionStorage (gilt bis

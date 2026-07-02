@@ -145,7 +145,7 @@ function RichText({ value, onChange, placeholder }) {
 }
 
 // ===========================================================================
-export default function Meetings({ persons = [], categories = [], profile = "", onCreateTask, companyColor, onMeetingsChange }) {
+export default function Meetings({ persons = [], categories = [], profile = "", onCreateTask, companyColor, onMeetingsChange, openMeetingReq }) {
   useLang();
   const [meetings, setMeetings] = useState([]);
   const [types, setTypes] = useState(MEETING_TYPES);
@@ -172,6 +172,14 @@ export default function Meetings({ persons = [], categories = [], profile = "", 
     window.addEventListener("ctc:remote", h);
     return () => { on = false; window.removeEventListener("ctc:remote", h); };
   }, []);
+
+  // Meeting aus der globalen Suche öffnen (sobald geladen)
+  const handledOpen = useRef(0);
+  useEffect(() => {
+    if (!openMeetingReq || !openMeetingReq.id || handledOpen.current === openMeetingReq.n) return;
+    const mt = meetings.find((x) => x.id === openMeetingReq.id);
+    if (mt) { handledOpen.current = openMeetingReq.n; setEditing(mt); }
+  }, [openMeetingReq, meetings]);
 
   function persistTypes(next) { setTypes(next); saveTypes(next); }
 

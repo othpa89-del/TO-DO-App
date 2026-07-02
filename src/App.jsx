@@ -157,9 +157,17 @@ async function saveScope(scope, arr) {
   await window.storage.set(key, JSON.stringify(arr), shared);
 }
 
+// Ansichts-Einstellungen (Filter/Sortierung/Layout) pro Gerät merken.
+const PREFS_KEY = "ctc_prefs_v1";
+const loadPrefs = () => { try { return JSON.parse(localStorage.getItem(PREFS_KEY)) || {}; } catch { return {}; } };
+
 // ===========================================================================
 export default function App() {
   const lang = useLang(); // re-render bei Sprachwechsel
+  const [swUpdate, setSwUpdate] = useState(false);
+  const [gOpen, setGOpen] = useState(false); // globale Suche
+  const [gSearch, setGSearch] = useState("");
+  const [openMeetingReq, setOpenMeetingReq] = useState(null); // Meeting aus Suche öffnen
   const [tasks, setTasks] = useState({ personal: [] });
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [companies, setCompanies] = useState(DEFAULT_COMPANIES);
@@ -172,16 +180,16 @@ export default function App() {
   const [returnView, setReturnView] = useState("all"); // wohin nach dem Bearbeiten zurück
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("all");
-  const [filterStatus, setFilterStatus] = useState("open");
+  const [filterStatus, setFilterStatus] = useState(() => loadPrefs().filterStatus || "open");
   const [filterCompany, setFilterCompany] = useState("all");
   const [filterContact, setFilterContact] = useState("all");
-  const [sortBy, setSortBy] = useState("due");
-  const [groupByCat, setGroupByCat] = useState(false);
+  const [sortBy, setSortBy] = useState(() => loadPrefs().sortBy || "due");
+  const [groupByCat, setGroupByCat] = useState(() => !!loadPrefs().groupByCat);
   const [editId, setEditId] = useState(null);
   const [clOpen, setClOpen] = useState(false);  // Checkliste-Abschnitt offen
   const [atOpen, setAtOpen] = useState(false);  // Anhänge-Abschnitt offen
-  const [pLayout, setPLayout] = useState("list"); // Persons: list | cards (Standard: Liste)
-  const [taskLayout, setTaskLayout] = useState("list"); // Aufgaben: list | board
+  const [pLayout, setPLayout] = useState(() => loadPrefs().pLayout || "list"); // Persons: list | cards
+  const [taskLayout, setTaskLayout] = useState(() => loadPrefs().taskLayout || "list"); // Aufgaben: list | board
   const [editScope, setEditScope] = useState(null);
   const [profile, setProfile] = useState("");
   const [toast, setToast] = useState(null);
@@ -256,6 +264,18 @@ export default function App() {
     const h = () => setRemoteTick((v) => v + 1);
     window.addEventListener("ctc:remote", h);
     return () => window.removeEventListener("ctc:remote", h);
+  }, []);
+
+  // Ansichts-Einstellungen merken
+  useEffect(() => {
+    try { localStorage.setItem(PREFS_KEY, JSON.stringify({ filterStatus, sortBy, groupByCat, pLayout, taskLayout })); } catch {}
+  }, [filterStatus, sortBy, groupByCat, pLayout, taskLayout]);
+
+  // PWA: neue Version verfügbar -> Banner anzeigen
+  useEffect(() => {
+    const h = () => setSwUpdate(true);
+    window.addEventListener("ctc:sw-update", h);
+    return () => window.removeEventListener("ctc:sw-update", h);
   }, []);
 
   // Offline-/Sync-Status
@@ -834,6 +854,17 @@ export default function App() {
     })
     .sort((a, b) => a.name.localeCompare(b.name, "de"));
 
+  // Globale Suche: über Aufgaben, Meetings und Personen
+  const gq = gSearch.trim().toLowerCase();
+  const gTasks = gq ? merged.filter((t) => [t.title, t.notes, t.contact, t.company, catDisplay(t.category)].join(" ").toLowerCase().includes(gq)).slice(0, 8) : [];
+  const gMeetings = gq ? meetings.filter((m) => [m.title, m.project, m.type, m.location, (m.participants || []).map((p) => p.name).join(" ")].join(" ").toLowerCase().includes(gq)).slice(0, 8) : [];
+  const gPersons = gq ? persons.filter((p) => [p.name, p.company, p.role, p.email, (p.topics || []).join(" ")].join(" ").toLowerCase().includes(gq)).slice(0, 8) : [];
+  const gTotal = gTasks.length + gMeetings.length + gPersons.length;
+  function closeGlobal() { setGOpen(false); setGSearch(""); }
+  function gotoTask(t) { closeGlobal(); startEdit(t._scope || "personal", t); }
+  function gotoPerson(p) { closeGlobal(); setView("persons"); editPerson(p); }
+  function gotoMeeting(m) { closeGlobal(); setView("meetings"); setOpenMeetingReq({ id: m.id, n: (openMeetingReq?.n || 0) + 1 }); }
+
   return (
     <div className="ctc-root">
       <style>{css}</style>
@@ -844,6 +875,7 @@ export default function App() {
             <Plane className="hd-mark" strokeWidth={2.2} />
             <div><h1>TO DO APP</h1></div>
             <div className="hd-right">
+              <button className="hd-search" onClick={() => setGOpen(true)} title={L("Suche", "Search")}><Search size={18} /></button>
               <div className="lang-switch" title={L("Sprache", "Language")}>
                 <button className={"lang-b" + (lang === "de" ? " on" : "")} onClick={() => setLang("de")}>DE</button>
                 <button className={"lang-b" + (lang === "en" ? " on" : "")} onClick={() => setLang("en")}>EN</button>
@@ -915,7 +947,7 @@ export default function App() {
           </div>
         ) : view === "meetings" ? (
           <Meetings persons={persons} categories={sortedCats} profile={profile}
-            companyColor={companyColor} onCreateTask={addExternalTask} onMeetingsChange={setMeetings} />
+            companyColor={companyColor} onCreateTask={addExternalTask} onMeetingsChange={setMeetings} openMeetingReq={openMeetingReq} />
         ) : view === "persons" ? (
           <div className="grid">
             <aside className="panel">
@@ -1400,8 +1432,70 @@ export default function App() {
               : L(sync.pending + " Änderung(en) ausstehend", sync.pending + " change(s) pending")}
           </div>
         )}
+        {swUpdate && (
+          <div className="update-banner">
+            <span>{L("Neue Version verfügbar.", "New version available.")}</span>
+            <button className="btn primary" onClick={() => { try { if (window.__ctcUpdateSW) window.__ctcUpdateSW(true); else location.reload(); } catch { location.reload(); } }}>{L("Jetzt neu laden", "Reload now")}</button>
+            <button className="ub-x" onClick={() => setSwUpdate(false)} title={L("Später", "Later")}><X size={15} /></button>
+          </div>
+        )}
         <footer className="app-foot">© Copyright by Patrick Thorn</footer>
       </div>
+
+      {/* Globale Suche */}
+      {gOpen && (
+        <div className="modal-bg gsearch-bg" onClick={closeGlobal}>
+          <div className="gsearch" onClick={(e) => e.stopPropagation()}>
+            <div className="gsearch-in">
+              <Search size={17} />
+              <input autoFocus value={gSearch} onChange={(e) => setGSearch(e.target.value)}
+                onKeyDown={(e) => e.key === "Escape" && closeGlobal()}
+                placeholder={L("Suche in Aufgaben, Meetings, Personen …", "Search tasks, meetings, persons …")} />
+              <button className="icon" onClick={closeGlobal}><X size={18} /></button>
+            </div>
+            <div className="gsearch-body">
+              {!gq ? <div className="gs-hint">{L("Tippe, um überall zu suchen …", "Type to search everywhere …")}</div>
+                : gTotal === 0 ? <div className="gs-hint">{L("Keine Treffer.", "No matches.")}</div> : (
+                  <>
+                    {gTasks.length > 0 && (
+                      <div className="gs-group"><div className="gs-h">{L("Aufgaben", "Tasks")}</div>
+                        {gTasks.map((t) => (
+                          <button key={keyOf(t)} className="gs-row" onClick={() => gotoTask(t)}>
+                            <span className="gs-dot" style={{ background: companyColor(t.company) }} />
+                            <span className="gs-title">{t.title}</span>
+                            <span className="gs-sub">{[catDisplay(t.category), (STATUS[t.status] || STATUS.offen).label].filter(Boolean).join(" · ")}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {gMeetings.length > 0 && (
+                      <div className="gs-group"><div className="gs-h">{L("Meetings", "Meetings")}</div>
+                        {gMeetings.map((m) => (
+                          <button key={m.id} className="gs-row" onClick={() => gotoMeeting(m)}>
+                            <Plane size={13} className="gs-ic" />
+                            <span className="gs-title">{m.title || L("(ohne Titel)", "(no title)")}</span>
+                            <span className="gs-sub">{[fmtDay(m.date), m.type].filter(Boolean).join(" · ")}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {gPersons.length > 0 && (
+                      <div className="gs-group"><div className="gs-h">{L("Personen", "Persons")}</div>
+                        {gPersons.map((p) => (
+                          <button key={p.id} className="gs-row" onClick={() => gotoPerson(p)}>
+                            <User size={13} className="gs-ic" />
+                            <span className="gs-title">{p.name}</span>
+                            <span className="gs-sub">{[p.role, p.company].filter(Boolean).join(" · ")}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bereiche verwalten */}
       {mgrOpen && (
@@ -1569,7 +1663,26 @@ const css = `
 .lang-switch{display:flex;gap:3px;background:rgba(255,255,255,.18);border-radius:8px;padding:3px;}
 .lang-b{font-family:inherit;font-size:12px;font-weight:800;cursor:pointer;border:none;background:transparent;color:rgba(255,255,255,.85);border-radius:6px;padding:5px 9px;}
 .lang-b.on{background:${C.white};color:${C.burgundyDark};}
+.hd-search{display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:8px;width:34px;height:34px;cursor:pointer;flex:none;}
+.hd-search:hover{background:rgba(255,255,255,.30);}
 .hd-profile{text-align:right;}
+.update-banner{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));z-index:60;display:flex;align-items:center;gap:12px;background:${C.ink};color:#fff;border-radius:12px;padding:9px 10px 9px 16px;box-shadow:0 8px 30px rgba(0,0,0,.28);font-size:13px;font-weight:700;max-width:92vw;}
+.update-banner .btn{padding:7px 12px;font-size:13px;}
+.update-banner .ub-x{background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;display:flex;padding:2px;}
+.gsearch-bg{align-items:flex-start;}
+.gsearch{width:100%;max-width:560px;margin-top:9vh;background:${C.white};border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;display:flex;flex-direction:column;max-height:74vh;}
+.gsearch-in{display:flex;align-items:center;gap:10px;padding:13px 14px;border-bottom:1px solid ${C.line};color:${C.cool};}
+.gsearch-in input{flex:1;border:none;outline:none;font-size:16px;font-family:inherit;color:${C.ink};background:none;}
+.gsearch-body{overflow:auto;padding:8px;}
+.gs-hint{padding:26px;text-align:center;color:${C.cool};font-size:14px;}
+.gs-group{margin-bottom:4px;}
+.gs-h{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:${C.burgundy};padding:8px 10px 4px;}
+.gs-row{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:none;border:none;cursor:pointer;padding:8px 10px;border-radius:8px;font-family:inherit;}
+.gs-row:hover{background:${C.fill};}
+.gs-dot{width:9px;height:9px;border-radius:50%;flex:none;}
+.gs-ic{color:${C.burgundy};flex:none;}
+.gs-title{font-size:14px;font-weight:700;color:${C.ink};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.gs-sub{font-size:12px;color:${C.cool};margin-left:auto;white-space:nowrap;flex:none;padding-left:10px;}
 .hd-profile label{display:block;color:rgba(255,255,255,.82);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;}
 .hd-profile input{width:190px;max-width:46vw;text-align:center;border:none;border-radius:7px;padding:7px 10px;font-size:14px;font-weight:700;color:${C.burgundyDark};background:${C.white};}
 .tabs{display:flex;align-items:center;gap:4px;padding:0 24px;background:${C.burgundyDark};}

@@ -7,8 +7,8 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: "autoUpdate",
-      injectRegister: "auto",
+      registerType: "prompt",
+      injectRegister: null,
       includeAssets: ["apple-touch-icon.png", "favicon.ico"],
       manifest: {
         name: "TO DO APP",
