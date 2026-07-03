@@ -84,30 +84,41 @@ den Ordner beim nächsten Start automatisch wiederfindet. Fehlt die Berechtigung
 ```
 wissensarchiv/
 ├─ index.html          – die komplette App (HTML + CSS + JS in einer Datei)
-├─ service-worker.js   – Offline-Cache der App-Shell und (ab Etappe 2) der Bibliotheken
+├─ parse-worker.js     – Web Worker für DOCX/XLSX/CSV/TXT/MD (PDF läuft mit eigenem PDF.js-Worker)
+├─ service-worker.js   – Offline-Cache der App-Shell und der Bibliotheken
 ├─ manifest.json       – PWA-Manifest (Installierbarkeit)
 ├─ icons/              – App-Icons
-├─ vendor/             – lokal mitgelieferte Bibliotheken (ab Etappe 2)
+├─ vendor/             – lokal mitgelieferte Bibliotheken (PDF.js, mammoth, SheetJS, JSZip, docx, jsPDF)
 ├─ start.py / .bat / .command – lokaler Start
 └─ README.md
 ```
 
-## Umsetzungsstand (Etappen)
+## Funktionsumfang
 
-Die App wird in vier lauffähigen Etappen gebaut:
-
-- **Etappe 1 – Fundament (fertig):** Ordner wählen/wiederherstellen, Reconnect-Dialog,
-  Ordnerstruktur anlegen, Einstellungen (Theme Auto/Hell/Dunkel, Sprache DE/EN),
-  PWA-Grundgerüst mit Offline-Cache, Browser-Prüfung.
-- **Etappe 2 – Import & Suche:** Import (Drag & Drop / Datei / Ordner), Parser im
-  Web Worker (PDF.js, mammoth.js, SheetJS), PDF seitenweise mit Fortschritt,
-  Erkennung gescannter PDFs, Duplikat-Dialog, Volltextindex, Suche mit Filtern,
-  Snippets, Quellenreferenz und Fundstellen-Ansicht.
-- **Etappe 3 – Bibliothek & Backup:** Verwaltung (Umbenennen, Tags, Notizen, Löschen,
-  Neu-Indexieren, Batch-Aktionen) sowie ZIP-Export/-Import des gesamten Archivs.
-- **Etappe 4 – Zusammenfassung & Export:** extraktive Offline-Zusammenfassung und
-  optional Claude API (claude-sonnet-4-6), Export als DOCX/PDF/XLSX, jeweils mit
-  vollständigem Quellenverzeichnis.
+- **Speicherung:** File System Access API – Originale, Suchindex und Metadaten
+  liegen als echte Dateien im gewählten Ordner (`/originals`, `/index`, `/meta`,
+  `/exports`). Ordner-Handle wird zwischengespeichert; Reconnect-Dialog bei
+  fehlender Berechtigung. Übersteht das Löschen von Browser-Daten.
+- **Import:** Drag & Drop, Dateiauswahl oder ganzer Ordner. Formate PDF, DOCX,
+  XLSX, CSV, TXT, MD. Parsing im Web Worker (UI bleibt bedienbar); PDF seitenweise
+  mit Fortschrittsanzeige „Seite x von y". Gescannte PDFs ohne Textebene werden
+  erkannt und markiert (kein OCR). Duplikate (Name/Inhalt) → Überspringen/Ersetzen.
+- **Suche:** Volltext über alle Index-JSONs (Originale werden nie geladen). Filter
+  nach Dateityp, Importzeitraum und Tags. Treffer mit Kontext-Snippet,
+  hervorgehobenem Begriff und präziser Quelle (Seite / Blatt + Zelle / Abschnitt).
+  Klick öffnet die Fundstelle – bei PDF wird nur die betroffene Seite gerendert.
+- **Bibliothek:** Sortierung (Name/Datum/Größe), Filter, Bestandssuche; pro Datei
+  Umbenennen, Tags, Notizen, Löschen, Original öffnen/herunterladen, Neu-Indexieren;
+  Mehrfachauswahl für Batch-Aktionen (Taggen/Löschen).
+- **Backup:** Komplett-Export des Archivs als eine ZIP (Originale + Index + Meta)
+  und ZIP-Import zur vollständigen Wiederherstellung inkl. Tags und Notizen.
+- **Zusammenfassung:** extraktiv (offline, Satz-Ranking) oder per Claude API
+  (`claude-sonnet-4-6`, API-Key lokal in `/meta/apikey.txt`, sauberes Fehler-
+  handling offline). Jede Zusammenfassung endet mit vollständigem Quellenverzeichnis.
+- **Export:** Suchtreffer und Zusammenfassungen als DOCX (docx.js), PDF (jsPDF)
+  oder XLSX (SheetJS) – gespeichert in `/exports` und als Download.
+- **Oberfläche:** Seitenleiste + Hauptbereich, Farbwelt exakt nach Vorgabe, Arial,
+  Dark/Light/Auto-Theme, Sprache Deutsch/Englisch umschaltbar.
 
 ---
 

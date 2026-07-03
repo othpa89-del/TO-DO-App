@@ -4,7 +4,7 @@
  * Strategie: cache-first für gleiche Origin, mit Laufzeit-Caching neuer Dateien
  * (z. B. vendor-Libs, die in späteren Etappen dazukommen). */
 
-const VERSION = 'wa-v1';
+const VERSION = 'wa-v2';
 const CACHE = `wissensarchiv-${VERSION}`;
 
 // Kern der App-Shell, der beim Installieren fest vorgeladen wird.
@@ -12,9 +12,18 @@ const APP_SHELL = [
   './',
   './index.html',
   './manifest.json',
+  './parse-worker.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
+  // Bibliotheken lokal – damit die App nach dem ersten Start vollstaendig offline laeuft.
+  './vendor/pdf.min.js',
+  './vendor/pdf.worker.min.js',
+  './vendor/mammoth.browser.min.js',
+  './vendor/xlsx.full.min.js',
+  './vendor/jszip.min.js',
+  './vendor/docx.umd.js',
+  './vendor/jspdf.umd.min.js',
 ];
 
 self.addEventListener('install', (event) => {

@@ -9,6 +9,7 @@
   <meta name="theme-color" content="#00A6CF">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <script src="vendor/pdf.min.js"></script>
   <style>
     :root {
       --primary:#00A6CF; --primary-hover:#0090b4; --secondary:#6BCCE0; --surface-accent:#E6F5F9;
@@ -36,12 +37,13 @@
     code{background:var(--bg-alt);padding:2px 6px;border-radius:5px;font-family:Consolas,Menlo,monospace;font-size:.92em}
     .num{font-variant-numeric:tabular-nums}
     :focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+    ::selection{background:var(--secondary);color:#08323c}
 
     .btn{border:1px solid var(--primary);background:var(--primary);color:#fff;padding:8px 15px;border-radius:8px;font-size:13px;font-weight:bold;display:inline-flex;align-items:center;gap:7px}
     .btn:hover{background:var(--primary-hover);border-color:var(--primary-hover)}
     .btn.neutral{background:var(--panel);color:var(--text);border-color:var(--line)}
     .btn.neutral:hover{background:var(--bg-alt)}
-    .btn.ghost{background:transparent;color:var(--primary)}
+    .btn.ghost{background:transparent;color:var(--primary);border-color:transparent}
     .btn.ghost:hover{background:var(--surface-accent)}
     .btn.danger{background:transparent;color:var(--danger);border-color:var(--line)}
     .btn.danger:hover{background:rgba(224,49,49,.08)}
@@ -49,7 +51,6 @@
     .btn.lg{font-size:15px;padding:11px 22px}
     .btn:disabled{opacity:.5;cursor:not-allowed}
 
-    /* ---------- Vollbild-Screens (Onboarding / nicht unterstützt) ---------- */
     .fullscreen{position:fixed;inset:0;background:var(--bg);z-index:60;display:none;place-items:center;padding:24px;overflow:auto}
     .fullscreen.show{display:grid}
     .card-center{max-width:560px;text-align:center}
@@ -61,12 +62,13 @@
     .folder-preview .root{color:var(--text);font-weight:bold}
     .small-note{font-size:12px;color:var(--text-muted);margin-top:18px}
 
-    /* ---------- App-Shell ---------- */
     .app{display:none;grid-template-columns:var(--sidebar-w) 1fr;grid-template-rows:56px 1fr;height:100vh;min-height:560px}
     .app.show{display:grid}
     .topbar{grid-column:1/-1;display:flex;align-items:center;gap:14px;padding:0 18px;background:var(--panel);border-bottom:1px solid var(--line)}
     .brand{display:flex;align-items:center;gap:10px;font-weight:bold;font-size:16px}
     .logo{width:30px;height:30px;border-radius:7px;background:linear-gradient(135deg,var(--primary),var(--secondary));display:grid;place-items:center;color:#fff;font-weight:bold;font-size:15px}
+    .top-search{flex:0 1 380px;display:flex;align-items:center;gap:8px;background:var(--bg-alt);border:1px solid var(--line);border-radius:20px;padding:6px 14px;color:var(--text-muted)}
+    .top-search input{border:0;background:transparent;outline:none;color:var(--text);flex:1;font-family:inherit;font-size:13px}
     .top-spacer{flex:1}
     .seg{display:inline-flex;border:1px solid var(--line);border-radius:20px;overflow:hidden}
     .seg button{border:0;background:var(--panel);color:var(--text-muted);padding:5px 11px;font-size:12px}
@@ -98,45 +100,118 @@
 
     .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
     .panel-pad{padding:18px}
-    .cards{display:grid;grid-template-columns:1fr;gap:16px;max-width:720px}
+    .cards{display:grid;grid-template-columns:1fr;gap:16px}
     .field{display:flex;flex-direction:column;gap:5px}
     .field label{font-size:12px;color:var(--text-muted);font-weight:bold}
-    .field input{padding:8px 11px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-family:inherit;font-size:13px;outline:none}
-    .field input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(0,166,207,.15)}
-    .chip{border:1px solid var(--line);background:var(--panel);color:var(--text-muted);border-radius:16px;padding:4px 11px;font-size:12px;display:inline-flex;align-items:center;gap:6px}
+    .field input,.field select,.field textarea{padding:8px 11px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-family:inherit;font-size:13px;outline:none;width:100%}
+    .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(0,166,207,.15)}
+    .chip{border:1px solid var(--line);background:var(--panel);color:var(--text-muted);border-radius:16px;padding:4px 11px;font-size:12px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+    .chip.on{background:var(--primary);color:#fff;border-color:var(--primary)}
+    .chip.tag{background:var(--surface-accent);color:var(--primary);border-color:transparent;cursor:default}
+    .chip.tag .x{cursor:pointer;opacity:.7}
+    .chip.tag .x:hover{opacity:1}
     .switch{position:relative;width:42px;height:24px;background:var(--line);border-radius:12px;transition:.2s;flex:none;border:0}
     .switch.on{background:var(--primary)}
     .switch::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.2s}
     .switch.on::after{left:21px}
 
-    .empty{display:grid;place-items:center;text-align:center;padding:60px 20px;color:var(--text-muted)}
+    .empty{display:grid;place-items:center;text-align:center;padding:56px 20px;color:var(--text-muted)}
     .empty .big{font-size:40px;margin-bottom:12px}
-    .stage-tag{display:inline-block;background:var(--surface-accent);color:var(--primary);border:1px solid var(--secondary);border-radius:14px;padding:2px 10px;font-size:12px;font-weight:bold;margin-bottom:10px}
 
-    /* ---------- Overlay-Dialoge ---------- */
+    /* Tabelle */
+    .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+    .table-wrap{overflow-x:auto}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    thead th{text-align:left;padding:10px 12px;color:var(--text-muted);font-size:12px;border-bottom:1px solid var(--line);white-space:nowrap}
+    thead th.sortable{cursor:pointer;user-select:none}
+    thead th.sortable.asc::after{content:" ▲";color:var(--primary)}
+    thead th.sortable.desc::after{content:" ▼";color:var(--primary)}
+    tbody td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+    tbody tr:hover{background:var(--bg-alt)}
+    tbody tr.sel{background:var(--surface-accent)}
+    .ftype{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:6px;font-size:10px;font-weight:bold;color:#fff;flex:none}
+    .t-pdf{background:#d64545}.t-docx{background:#2b6cb0}.t-xlsx{background:#2f855a}.t-csv{background:#6b7280}.t-txt{background:#8a6d3b}.t-md{background:#7048a8}
+    .fname{font-weight:bold}
+    .fmeta{color:var(--text-muted);font-size:12px}
+    .badge-scan{background:rgba(232,161,58,.16);color:#b9791f;border:1px solid rgba(232,161,58,.4);border-radius:5px;padding:1px 6px;font-size:11px;white-space:nowrap}
+    .rowmenu{position:relative}
+    .rowmenu-btn{border:0;background:transparent;color:var(--text-muted);font-size:18px;padding:2px 8px;border-radius:6px}
+    .rowmenu-btn:hover{background:var(--bg-alt)}
+    .menu{position:absolute;right:0;top:100%;z-index:20;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);min-width:190px;padding:6px;display:none}
+    .menu.show{display:block}
+    .menu button{display:flex;gap:9px;align-items:center;width:100%;text-align:left;border:0;background:transparent;color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px}
+    .menu button:hover{background:var(--bg-alt)}
+    .menu button.danger{color:var(--danger)}
+    .menu .sep{height:1px;background:var(--line);margin:5px 0}
+
+    /* Suche */
+    .search-layout{display:grid;grid-template-columns:240px 1fr;gap:20px;align-items:start}
+    .filter-group{margin-bottom:18px}
+    .filter-group h4{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:9px}
+    .check{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;cursor:pointer}
+    .result{border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:12px;background:var(--panel);box-shadow:var(--shadow)}
+    .result:hover{border-color:var(--secondary)}
+    .result .r-top{display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+    .result .r-title{font-weight:bold;cursor:pointer}
+    .result .r-title:hover{color:var(--primary)}
+    .result .src{color:var(--text-muted);font-size:12px;margin-left:auto;white-space:nowrap}
+    .snippet{color:var(--text);font-size:13px}
+    mark{background:var(--secondary);color:#08323c;padding:0 2px;border-radius:2px}
+    .result .r-foot{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center}
+
+    /* Fundstelle */
+    .doc-view{display:grid;grid-template-columns:1fr 300px;gap:20px;align-items:start}
+    .pdf-canvas-wrap{background:var(--bg-alt);border:1px solid var(--line);border-radius:8px;padding:16px;display:grid;place-items:center;overflow:auto;max-height:74vh}
+    .pdf-canvas-wrap canvas{max-width:100%;height:auto;box-shadow:var(--shadow);background:#fff}
+    .section-text{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px;line-height:1.7;max-height:74vh;overflow:auto;white-space:pre-wrap}
+    .pdf-toolbar{display:flex;align-items:center;gap:10px;justify-content:center;margin-top:12px;color:var(--text-muted);font-size:13px}
+
+    /* Import */
+    .dropzone{border:2px dashed var(--secondary);background:var(--surface-accent);border-radius:12px;padding:36px;text-align:center;color:var(--text-muted)}
+    .dropzone.drag{background:var(--primary);color:#fff;border-color:#fff}
+    .progress{height:8px;background:var(--bg-alt);border-radius:6px;overflow:hidden}
+    .progress>span{display:block;height:100%;background:linear-gradient(90deg,var(--primary),var(--secondary));width:0;transition:width .12s}
+    .queue-item{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+    .queue-item:last-child{border-bottom:0}
+    .queue-item .qmain{flex:1;min-width:0}
+    .queue-item .fname{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+    .notice{display:flex;gap:10px;padding:12px 14px;border-radius:8px;font-size:13px;align-items:flex-start}
+    .notice.warn{background:rgba(232,161,58,.12);border:1px solid rgba(232,161,58,.35);color:#9a6a1e}
+    .notice.info{background:var(--surface-accent);border:1px solid var(--secondary);color:var(--text)}
+    .notice.err{background:rgba(224,49,49,.1);border:1px solid rgba(224,49,49,.35);color:var(--danger)}
+
+    .summary-out{line-height:1.7}
+    .summary-out h3{margin:14px 0 8px;font-size:16px}
+    .sourcelist{margin-top:18px;border-top:1px solid var(--line);padding-top:14px}
+    .sourcelist ol{margin:8px 0 0;padding-left:20px}
+    .sourcelist li{margin-bottom:5px;color:var(--text-muted);font-size:13px}
+
     .overlay{position:fixed;inset:0;background:rgba(20,24,28,.55);display:none;align-items:center;justify-content:center;z-index:70;padding:20px}
     .overlay.show{display:flex}
     .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;max-width:480px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.25);overflow:hidden}
+    .modal.wide{max-width:600px}
     .modal-head{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
     .modal-head .mi{width:40px;height:40px;border-radius:9px;background:var(--surface-accent);color:var(--primary);display:grid;place-items:center;font-size:20px;flex:none}
     .modal-body{padding:20px}
-    .modal-foot{padding:14px 20px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end;background:var(--bg-alt)}
+    .modal-foot{padding:14px 20px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end;background:var(--bg-alt);flex-wrap:wrap}
 
-    /* ---------- Toast ---------- */
     #toasts{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:90;display:flex;flex-direction:column;gap:8px;align-items:center}
     .toast{background:var(--text);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:90vw;animation:fade .18s ease}
     .toast.err{background:var(--danger);color:#fff}
     .toast.ok{background:var(--good);color:#fff}
 
-    @media (max-width:860px){
-      .app{grid-template-columns:64px 1fr}
-      .nav-item span.txt,.nav-label,.sidebar-foot{display:none}
-    }
+    .stat{display:flex;flex-direction:column;gap:3px}
+    .busy{display:inline-block;width:15px;height:15px;border:2px solid var(--line);border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    @media (max-width:900px){.search-layout,.doc-view{grid-template-columns:1fr}}
+    @media (max-width:860px){.app{grid-template-columns:64px 1fr}.nav-item span.txt,.nav-label,.sidebar-foot,.top-search{display:none}}
   </style>
 </head>
 <body>
 
-<!-- ============ SCREEN: Browser nicht unterstützt ============ -->
+<!-- Browser nicht unterstützt -->
 <div class="fullscreen" id="screen-unsupported">
   <div class="card-center">
     <div class="onboard-logo">W</div>
@@ -146,7 +221,7 @@
   </div>
 </div>
 
-<!-- ============ SCREEN: Onboarding / Ordner wählen ============ -->
+<!-- Onboarding -->
 <div class="fullscreen" id="screen-onboard">
   <div class="card-center">
     <div class="onboard-logo">W</div>
@@ -164,14 +239,14 @@
   </div>
 </div>
 
-<!-- ============ APP-SHELL ============ -->
+<!-- App -->
 <div class="app" id="app">
   <header class="topbar">
     <div class="brand"><div class="logo">W</div> Wissensarchiv</div>
+    <div class="top-search">🔎 <input id="top-search-input" placeholder="Volltextsuche über alle Dokumente…" data-i18n-ph="search-ph"></div>
     <div class="top-spacer"></div>
     <div class="seg" id="lang-seg" title="Sprache / Language">
-      <button data-lang="de">DE</button>
-      <button data-lang="en">EN</button>
+      <button data-lang="de">DE</button><button data-lang="en">EN</button>
     </div>
     <button class="icon-btn" id="theme-btn" title="Theme wechseln">🌓</button>
   </header>
@@ -180,13 +255,12 @@
     <div class="nav-label" data-i18n="nav-nav">Navigation</div>
     <button class="nav-item active" data-view="lib"><span class="ic">📚</span><span class="txt" data-i18n="nav-lib">Bibliothek</span><span class="count" id="cnt-lib">0</span></button>
     <button class="nav-item" data-view="search"><span class="ic">🔎</span><span class="txt" data-i18n="nav-search">Suche</span></button>
+    <button class="nav-item" data-view="doc" id="nav-doc" style="display:none"><span class="ic">📄</span><span class="txt" data-i18n="nav-doc">Fundstelle</span></button>
     <button class="nav-item" data-view="summary"><span class="ic">✨</span><span class="txt" data-i18n="nav-sum">Zusammenfassung</span></button>
     <button class="nav-item" data-view="backup"><span class="ic">💾</span><span class="txt" data-i18n="nav-backup">Backup</span></button>
     <button class="nav-item" data-view="settings"><span class="ic">⚙️</span><span class="txt" data-i18n="nav-set">Einstellungen</span></button>
-
     <div class="nav-label" data-i18n="nav-actions">Aktionen</div>
     <button class="nav-item" data-view="import"><span class="ic">⬆️</span><span class="txt" data-i18n="nav-import">Importieren</span></button>
-
     <div class="sidebar-foot">
       <div class="storage-ok"><span class="dot"></span> <span data-i18n="foot-connected">Ordner verbunden</span></div>
       <div style="margin-top:4px;opacity:.85" id="foot-path">—</div>
@@ -194,48 +268,139 @@
   </nav>
 
   <main class="main">
-    <!-- Bibliothek -->
+    <!-- ===== Bibliothek ===== -->
     <section class="view show" id="view-lib">
       <div class="page-head">
         <div><h2 data-i18n="lib-h">Bibliothek</h2><p id="lib-sub" data-i18n="lib-p">Alle Dokumente an einem Ort.</p></div>
         <div class="row"><button class="btn" data-view-jump="import">⬆️ <span data-i18n="nav-import">Importieren</span></button></div>
       </div>
-      <div class="empty panel">
-        <div class="big">📚</div>
-        <div class="stage-tag" data-i18n="stage2">Kommt in Etappe 2</div>
-        <h3 data-i18n="lib-empty-h">Noch keine Dokumente</h3>
-        <p style="max-width:420px" data-i18n="lib-empty-p">Import, Volltextindex und Verwaltung folgen in den nächsten Etappen. Das Fundament (Ordner-Anbindung, Offline-Betrieb, Einstellungen) steht bereits.</p>
+      <div id="lib-content"></div>
+    </section>
+
+    <!-- ===== Suche ===== -->
+    <section class="view" id="view-search">
+      <div class="page-head"><div><h2 data-i18n="nav-search">Suche</h2><p data-i18n="search-p">Volltext über alle Indizes · Originale werden dabei nie geladen.</p></div></div>
+      <div class="top-search" style="max-width:none;margin-bottom:18px">🔎 <input id="search-input" placeholder="Suchbegriff…" data-i18n-ph="search-ph2" style="font-size:14px"><button class="btn sm" id="search-btn" data-i18n="do-search">Suchen</button></div>
+      <div class="search-layout">
+        <aside class="panel panel-pad">
+          <div class="filter-group">
+            <h4 data-i18n="f-type">Dateityp</h4>
+            <div id="filter-types"></div>
+          </div>
+          <div class="filter-group">
+            <h4 data-i18n="f-date">Zeitraum (Import)</h4>
+            <div class="field" style="margin-bottom:8px"><input type="date" id="filter-from"></div>
+            <div class="field"><input type="date" id="filter-to"></div>
+          </div>
+          <div class="filter-group">
+            <h4 data-i18n="f-tags">Tags / Kategorien</h4>
+            <div id="filter-tags" class="row"></div>
+          </div>
+          <button class="btn ghost neutral sm" id="filter-reset" style="width:100%" data-i18n="f-reset">Filter zurücksetzen</button>
+        </aside>
+        <div>
+          <div class="row" style="justify-content:space-between;margin-bottom:12px">
+            <strong id="search-count">—</strong>
+            <div class="row">
+              <button class="btn sm neutral" id="sel-all-hits" data-i18n="select-all">Alle wählen</button>
+              <button class="btn sm neutral" id="sum-hits" data-i18n="sum-selected">Ausgewählte zusammenfassen</button>
+              <button class="btn sm neutral" id="export-hits" data-i18n="export">Export</button>
+            </div>
+          </div>
+          <div id="search-results"></div>
+        </div>
       </div>
     </section>
 
-    <!-- Suche -->
-    <section class="view" id="view-search">
-      <div class="page-head"><div><h2 data-i18n="nav-search">Suche</h2><p data-i18n="search-p">Volltext über alle Indizes.</p></div></div>
-      <div class="empty panel"><div class="big">🔎</div><div class="stage-tag" data-i18n="stage2">Kommt in Etappe 2</div><h3 data-i18n="soon-h">Bald verfügbar</h3><p style="max-width:420px" data-i18n="search-soon">Volltextsuche mit Filtern, Snippets und Quellenreferenz folgt zusammen mit dem Import.</p></div>
+    <!-- ===== Fundstelle ===== -->
+    <section class="view" id="view-doc">
+      <div class="page-head">
+        <div><h2 data-i18n="nav-doc">Fundstelle</h2><p id="doc-sub">—</p></div>
+        <div class="row">
+          <button class="btn neutral sm" id="doc-download">⬇ <span data-i18n="doc-original">Original</span></button>
+          <button class="btn neutral sm" id="doc-reindex">🔄 <span data-i18n="reindex">Neu-Indexieren</span></button>
+        </div>
+      </div>
+      <div class="doc-view">
+        <div id="doc-main"></div>
+        <aside class="panel panel-pad" id="doc-info"></aside>
+      </div>
     </section>
 
-    <!-- Zusammenfassung -->
+    <!-- ===== Zusammenfassung ===== -->
     <section class="view" id="view-summary">
-      <div class="page-head"><div><h2 data-i18n="nav-sum">Zusammenfassung</h2><p data-i18n="sum-p">Extraktiv (offline) oder per Claude API.</p></div></div>
-      <div class="empty panel"><div class="big">✨</div><div class="stage-tag" data-i18n="stage4">Kommt in Etappe 4</div><h3 data-i18n="soon-h">Bald verfügbar</h3><p style="max-width:420px" data-i18n="sum-soon">Zusammenfassungen mit vollständigem Quellenverzeichnis und Export als DOCX/PDF/XLSX.</p></div>
+      <div class="page-head"><div><h2 data-i18n="nav-sum">Zusammenfassung</h2><p data-i18n="sum-p">Über ausgewählte Dokumente oder Suchtreffer · endet mit vollständigem Quellenverzeichnis.</p></div></div>
+      <div class="search-layout">
+        <aside class="panel panel-pad">
+          <h4 style="margin-bottom:10px" data-i18n="sum-source">Quelle</h4>
+          <label class="check"><input type="radio" name="sumsrc" value="selected" checked> <span data-i18n="sum-src-sel">Ausgewählte Dokumente</span></label>
+          <label class="check"><input type="radio" name="sumsrc" value="hits"> <span data-i18n="sum-src-hits">Aktuelle Suchtreffer</span></label>
+          <label class="check"><input type="radio" name="sumsrc" value="all"> <span data-i18n="sum-src-all">Gesamtes Archiv</span></label>
+          <div id="sum-picklist" style="margin-top:12px"></div>
+          <h4 style="margin:18px 0 10px" data-i18n="sum-mode">Modus</h4>
+          <div class="seg" id="sum-mode" style="border-radius:8px;width:100%">
+            <button class="on" data-mode="extractive" style="flex:1" data-i18n="sum-extractive">Extraktiv (offline)</button>
+            <button data-mode="ai" style="flex:1" data-i18n="sum-ai">Claude API</button>
+          </div>
+          <button class="btn" id="sum-generate" style="width:100%;margin-top:14px;justify-content:center">✨ <span data-i18n="sum-generate">Erstellen</span></button>
+        </aside>
+        <div class="panel panel-pad">
+          <div id="sum-output"><div class="empty"><div class="big">✨</div><p data-i18n="sum-hint">Wähle links eine Quelle und erstelle eine Zusammenfassung.</p></div></div>
+          <div class="row" id="sum-export-row" style="margin-top:16px;display:none">
+            <span style="color:var(--text-muted);font-size:12px" data-i18n="export-as">Exportieren als:</span>
+            <button class="btn neutral sm" data-export="docx">⬇ DOCX</button>
+            <button class="btn neutral sm" data-export="pdf">⬇ PDF</button>
+            <button class="btn neutral sm" data-export="xlsx">⬇ XLSX</button>
+          </div>
+        </div>
+      </div>
     </section>
 
-    <!-- Backup -->
+    <!-- ===== Backup ===== -->
     <section class="view" id="view-backup">
-      <div class="page-head"><div><h2 data-i18n="nav-backup">Backup</h2><p data-i18n="backup-p">Komplettes Archiv als ZIP.</p></div></div>
-      <div class="empty panel"><div class="big">💾</div><div class="stage-tag" data-i18n="stage3">Kommt in Etappe 3</div><h3 data-i18n="soon-h">Bald verfügbar</h3><p style="max-width:420px" data-i18n="backup-soon">Export und Wiederherstellung des gesamten Archivs inklusive Tags und Notizen.</p></div>
+      <div class="page-head"><div><h2 data-i18n="nav-backup">Backup</h2><p data-i18n="backup-p">Komplettes Archiv als eine ZIP – Originale, Indizes, Tags & Notizen.</p></div></div>
+      <div class="cards" style="grid-template-columns:1fr 1fr;max-width:900px">
+        <div class="panel panel-pad">
+          <div style="font-size:26px">📦</div>
+          <h3 style="margin:8px 0" data-i18n="backup-exp-h">Archiv exportieren</h3>
+          <p style="color:var(--text-muted)" data-i18n="backup-exp-p">Erzeugt eine ZIP mit /originals, /index und /meta. Wird in /exports gespeichert und als Download angeboten.</p>
+          <div class="row" style="margin-top:10px" id="backup-stats"></div>
+          <button class="btn" style="margin-top:14px;width:100%;justify-content:center" id="backup-export">⬇ <span data-i18n="backup-create">Backup-ZIP erstellen</span></button>
+        </div>
+        <div class="panel panel-pad">
+          <div style="font-size:26px">♻️</div>
+          <h3 style="margin:8px 0" data-i18n="backup-imp-h">Aus ZIP wiederherstellen</h3>
+          <p style="color:var(--text-muted)" data-i18n="backup-imp-p">Vollständige Wiederherstellung – inklusive Tags und Notizen. Vorhandene Dokumente werden ergänzt.</p>
+          <div class="dropzone" id="backup-drop" style="margin-top:12px;padding:22px"><div style="font-size:24px">⬆️</div><div data-i18n="backup-drop">Backup-ZIP hierher ziehen oder klicken</div></div>
+        </div>
+      </div>
     </section>
 
-    <!-- Import -->
+    <!-- ===== Import ===== -->
     <section class="view" id="view-import">
       <div class="page-head"><div><h2 data-i18n="nav-import">Importieren</h2><p data-i18n="import-p">PDF · DOCX · XLSX · CSV · TXT · MD</p></div></div>
-      <div class="empty panel"><div class="big">⬆️</div><div class="stage-tag" data-i18n="stage2">Kommt in Etappe 2</div><h3 data-i18n="soon-h">Bald verfügbar</h3><p style="max-width:420px" data-i18n="import-soon">Import per Drag & Drop, Dateiauswahl oder ganzem Ordner. Parsing im Web Worker, PDF seitenweise, mit Fortschrittsanzeige.</p></div>
+      <div class="dropzone" id="dropzone">
+        <div style="font-size:30px">📥</div>
+        <div style="margin-top:6px" data-i18n="imp-drop">Dateien oder ganzen Ordner hierher ziehen</div>
+        <div class="row" style="justify-content:center;margin-top:12px">
+          <button class="btn sm neutral" id="pick-files" data-i18n="imp-files">Dateien wählen</button>
+          <button class="btn sm neutral" id="pick-folder" data-i18n="imp-folder">Ordner wählen</button>
+        </div>
+      </div>
+      <div class="panel panel-pad" id="import-queue-wrap" style="margin-top:18px;display:none">
+        <div class="row" style="justify-content:space-between;margin-bottom:6px">
+          <h4 data-i18n="imp-queue">Import-Warteschlange</h4>
+          <span id="import-summary" style="color:var(--text-muted);font-size:12px"></span>
+        </div>
+        <div id="import-queue"></div>
+        <p style="color:var(--text-muted);font-size:12px;margin-top:8px" data-i18n="imp-uihint">Die App bleibt während des Imports bedienbar. Große PDFs werden seitenweise verarbeitet.</p>
+      </div>
     </section>
 
-    <!-- Einstellungen (in E1 voll funktionsfähig) -->
+    <!-- ===== Einstellungen ===== -->
     <section class="view" id="view-settings">
-      <div class="page-head"><div><h2 data-i18n="nav-set">Einstellungen</h2><p data-i18n="set-p">Lokal gespeichert in /meta/settings.json</p></div></div>
-      <div class="cards">
+      <div class="page-head"><div><h2 data-i18n="nav-set">Einstellungen</h2><p data-i18n="set-p">Lokal gespeichert in /meta.</p></div></div>
+      <div class="cards" style="max-width:720px">
         <div class="panel panel-pad">
           <h4 style="margin-bottom:14px" data-i18n="set-appear">Darstellung</h4>
           <div class="row" style="justify-content:space-between;margin-bottom:14px">
@@ -249,12 +414,16 @@
           <div class="row" style="justify-content:space-between">
             <span data-i18n="set-lang">Sprache / Language</span>
             <div class="seg" id="lang-seg2" style="border-radius:8px">
-              <button data-lang="de">Deutsch</button>
-              <button data-lang="en">English</button>
+              <button data-lang="de">Deutsch</button><button data-lang="en">English</button>
             </div>
           </div>
         </div>
-
+        <div class="panel panel-pad">
+          <h4 style="margin-bottom:6px" data-i18n="set-api">Claude API (optional)</h4>
+          <p style="color:var(--text-muted);margin:0 0 12px" data-i18n="set-api-p">Für Online-Zusammenfassungen (Modell claude-sonnet-4-6). Wird lokal in /meta/apikey.txt gespeichert – nicht im Browser.</p>
+          <div class="field" style="margin-bottom:10px"><label>API-Key</label><input type="password" id="api-key" placeholder="sk-ant-…"></div>
+          <div class="row"><button class="btn sm" id="api-save" data-i18n="save">Speichern</button><button class="btn sm neutral" id="api-test" data-i18n="api-test">Verbindung testen</button><span id="api-status"></span></div>
+        </div>
         <div class="panel panel-pad">
           <h4 style="margin-bottom:6px" data-i18n="set-storage">Speicherort</h4>
           <p style="color:var(--text-muted);margin:0 0 12px" data-i18n="set-storage-p">Alle Daten liegen als echte Dateien in diesem Ordner.</p>
@@ -265,33 +434,23 @@
               <button class="btn sm danger" id="btn-disconnect" data-i18n="set-disconnect">Trennen</button>
             </div>
           </div>
-          <div class="row" style="margin-top:14px">
-            <span class="switch" id="sw-offline"></span>
-            <span id="offline-label" data-i18n="set-offline">Offline-Betrieb wird eingerichtet …</span>
-          </div>
+          <div class="row" style="margin-top:14px"><span class="switch" id="sw-offline"></span> <span id="offline-label" data-i18n="set-offline">Offline-Betrieb wird eingerichtet …</span></div>
         </div>
-
-        <div class="panel panel-pad">
-          <h4 style="margin-bottom:6px" data-i18n="set-api">Claude API (optional)</h4>
-          <p style="color:var(--text-muted);margin:0 0 4px" data-i18n="set-api-p">Für Online-Zusammenfassungen (Modell claude-sonnet-4-6). Wird lokal in /meta gespeichert.</p>
-          <div class="stage-tag" data-i18n="stage4">Kommt in Etappe 4</div>
-        </div>
-
         <div class="panel panel-pad">
           <h4 style="margin-bottom:6px" data-i18n="set-about">Über</h4>
-          <p style="color:var(--text-muted);margin:0" data-i18n="set-about-p">Wissensarchiv · Etappe 1 (Fundament). Keine Konten, kein Server – deine Daten bleiben bei dir.</p>
+          <p style="color:var(--text-muted);margin:0" data-i18n="set-about-p">Wissensarchiv · Keine Konten, kein Server – deine Daten bleiben bei dir.</p>
         </div>
       </div>
     </section>
   </main>
 </div>
 
-<!-- ============ Reconnect-Dialog ============ -->
+<!-- Reconnect -->
 <div class="overlay" id="dlg-reconnect">
   <div class="modal">
     <div class="modal-head"><div class="mi">🔌</div><h3 data-i18n="rc-h">Ordner erneut verbinden</h3></div>
     <div class="modal-body">
-      <p data-i18n="rc-p">Der Browser hat die Berechtigung für deinen Datenordner zurückgesetzt (z. B. nach dem Löschen von Website-Daten). Deine Dateien sind unverändert auf der Festplatte – bitte den Ordner einmal neu bestätigen.</p>
+      <p data-i18n="rc-p">Der Browser hat die Berechtigung für deinen Datenordner zurückgesetzt. Deine Dateien sind unverändert auf der Festplatte – bitte den Ordner einmal neu bestätigen.</p>
       <div class="folder-preview"><div class="root">📁 <span id="rc-name">—</span></div></div>
     </div>
     <div class="modal-foot">
@@ -301,377 +460,700 @@
   </div>
 </div>
 
+<!-- Duplikat -->
+<div class="overlay" id="dlg-dup">
+  <div class="modal">
+    <div class="modal-head"><div class="mi">📑</div><h3 data-i18n="dup-h">Duplikat gefunden</h3></div>
+    <div class="modal-body">
+      <p id="dup-text">—</p>
+      <label class="check" style="margin-top:10px"><input type="checkbox" id="dup-all"> <span data-i18n="dup-all">Für alle weiteren Duplikate übernehmen</span></label>
+    </div>
+    <div class="modal-foot">
+      <button class="btn neutral" id="dup-skip" data-i18n="dup-skip">Überspringen</button>
+      <button class="btn" id="dup-replace" data-i18n="dup-replace">Ersetzen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Generischer Prompt (Umbenennen / Tag / Notiz) -->
+<div class="overlay" id="dlg-prompt">
+  <div class="modal">
+    <div class="modal-head"><div class="mi" id="prompt-icon">✏️</div><h3 id="prompt-title">—</h3></div>
+    <div class="modal-body"><div class="field"><label id="prompt-label">—</label><input id="prompt-input" type="text"></div></div>
+    <div class="modal-foot">
+      <button class="btn neutral" id="prompt-cancel" data-i18n="cancel">Abbrechen</button>
+      <button class="btn" id="prompt-ok" data-i18n="ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- Export-Auswahl -->
+<div class="overlay" id="dlg-export">
+  <div class="modal">
+    <div class="modal-head"><div class="mi">⬇️</div><h3 data-i18n="exp-h">Treffer exportieren</h3></div>
+    <div class="modal-body">
+      <p id="exp-text" style="color:var(--text-muted)">—</p>
+      <div class="row" style="margin-top:8px">
+        <button class="btn neutral" data-expfmt="docx">📄 DOCX</button>
+        <button class="btn neutral" data-expfmt="pdf">📕 PDF</button>
+        <button class="btn neutral" data-expfmt="xlsx">📊 XLSX</button>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn neutral" id="exp-cancel" data-i18n="close">Schließen</button></div>
+  </div>
+</div>
+
 <div id="toasts"></div>
 
 <script>
 /* =====================================================================
-   Wissensarchiv – Etappe 1 (Fundament)
-   Vanilla JS, modular. Alle Daten liegen im vom Nutzer gewählten Ordner.
+   Wissensarchiv – Vollständige App
+   Vanilla JS. Alle Daten liegen als echte Dateien im gewählten Ordner.
    ===================================================================== */
 (() => {
   'use strict';
 
-  // ---------- kleiner IndexedDB-Key/Value-Store (nur Handle-Cache + UI-State) ----------
+  const SUPPORTED = ['pdf','docx','xlsx','xls','csv','txt','md','markdown'];
+  const typeOf = (ext) => ({pdf:'pdf',docx:'docx',xlsx:'xlsx',xls:'xlsx',csv:'csv',txt:'txt',md:'md',markdown:'md'}[ext] || ext);
+  const $ = (s, r=document) => r.querySelector(s);
+  const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  // ---------- IndexedDB (nur Handle-Cache) ----------
   const IDB = {
-    _db: null,
-    async open() {
-      if (this._db) return this._db;
-      this._db = await new Promise((res, rej) => {
-        const r = indexedDB.open('wissensarchiv', 1);
-        r.onupgradeneeded = () => r.result.createObjectStore('kv');
-        r.onsuccess = () => res(r.result);
-        r.onerror = () => rej(r.error);
-      });
-      return this._db;
-    },
-    async get(key) {
-      const db = await this.open();
-      return new Promise((res, rej) => {
-        const tx = db.transaction('kv', 'readonly').objectStore('kv').get(key);
-        tx.onsuccess = () => res(tx.result);
-        tx.onerror = () => rej(tx.error);
-      });
-    },
-    async set(key, val) {
-      const db = await this.open();
-      return new Promise((res, rej) => {
-        const tx = db.transaction('kv', 'readwrite');
-        tx.objectStore('kv').put(val, key);
-        tx.oncomplete = () => res();
-        tx.onerror = () => rej(tx.error);
-      });
-    },
-    async del(key) {
-      const db = await this.open();
-      return new Promise((res, rej) => {
-        const tx = db.transaction('kv', 'readwrite');
-        tx.objectStore('kv').delete(key);
-        tx.oncomplete = () => res();
-        tx.onerror = () => rej(tx.error);
-      });
-    },
+    _db:null,
+    async open(){ if(this._db)return this._db; this._db=await new Promise((res,rej)=>{const r=indexedDB.open('wissensarchiv',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);}); return this._db; },
+    async get(k){ const db=await this.open(); return new Promise((res,rej)=>{const t=db.transaction('kv','readonly').objectStore('kv').get(k);t.onsuccess=()=>res(t.result);t.onerror=()=>rej(t.error);}); },
+    async set(k,v){ const db=await this.open(); return new Promise((res,rej)=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);}); },
+    async del(k){ const db=await this.open(); return new Promise((res,rej)=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').delete(k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);}); },
   };
 
-  // ---------- App-Zustand ----------
+  // ---------- Zustand ----------
   const state = {
-    rootHandle: null,
-    dirs: {},                       // originals, index, meta, exports (Directory-Handles)
-    settings: { theme: 'auto', lang: 'de' },
-    pendingHandle: null,            // Handle, das auf Reconnect wartet
+    rootHandle:null, dirs:{}, pendingHandle:null,
+    settings:{ theme:'auto', lang:'de' },
+    apiKey:'',
+    catalog:[],                 // [{id,name,ext,type,size,importedAt,scanned,pageCount,tags,note,unitCount}]
+    indexCache:new Map(),       // id -> vollständiges Index-Objekt
+    lastHits:[],                // letzte Suchtreffer
+    lib:{ sort:'importedAt', dir:'desc', type:'all', tag:null, q:'' , selected:new Set() },
+    search:{ q:'', types:new Set(SUPPORTED.map(typeOf)), from:'', to:'', tag:null, selected:new Set() },
+    curDoc:null,                // {doc, ref, terms, page}
+    parseWorker:null,
+    sumMode:'extractive', lastSummary:null,
   };
-
-  const $ = (sel) => document.querySelector(sel);
-  const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
   // ---------- Toast ----------
-  function toast(msg, kind = '') {
-    const el = document.createElement('div');
-    el.className = 'toast' + (kind ? ' ' + kind : '');
-    el.textContent = msg;
-    $('#toasts').appendChild(el);
-    setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; }, 2600);
-    setTimeout(() => el.remove(), 3000);
-  }
+  function toast(msg, kind=''){ const el=document.createElement('div'); el.className='toast'+(kind?' '+kind:''); el.textContent=msg; $('#toasts').appendChild(el); setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .3s';},2800); setTimeout(()=>el.remove(),3200); }
 
-  // ---------- Screens umschalten ----------
-  function showScreen(name) {
-    $('#screen-unsupported').classList.toggle('show', name === 'unsupported');
-    $('#screen-onboard').classList.toggle('show', name === 'onboard');
-    $('#app').classList.toggle('show', name === 'app');
-  }
+  // ---------- Screens ----------
+  function showScreen(name){ $('#screen-unsupported').classList.toggle('show',name==='unsupported'); $('#screen-onboard').classList.toggle('show',name==='onboard'); $('#app').classList.toggle('show',name==='app'); }
 
   // ---------- Theme ----------
-  function applyTheme(t) {
-    state.settings.theme = t;
-    if (t === 'auto') document.documentElement.removeAttribute('data-theme');
-    else document.documentElement.setAttribute('data-theme', t);
-    $('#theme-btn').textContent = t === 'dark' ? '🌙' : t === 'light' ? '☀️' : '🌓';
-    $$('#theme-seg button').forEach((b) => b.classList.toggle('on', b.dataset.themeVal === t));
-    try { localStorage.setItem('wa.theme', t); } catch (e) {}
-  }
-  function cycleTheme() {
-    const order = ['auto', 'light', 'dark'];
-    const next = order[(order.indexOf(state.settings.theme) + 1) % 3];
-    applyTheme(next);
-    persistSettings();
-  }
+  function applyTheme(t){ state.settings.theme=t; if(t==='auto')document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme',t); $('#theme-btn').textContent=t==='dark'?'🌙':t==='light'?'☀️':'🌓'; $$('#theme-seg button').forEach(b=>b.classList.toggle('on',b.dataset.themeVal===t)); try{localStorage.setItem('wa.theme',t);}catch(e){} }
+  function cycleTheme(){ const o=['auto','light','dark']; applyTheme(o[(o.indexOf(state.settings.theme)+1)%3]); persistSettings(); }
 
-  // ---------- Sprache / i18n ----------
+  // ---------- i18n ----------
   const I18N = {
-    'uns-h': ['Nicht unterstützter Browser', 'Unsupported browser'],
-    'uns-p': ['Das Wissensarchiv benötigt die <b>File System Access API</b>, um deine Daten direkt auf der Festplatte zu speichern. Diese ist aktuell nur in <b>Google Chrome</b> und <b>Microsoft Edge</b> (Desktop) verfügbar.', 'Knowledge Archive needs the <b>File System Access API</b> to store your data directly on disk. It is currently only available in <b>Google Chrome</b> and <b>Microsoft Edge</b> (desktop).'],
-    'uns-note': ['Bitte öffne diese Seite in Chrome oder Edge. Hinweis: Die App muss über <code>https://</code> oder <code>localhost</code> laufen – nicht per Doppelklick als lokale Datei.', 'Please open this page in Chrome or Edge. Note: the app must run over <code>https://</code> or <code>localhost</code> – not as a double-clicked local file.'],
-    'ob-title': ['Willkommen im Wissensarchiv', 'Welcome to your Knowledge Archive'],
-    'ob-sub': ['Deine persönliche, offline-fähige Wissensdatenbank. Wähle einen Ordner auf der Festplatte – dort werden alle Originaldateien, der Suchindex und deine Metadaten als echte Dateien gespeichert. Das übersteht auch das Löschen von Browser-Daten.', 'Your personal, offline-capable knowledge base. Choose a folder on disk – all original files, the search index and your metadata are stored there as real files. This survives clearing your browser data.'],
-    'ob-yourfolder': ['Dein Ordner', 'Your folder'],
-    'ob-d1': ['– Originaldateien', '– original files'],
-    'ob-d2': ['– ein JSON-Index pro Dokument', '– one JSON index per document'],
-    'ob-d3': ['– Tags, Notizen, Einstellungen, API-Key', '– tags, notes, settings, API key'],
-    'ob-d4': ['– Berichte & Backups', '– reports & backups'],
-    'ob-choose': ['Ordner wählen', 'Choose folder'],
-    'ob-browser': ['Erfordert Chrome oder Edge (Desktop).', 'Requires Chrome or Edge (desktop).'],
-    'nav-nav': ['Navigation', 'Navigation'], 'nav-actions': ['Aktionen', 'Actions'],
-    'nav-lib': ['Bibliothek', 'Library'], 'nav-search': ['Suche', 'Search'],
-    'nav-sum': ['Zusammenfassung', 'Summary'], 'nav-backup': ['Backup', 'Backup'],
-    'nav-set': ['Einstellungen', 'Settings'], 'nav-import': ['Importieren', 'Import'],
-    'foot-connected': ['Ordner verbunden', 'Folder connected'],
-    'lib-h': ['Bibliothek', 'Library'], 'lib-p': ['Alle Dokumente an einem Ort.', 'All your documents in one place.'],
-    'lib-empty-h': ['Noch keine Dokumente', 'No documents yet'],
-    'lib-empty-p': ['Import, Volltextindex und Verwaltung folgen in den nächsten Etappen. Das Fundament (Ordner-Anbindung, Offline-Betrieb, Einstellungen) steht bereits.', 'Import, full-text index and management come in the next stages. The foundation (folder access, offline operation, settings) is already in place.'],
-    'search-p': ['Volltext über alle Indizes.', 'Full-text across all indexes.'],
-    'search-soon': ['Volltextsuche mit Filtern, Snippets und Quellenreferenz folgt zusammen mit dem Import.', 'Full-text search with filters, snippets and source references arrives together with import.'],
-    'sum-p': ['Extraktiv (offline) oder per Claude API.', 'Extractive (offline) or via Claude API.'],
-    'sum-soon': ['Zusammenfassungen mit vollständigem Quellenverzeichnis und Export als DOCX/PDF/XLSX.', 'Summaries with a full source list and export to DOCX/PDF/XLSX.'],
-    'backup-p': ['Komplettes Archiv als ZIP.', 'Full archive as a ZIP.'],
-    'backup-soon': ['Export und Wiederherstellung des gesamten Archivs inklusive Tags und Notizen.', 'Export and restore the whole archive including tags and notes.'],
-    'import-p': ['PDF · DOCX · XLSX · CSV · TXT · MD', 'PDF · DOCX · XLSX · CSV · TXT · MD'],
-    'import-soon': ['Import per Drag & Drop, Dateiauswahl oder ganzem Ordner. Parsing im Web Worker, PDF seitenweise, mit Fortschrittsanzeige.', 'Import via drag & drop, file picker or a whole folder. Parsing in a web worker, PDF page by page, with a progress bar.'],
-    'soon-h': ['Bald verfügbar', 'Coming soon'],
-    'stage2': ['Kommt in Etappe 2', 'Coming in stage 2'],
-    'stage3': ['Kommt in Etappe 3', 'Coming in stage 3'],
-    'stage4': ['Kommt in Etappe 4', 'Coming in stage 4'],
-    'set-p': ['Lokal gespeichert in /meta/settings.json', 'Stored locally in /meta/settings.json'],
-    'set-appear': ['Darstellung', 'Appearance'], 'set-theme': ['Theme', 'Theme'],
-    'theme-auto': ['Auto', 'Auto'], 'theme-light': ['Hell', 'Light'], 'theme-dark': ['Dunkel', 'Dark'],
-    'set-lang': ['Sprache / Language', 'Language / Sprache'],
-    'set-storage': ['Speicherort', 'Storage location'],
-    'set-storage-p': ['Alle Daten liegen als echte Dateien in diesem Ordner.', 'All data lives as real files in this folder.'],
-    'set-change': ['Ordner wechseln', 'Change folder'], 'set-disconnect': ['Trennen', 'Disconnect'],
-    'set-offline': ['Offline-Betrieb wird eingerichtet …', 'Setting up offline mode …'],
-    'set-offline-on': ['Offline-Betrieb aktiv (App als PWA installierbar).', 'Offline mode active (installable as a PWA).'],
-    'set-offline-off': ['Offline-Betrieb nicht verfügbar (nur über https/localhost).', 'Offline mode unavailable (needs https/localhost).'],
-    'set-api': ['Claude API (optional)', 'Claude API (optional)'],
-    'set-api-p': ['Für Online-Zusammenfassungen (Modell claude-sonnet-4-6). Wird lokal in /meta gespeichert.', 'For online summaries (model claude-sonnet-4-6). Stored locally in /meta.'],
-    'set-about': ['Über', 'About'],
-    'set-about-p': ['Wissensarchiv · Etappe 1 (Fundament). Keine Konten, kein Server – deine Daten bleiben bei dir.', 'Knowledge Archive · Stage 1 (foundation). No accounts, no server – your data stays with you.'],
-    'rc-h': ['Ordner erneut verbinden', 'Reconnect folder'],
-    'rc-p': ['Der Browser hat die Berechtigung für deinen Datenordner zurückgesetzt (z. B. nach dem Löschen von Website-Daten). Deine Dateien sind unverändert auf der Festplatte – bitte den Ordner einmal neu bestätigen.', 'The browser reset permission for your data folder (e.g. after clearing site data). Your files are untouched on disk – please confirm the folder once more.'],
-    'rc-other': ['Anderen Ordner wählen', 'Choose another folder'], 'rc-btn': ['Verbinden', 'Connect'],
+    'uns-h':['Nicht unterstützter Browser','Unsupported browser'],
+    'uns-p':['Das Wissensarchiv benötigt die <b>File System Access API</b>, um deine Daten direkt auf der Festplatte zu speichern. Diese ist aktuell nur in <b>Google Chrome</b> und <b>Microsoft Edge</b> (Desktop) verfügbar.','Knowledge Archive needs the <b>File System Access API</b> to store your data directly on disk. It is currently only available in <b>Google Chrome</b> and <b>Microsoft Edge</b> (desktop).'],
+    'uns-note':['Bitte öffne diese Seite in Chrome oder Edge. Hinweis: Die App muss über <code>https://</code> oder <code>localhost</code> laufen – nicht per Doppelklick als lokale Datei.','Please open this page in Chrome or Edge. Note: the app must run over <code>https://</code> or <code>localhost</code> – not as a double-clicked local file.'],
+    'ob-title':['Willkommen im Wissensarchiv','Welcome to your Knowledge Archive'],
+    'ob-sub':['Deine persönliche, offline-fähige Wissensdatenbank. Wähle einen Ordner auf der Festplatte – dort werden alle Originaldateien, der Suchindex und deine Metadaten als echte Dateien gespeichert. Das übersteht auch das Löschen von Browser-Daten.','Your personal, offline-capable knowledge base. Choose a folder on disk – all original files, the search index and your metadata are stored there as real files. This survives clearing your browser data.'],
+    'ob-yourfolder':['Dein Ordner','Your folder'],'ob-d1':['– Originaldateien','– original files'],'ob-d2':['– ein JSON-Index pro Dokument','– one JSON index per document'],'ob-d3':['– Tags, Notizen, Einstellungen, API-Key','– tags, notes, settings, API key'],'ob-d4':['– Berichte & Backups','– reports & backups'],
+    'ob-choose':['Ordner wählen','Choose folder'],'ob-browser':['Erfordert Chrome oder Edge (Desktop).','Requires Chrome or Edge (desktop).'],
+    'nav-nav':['Navigation','Navigation'],'nav-actions':['Aktionen','Actions'],'nav-lib':['Bibliothek','Library'],'nav-search':['Suche','Search'],'nav-doc':['Fundstelle','Source view'],'nav-sum':['Zusammenfassung','Summary'],'nav-backup':['Backup','Backup'],'nav-set':['Einstellungen','Settings'],'nav-import':['Importieren','Import'],
+    'foot-connected':['Ordner verbunden','Folder connected'],
+    'lib-h':['Bibliothek','Library'],'lib-p':['Alle Dokumente an einem Ort.','All your documents in one place.'],
+    'lib-empty-h':['Noch keine Dokumente','No documents yet'],'lib-empty-p':['Importiere Dateien per Drag & Drop, Dateiauswahl oder ganzem Ordner.','Import files via drag & drop, file picker or a whole folder.'],
+    'search-p':['Volltext über alle Indizes · Originale werden dabei nie geladen.','Full-text across all indexes · originals are never loaded.'],
+    'search-ph':['Volltextsuche über alle Dokumente…','Full-text search across all documents…'],'search-ph2':['Suchbegriff…','Search term…'],'do-search':['Suchen','Search'],
+    'f-type':['Dateityp','File type'],'f-date':['Zeitraum (Import)','Date range (import)'],'f-tags':['Tags / Kategorien','Tags / categories'],'f-reset':['Filter zurücksetzen','Reset filters'],
+    'select-all':['Alle wählen','Select all'],'sum-selected':['Ausgewählte zusammenfassen','Summarize selected'],'export':['Export','Export'],
+    'doc-original':['Original','Original'],'reindex':['Neu-Indexieren','Re-index'],
+    'sum-p':['Über ausgewählte Dokumente oder Suchtreffer · endet mit vollständigem Quellenverzeichnis.','Across selected documents or search hits · ends with a full source list.'],
+    'sum-source':['Quelle','Source'],'sum-src-sel':['Ausgewählte Dokumente','Selected documents'],'sum-src-hits':['Aktuelle Suchtreffer','Current search hits'],'sum-src-all':['Gesamtes Archiv','Entire archive'],
+    'sum-mode':['Modus','Mode'],'sum-extractive':['Extraktiv (offline)','Extractive (offline)'],'sum-ai':['Claude API','Claude API'],'sum-generate':['Erstellen','Generate'],
+    'sum-hint':['Wähle links eine Quelle und erstelle eine Zusammenfassung.','Pick a source on the left and generate a summary.'],
+    'sum-sources':['Quellenverzeichnis','Source list'],'export-as':['Exportieren als:','Export as:'],
+    'backup-p':['Komplettes Archiv als eine ZIP – Originale, Indizes, Tags & Notizen.','Full archive as one ZIP – originals, indexes, tags & notes.'],
+    'backup-exp-h':['Archiv exportieren','Export archive'],'backup-exp-p':['Erzeugt eine ZIP mit /originals, /index und /meta. Wird in /exports gespeichert und als Download angeboten.','Creates a ZIP with /originals, /index and /meta. Saved to /exports and offered as a download.'],
+    'backup-create':['Backup-ZIP erstellen','Create backup ZIP'],'backup-imp-h':['Aus ZIP wiederherstellen','Restore from ZIP'],'backup-imp-p':['Vollständige Wiederherstellung – inklusive Tags und Notizen. Vorhandene Dokumente werden ergänzt.','Full restore – including tags and notes. Existing documents are merged in.'],'backup-drop':['Backup-ZIP hierher ziehen oder klicken','Drop a backup ZIP here or click'],
+    'import-p':['PDF · DOCX · XLSX · CSV · TXT · MD','PDF · DOCX · XLSX · CSV · TXT · MD'],
+    'imp-drop':['Dateien oder ganzen Ordner hierher ziehen','Drop files or a whole folder here'],'imp-files':['Dateien wählen','Choose files'],'imp-folder':['Ordner wählen','Choose folder'],
+    'imp-queue':['Import-Warteschlange','Import queue'],'imp-uihint':['Die App bleibt während des Imports bedienbar. Große PDFs werden seitenweise verarbeitet.','The app stays usable during import. Large PDFs are processed page by page.'],
+    'set-p':['Lokal gespeichert in /meta.','Stored locally in /meta.'],'set-appear':['Darstellung','Appearance'],'set-theme':['Theme','Theme'],'theme-auto':['Auto','Auto'],'theme-light':['Hell','Light'],'theme-dark':['Dunkel','Dark'],'set-lang':['Sprache / Language','Language / Sprache'],
+    'set-api':['Claude API (optional)','Claude API (optional)'],'set-api-p':['Für Online-Zusammenfassungen (Modell claude-sonnet-4-6). Wird lokal in /meta/apikey.txt gespeichert – nicht im Browser.','For online summaries (model claude-sonnet-4-6). Stored locally in /meta/apikey.txt – not in the browser.'],'api-test':['Verbindung testen','Test connection'],'save':['Speichern','Save'],
+    'set-storage':['Speicherort','Storage location'],'set-storage-p':['Alle Daten liegen als echte Dateien in diesem Ordner.','All data lives as real files in this folder.'],'set-change':['Ordner wechseln','Change folder'],'set-disconnect':['Trennen','Disconnect'],
+    'set-offline':['Offline-Betrieb wird eingerichtet …','Setting up offline mode …'],'set-offline-on':['Offline-Betrieb aktiv (App als PWA installierbar).','Offline mode active (installable as a PWA).'],'set-offline-off':['Offline-Betrieb nicht verfügbar (nur über https/localhost).','Offline mode unavailable (needs https/localhost).'],
+    'set-about':['Über','About'],'set-about-p':['Wissensarchiv · Keine Konten, kein Server – deine Daten bleiben bei dir.','Knowledge Archive · No accounts, no server – your data stays with you.'],
+    'rc-h':['Ordner erneut verbinden','Reconnect folder'],'rc-p':['Der Browser hat die Berechtigung für deinen Datenordner zurückgesetzt. Deine Dateien sind unverändert auf der Festplatte – bitte den Ordner einmal neu bestätigen.','The browser reset permission for your data folder. Your files are untouched on disk – please confirm the folder once more.'],'rc-other':['Anderen Ordner wählen','Choose another folder'],'rc-btn':['Verbinden','Connect'],
+    'dup-h':['Duplikat gefunden','Duplicate found'],'dup-all':['Für alle weiteren Duplikate übernehmen','Apply to all further duplicates'],'dup-skip':['Überspringen','Skip'],'dup-replace':['Ersetzen','Replace'],
+    'cancel':['Abbrechen','Cancel'],'ok':['OK','OK'],'close':['Schließen','Close'],
+    'exp-h':['Treffer exportieren','Export results'],
+    'col-name':['Name','Name'],'col-date':['Importdatum','Imported'],'col-size':['Größe','Size'],'col-type':['Typ','Type'],'col-tags':['Tags','Tags'],'col-status':['Status','Status'],
+    'act-open':['Original öffnen','Open original'],'act-download':['Herunterladen','Download'],'act-rename':['Umbenennen','Rename'],'act-tag':['Tag hinzufügen','Add tag'],'act-note':['Notiz','Note'],'act-reindex':['Neu-Indexieren','Re-index'],'act-delete':['Löschen','Delete'],
+    'sortby':['Sortieren','Sort'],'search-in-lib':['Im Bestand suchen…','Search library…'],
+    'batch-tag':['Taggen','Tag'],'batch-delete':['Löschen','Delete'],'sel-count':['ausgewählt','selected'],
+    'hits':['Treffer','hits'],'no-hits':['Keine Treffer.','No results.'],'type-search-hint':['Gib oben einen Suchbegriff ein.','Type a search term above.'],
+    'open-hit':['Fundstelle öffnen →','Open source →'],'doc-note-l':['Notiz','Note'],'doc-info':['Dokument-Info','Document info'],
+    'scan-warn':['Dieses PDF hat keine Textebene (gescannt). Suche findet nur den Dateinamen. Kein OCR.','This PDF has no text layer (scanned). Search only matches the file name. No OCR.'],
+    'page':['Seite','Page'],'section':['Abschnitt','Section'],'sheet':['Blatt','Sheet'],'cell':['Zelle','Cell'],
+    'rename-t':['Umbenennen','Rename'],'rename-l':['Neuer Name','New name'],'tag-t':['Tag hinzufügen','Add tag'],'tag-l':['Tag-Name','Tag name'],'note-t':['Notiz bearbeiten','Edit note'],'note-l':['Notiz','Note'],
   };
-
-  function applyLang(lang) {
-    state.settings.lang = lang;
-    const i = lang === 'de' ? 0 : 1;
-    document.documentElement.lang = lang;
-    $$('[data-i18n]').forEach((n) => { const t = I18N[n.getAttribute('data-i18n')]; if (t) n.innerHTML = t[i]; });
-    $$('#lang-seg button, #lang-seg2 button').forEach((b) => b.classList.toggle('on', b.dataset.lang === lang));
-    updateOfflineLabel();
-    try { localStorage.setItem('wa.lang', lang); } catch (e) {}
+  const tr = (key) => (I18N[key]||['',''])[state.settings.lang==='de'?0:1];
+  function applyLang(lang){ state.settings.lang=lang; const i=lang==='de'?0:1; document.documentElement.lang=lang;
+    $$('[data-i18n]').forEach(n=>{const t=I18N[n.getAttribute('data-i18n')];if(t)n.innerHTML=t[i];});
+    $$('[data-i18n-ph]').forEach(n=>{const t=I18N[n.getAttribute('data-i18n-ph')];if(t)n.placeholder=t[i];});
+    $$('#lang-seg button, #lang-seg2 button').forEach(b=>b.classList.toggle('on',b.dataset.lang===lang));
+    updateOfflineLabel(); try{localStorage.setItem('wa.lang',lang);}catch(e){}
+    // dynamische Bereiche neu rendern
+    if($('#app').classList.contains('show')){ renderLibrary(); renderFilters(); renderSearchResults(); renderBackupStats(); renderSumPicklist(); }
   }
 
-  // ---------- File System Access ----------
-  function fsSupported() { return 'showDirectoryPicker' in window; }
+  // ---------- File System ----------
+  function fsSupported(){ return 'showDirectoryPicker' in window || !!window.__WA_MOCK_ROOT__; }
+  async function ensurePermission(h, mode='readwrite'){ if(!h.queryPermission) return true; const o={mode}; if((await h.queryPermission(o))==='granted')return true; if((await h.requestPermission(o))==='granted')return true; return false; }
+  async function ensureStructure(){ for(const n of ['originals','index','meta','exports']) state.dirs[n]=await state.rootHandle.getDirectoryHandle(n,{create:true}); }
 
-  async function ensurePermission(handle, mode = 'readwrite') {
-    const opts = { mode };
-    if ((await handle.queryPermission(opts)) === 'granted') return true;
-    if ((await handle.requestPermission(opts)) === 'granted') return true;
-    return false;
+  async function readFileText(dir, name){ const fh=await dir.getFileHandle(name,{create:false}); return await (await fh.getFile()).text(); }
+  async function writeFile(dir, name, data){ const fh=await dir.getFileHandle(name,{create:true}); const w=await fh.createWritable(); await w.write(data); await w.close(); }
+  async function removeFile(dir, name){ try{ await dir.removeEntry(name); }catch(e){} }
+
+  async function loadSettings(){
+    try{ const p=JSON.parse(await readFileText(state.dirs.meta,'settings.json')); state.settings=Object.assign({theme:'auto',lang:'de'},p); }
+    catch(e){ state.settings={theme:'auto',lang:'de'}; await persistSettings(); }
+    try{ state.apiKey=(await readFileText(state.dirs.meta,'apikey.txt')).trim(); }catch(e){ state.apiKey=''; }
   }
+  let _pt=null;
+  function persistSettings(){ return new Promise(res=>{ clearTimeout(_pt); _pt=setTimeout(async()=>{ try{ if(state.dirs.meta) await writeFile(state.dirs.meta,'settings.json',JSON.stringify(state.settings,null,2)); }catch(e){console.warn(e);} res(); },150); }); }
+  async function saveApiKey(k){ state.apiKey=k.trim(); await writeFile(state.dirs.meta,'apikey.txt',state.apiKey); }
 
-  async function ensureStructure() {
-    const names = ['originals', 'index', 'meta', 'exports'];
-    for (const n of names) {
-      state.dirs[n] = await state.rootHandle.getDirectoryHandle(n, { create: true });
-    }
+  // ---------- Katalog & Index ----------
+  async function loadCatalog(){
+    try{ state.catalog=JSON.parse(await readFileText(state.dirs.meta,'catalog.json')); if(!Array.isArray(state.catalog))state.catalog=[]; }
+    catch(e){ state.catalog=await rebuildCatalog(); }
   }
+  async function saveCatalog(){ await writeFile(state.dirs.meta,'catalog.json',JSON.stringify(state.catalog,null,2)); }
+  function summaryOf(doc){ return {id:doc.id,name:doc.name,ext:doc.ext,type:doc.type,size:doc.size,importedAt:doc.importedAt,scanned:!!doc.scanned,pageCount:doc.pageCount||null,tags:doc.tags||[],note:doc.note||'',unitCount:(doc.units||[]).length,hash:doc.hash||''}; }
+  async function rebuildCatalog(){ const cat=[]; try{ for await(const [name,h] of state.dirs.index.entries()){ if(h.kind==='file'&&name.endsWith('.json')){ try{ const d=JSON.parse(await (await h.getFile()).text()); cat.push(summaryOf(d)); }catch(e){} } } }catch(e){} cat.sort((a,b)=>(b.importedAt||'').localeCompare(a.importedAt||'')); return cat; }
+  async function getIndex(id){ if(state.indexCache.has(id))return state.indexCache.get(id); const d=JSON.parse(await readFileText(state.dirs.index,id+'.json')); state.indexCache.set(id,d); return d; }
+  async function writeIndex(doc){ await writeFile(state.dirs.index,doc.id+'.json',JSON.stringify(doc)); state.indexCache.set(doc.id,doc); }
+  async function loadAllIndexes(){ for(const c of state.catalog){ if(!state.indexCache.has(c.id)){ try{ await getIndex(c.id); }catch(e){} } } }
 
-  async function loadSettings() {
-    // Autoritative Quelle: /meta/settings.json im Datenordner.
-    try {
-      const fh = await state.dirs.meta.getFileHandle('settings.json', { create: false });
-      const txt = await (await fh.getFile()).text();
-      const parsed = JSON.parse(txt);
-      state.settings = Object.assign({ theme: 'auto', lang: 'de' }, parsed);
-    } catch (e) {
-      // Datei fehlt oder unlesbar -> Defaults schreiben.
-      state.settings = { theme: 'auto', lang: 'de' };
-      await persistSettings();
-    }
+  function updateCount(){ $('#cnt-lib').textContent=String(state.catalog.length); }
+
+  // ---------- Parser ----------
+  function getWorker(){ if(!state.parseWorker){ state.parseWorker=new Worker('parse-worker.js'); } return state.parseWorker; }
+  const norm = (s)=>String(s).replace(/\s+/g,' ').trim();
+  async function parsePdf(buffer, onProgress){
+    const pdf=await pdfjsLib.getDocument({data:buffer}).promise; const total=pdf.numPages; const units=[]; let chars=0;
+    for(let p=1;p<=total;p++){ const page=await pdf.getPage(p); const tc=await page.getTextContent(); let t=''; for(const it of tc.items)t+=(it.str||'')+(it.hasEOL?'\n':' '); t=norm(t); if(t)units.push({ref:{page:p},text:t}); chars+=t.length; page.cleanup(); if(onProgress)onProgress(p,total); }
+    await pdf.destroy(); return {kind:'pdf',pageCount:total,scanned:total>0&&chars/total<12,units};
   }
+  function parseViaWorker(id, ext, buffer, onProgress){
+    return new Promise((resolve,reject)=>{ const w=getWorker(); const handler=(e)=>{ const m=e.data; if(m.id!==id)return; if(m.type==='progress'){ if(onProgress)onProgress(m.page,m.total); } else if(m.type==='done'){ w.removeEventListener('message',handler); resolve(m.result); } else if(m.type==='error'){ w.removeEventListener('message',handler); reject(new Error(m.message)); } }; w.addEventListener('message',handler); w.postMessage({type:'parse',id,ext,buffer},[buffer]); });
+  }
+  async function parseFile(id, ext, buffer, onProgress){
+    // Immer aus einer Kopie parsen – die Parser (PDF.js/Worker) übertragen bzw.
+    // entleeren den Buffer, das Original muss aber unversehrt gespeichert werden.
+    if(ext==='pdf') return await parsePdf(buffer.slice(0),onProgress);
+    return await parseViaWorker(id, ext, buffer.slice(0), onProgress);
+  }
+  async function sha256(buffer){ const h=await crypto.subtle.digest('SHA-256',buffer); return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join(''); }
 
-  let _persistTimer = null;
-  function persistSettings() {
-    // debounced Schreiben, damit schnelle Klicks nicht mehrfach schreiben.
-    return new Promise((res) => {
-      clearTimeout(_persistTimer);
-      _persistTimer = setTimeout(async () => {
-        try {
-          if (state.dirs.meta) {
-            const fh = await state.dirs.meta.getFileHandle('settings.json', { create: true });
-            const w = await fh.createWritable();
-            await w.write(JSON.stringify(state.settings, null, 2));
-            await w.close();
-          }
-        } catch (e) { console.warn('settings speichern fehlgeschlagen', e); }
-        res();
-      }, 150);
+  // ---------- Import ----------
+  let dupChoice=null; // {mode:'skip'|'replace', all:bool}
+  function askDuplicate(name, existing){
+    return new Promise((resolve)=>{
+      if(dupChoice&&dupChoice.all){ resolve(dupChoice.mode); return; }
+      const i=state.settings.lang==='de'?0:1;
+      $('#dup-text').innerHTML = (i===0
+        ? `Eine Datei existiert bereits im Archiv:<br><b>${esc(name)}</b><br><span style="color:var(--text-muted)">Vorhanden seit ${fmtDate(existing.importedAt)} · ${fmtBytes(existing.size)}</span>`
+        : `A file already exists in the archive:<br><b>${esc(name)}</b><br><span style="color:var(--text-muted)">Present since ${fmtDate(existing.importedAt)} · ${fmtBytes(existing.size)}</span>`);
+      $('#dup-all').checked=false;
+      const dlg=$('#dlg-dup'); dlg.classList.add('show');
+      const done=(mode)=>{ dlg.classList.remove('show'); if($('#dup-all').checked)dupChoice={mode,all:true}; resolve(mode); };
+      $('#dup-skip').onclick=()=>done('skip'); $('#dup-replace').onclick=()=>done('replace');
     });
   }
 
-  async function countDocuments() {
-    let n = 0;
-    try {
-      for await (const [name, h] of state.dirs.index.entries()) {
-        if (h.kind === 'file' && name.endsWith('.json')) n++;
-      }
-    } catch (e) {}
-    return n;
-  }
-
-  // ---------- Boot / Verbindung ----------
-  async function bootApp() {
-    await ensureStructure();
-    await loadSettings();
-    applyTheme(state.settings.theme);
-    applyLang(state.settings.lang);
-
-    const path = state.rootHandle.name;
-    $('#foot-path').textContent = path;
-    $('#set-path').textContent = path;
-    $('#cnt-lib').textContent = String(await countDocuments());
-
-    showScreen('app');
-    toast(state.settings.lang === 'de' ? 'Ordner verbunden.' : 'Folder connected.', 'ok');
-  }
-
-  async function pickFolder() {
-    try {
-      const handle = await window.showDirectoryPicker({ id: 'wissensarchiv', mode: 'readwrite' });
-      if (!(await ensurePermission(handle))) { toast(t('perm-denied'), 'err'); return; }
-      state.rootHandle = handle;
-      await IDB.set('rootHandle', handle);
-      await bootApp();
-    } catch (e) {
-      if (e && e.name === 'AbortError') return; // Nutzer hat abgebrochen
-      console.error(e);
-      toast(t('folder-err'), 'err');
+  async function importFiles(fileList){
+    const files=fileList.filter(f=>SUPPORTED.includes((f.name.split('.').pop()||'').toLowerCase()));
+    if(!files.length){ toast(state.settings.lang==='de'?'Keine unterstützten Dateien.':'No supported files.','err'); return; }
+    dupChoice=null;
+    switchView('import');
+    const wrap=$('#import-queue-wrap'), q=$('#import-queue'); wrap.style.display=''; q.innerHTML='';
+    let done=0, skipped=0, failed=0;
+    for(const file of files){
+      const ext=(file.name.split('.').pop()||'').toLowerCase();
+      const row=document.createElement('div'); row.className='queue-item';
+      row.innerHTML=`<span class="ftype t-${typeOf(ext)}">${typeOf(ext).toUpperCase().slice(0,3)}</span><div class="qmain"><div class="fname">${esc(file.name)}</div><div class="fmeta st">…</div><div class="progress" style="margin-top:6px;display:none"><span></span></div></div><span class="stat-icon">⏳</span>`;
+      q.appendChild(row);
+      const st=$('.st',row), bar=$('.progress',row), fill=$('.progress>span',row), icon=$('.stat-icon',row);
+      const setSt=(t)=>st.textContent=t;
+      try{
+        const buffer=await file.arrayBuffer();
+        const hash=await sha256(buffer);
+        // Duplikat: gleicher Name ODER gleicher Inhalt
+        const existing=state.catalog.find(c=>c.name===file.name || (c.hash&&c.hash===hash));
+        if(existing){ const mode=await askDuplicate(file.name, existing); if(mode==='skip'){ setSt(state.settings.lang==='de'?'übersprungen (Duplikat)':'skipped (duplicate)'); icon.textContent='⏭'; skipped++; continue; } await deleteDoc(existing.id, true); }
+        // Parsen
+        if(ext==='pdf'){ bar.style.display=''; }
+        setSt(state.settings.lang==='de'?'wird verarbeitet…':'processing…');
+        const res=await parseFile(hash.slice(0,8)+'-'+Date.now(), ext, buffer, (p,t)=>{ bar.style.display=''; fill.style.width=(p/t*100)+'%'; setSt((state.settings.lang==='de'?'Seite ':'Page ')+p+' / '+t); });
+        // Original speichern
+        const id=crypto.randomUUID();
+        const origName=id+'__'+file.name;
+        await writeFile(state.dirs.originals, origName, buffer);
+        const doc={ id, name:file.name, storedAs:origName, ext, type:typeOf(ext), size:file.size, importedAt:new Date().toISOString(), hash, scanned:!!res.scanned, pageCount:res.pageCount||null, tags:[], note:'', units:res.units||[] };
+        await writeIndex(doc);
+        state.catalog.unshift(summaryOf(doc)); await saveCatalog();
+        updateCount();
+        if(res.scanned){ setSt(state.settings.lang==='de'?'importiert · gescannt (kein Text)':'imported · scanned (no text)'); icon.innerHTML='<span class="badge-scan">⚠</span>'; }
+        else { setSt((state.settings.lang==='de'?'importiert · ':'imported · ')+(res.units?res.units.length:0)+(state.settings.lang==='de'?' Fundstellen':' units')); icon.textContent='✓'; }
+        done++;
+      }catch(err){ console.error(err); setSt((state.settings.lang==='de'?'Fehler: ':'Error: ')+err.message); icon.textContent='⚠'; failed++; }
+      $('#import-summary').textContent=`${done} ${state.settings.lang==='de'?'importiert':'imported'} · ${skipped} ${state.settings.lang==='de'?'übersprungen':'skipped'}${failed?` · ${failed} ${state.settings.lang==='de'?'Fehler':'errors'}`:''}`;
     }
+    renderLibrary(); renderFilters(); renderBackupStats();
+    toast(`${done} ${state.settings.lang==='de'?'importiert':'imported'}`+(skipped?`, ${skipped} ${state.settings.lang==='de'?'übersprungen':'skipped'}`:''), 'ok');
   }
 
-  async function reconnect() {
-    const h = state.pendingHandle;
-    if (!h) return;
-    try {
-      if (!(await ensurePermission(h))) { toast(t('perm-denied'), 'err'); return; }
-      state.rootHandle = h;
-      await IDB.set('rootHandle', h);
-      $('#dlg-reconnect').classList.remove('show');
-      await bootApp();
-    } catch (e) { console.error(e); toast(t('folder-err'), 'err'); }
+  // Drag&Drop inkl. Ordner
+  async function filesFromDataTransfer(dt){
+    const items=Array.from(dt.items||[]); const out=[];
+    const walk=async(entry)=>{ if(entry.isFile){ await new Promise(r=>entry.file(f=>{out.push(f);r();}, r)); } else if(entry.isDirectory){ const reader=entry.createReader(); await new Promise(r=>{ const read=()=>reader.readEntries(async(ents)=>{ if(!ents.length){r();return;} for(const e of ents)await walk(e); read(); }, r); read(); }); } };
+    const entries=items.map(it=>it.webkitGetAsEntry&&it.webkitGetAsEntry()).filter(Boolean);
+    if(entries.length){ for(const e of entries)await walk(e); return out; }
+    return Array.from(dt.files||[]);
   }
 
-  async function disconnect() {
-    await IDB.del('rootHandle');
-    state.rootHandle = null;
-    state.dirs = {};
-    showScreen('onboard');
-    toast(t('disconnected'));
+  // ---------- Bibliothek ----------
+  function fmtBytes(n){ if(n==null)return '—'; if(n<1024)return n+' B'; if(n<1048576)return (n/1024).toFixed(0)+' KB'; if(n<1073741824)return (n/1048576).toFixed(1)+' MB'; return (n/1073741824).toFixed(2)+' GB'; }
+  function fmtDate(iso){ if(!iso)return '—'; const d=new Date(iso); return d.toLocaleDateString(state.settings.lang==='de'?'de-DE':'en-GB'); }
+  function allTags(){ const s=new Set(); state.catalog.forEach(c=>(c.tags||[]).forEach(t=>s.add(t))); return Array.from(s).sort(); }
+
+  function renderLibrary(){
+    const el=$('#lib-content'); if(!el)return;
+    $('#lib-sub').textContent = (state.settings.lang==='de'?`${state.catalog.length} Dokumente · lokal gespeichert`:`${state.catalog.length} documents · stored locally`);
+    if(!state.catalog.length){ el.innerHTML=`<div class="empty panel"><div class="big">📚</div><h3>${tr('lib-empty-h')}</h3><p style="max-width:420px">${tr('lib-empty-p')}</p><button class="btn" style="margin-top:8px" data-view-jump="import">⬆️ ${tr('nav-import')}</button></div>`; wireJump(el); return; }
+    const L=state.lib;
+    let rows=state.catalog.slice();
+    if(L.type!=='all') rows=rows.filter(r=>r.type===L.type);
+    if(L.tag) rows=rows.filter(r=>(r.tags||[]).includes(L.tag));
+    if(L.q){ const q=L.q.toLowerCase(); rows=rows.filter(r=>r.name.toLowerCase().includes(q)||(r.note||'').toLowerCase().includes(q)||(r.tags||[]).some(t=>t.toLowerCase().includes(q))); }
+    const dir=L.dir==='asc'?1:-1;
+    rows.sort((a,b)=>{ let x=a[L.sort],y=b[L.sort]; if(L.sort==='name'){x=(x||'').toLowerCase();y=(y||'').toLowerCase();} if(x<y)return -1*dir; if(x>y)return 1*dir; return 0; });
+    const types=['all','pdf','docx','xlsx','csv','txt','md'];
+    const tagChips=allTags().map(t=>`<span class="chip ${L.tag===t?'on':''}" data-libtag="${esc(t)}">🏷 ${esc(t)}</span>`).join(' ');
+    const sel=L.selected;
+    const sortArrow=(k)=>L.sort===k?(L.dir==='asc'?'asc':'desc'):'';
+    el.innerHTML=`
+      <div class="toolbar">
+        ${types.map(t=>`<span class="chip ${L.type===t?'on':''}" data-libtype="${t}">${t==='all'?(state.settings.lang==='de'?'Alle':'All'):t.toUpperCase()}</span>`).join('')}
+        ${tagChips?'<span style="width:1px;height:22px;background:var(--line)"></span>'+tagChips:''}
+        <div style="flex:1"></div>
+        <div class="top-search" style="flex:0 1 220px"><input id="lib-q" placeholder="${tr('search-in-lib')}" value="${esc(L.q)}"></div>
+      </div>
+      ${sel.size?`<div class="notice info" style="margin-bottom:12px"><span>☑</span><span>${sel.size} ${tr('sel-count')} →</span> <button class="btn sm" id="batch-tag">🏷 ${tr('batch-tag')}</button> <button class="btn sm danger" id="batch-del">🗑 ${tr('batch-delete')}</button> <button class="btn sm ghost" id="batch-clear">✕</button></div>`:''}
+      <div class="panel"><div class="table-wrap"><table>
+        <thead><tr>
+          <th style="width:34px"><input type="checkbox" id="lib-selall" ${sel.size&&sel.size===rows.length?'checked':''}></th>
+          <th style="width:44px"></th>
+          <th class="sortable ${sortArrow('name')}" data-sort="name">${tr('col-name')}</th>
+          <th class="sortable ${sortArrow('importedAt')}" data-sort="importedAt">${tr('col-date')}</th>
+          <th class="sortable ${sortArrow('size')}" data-sort="size">${tr('col-size')}</th>
+          <th>${tr('col-tags')}</th><th>${tr('col-status')}</th><th style="width:40px"></th>
+        </tr></thead>
+        <tbody>${rows.map(r=>rowHtml(r,sel.has(r.id))).join('')}</tbody>
+      </table></div></div>`;
+    wireLibrary(el, rows);
+  }
+  function rowHtml(r, checked){
+    const tags=(r.tags||[]).map(t=>`<span class="chip tag">${esc(t)}</span>`).join(' ')||'<span style="color:var(--text-muted)">—</span>';
+    const status=r.scanned?`<span class="badge-scan">⚠ ${state.settings.lang==='de'?'Gescannt':'Scanned'}</span>`:`<span style="color:var(--good)">● ${state.settings.lang==='de'?'indexiert':'indexed'}</span>`;
+    const meta=r.type==='pdf'&&r.pageCount?`${r.pageCount} ${tr('page')}`:`${r.unitCount} ${state.settings.lang==='de'?'Fundstellen':'units'}`;
+    return `<tr class="${checked?'sel':''}" data-id="${r.id}">
+      <td><input type="checkbox" class="rowsel" ${checked?'checked':''}></td>
+      <td><span class="ftype t-${r.type}">${r.type.toUpperCase().slice(0,3)}</span></td>
+      <td><div class="fname">${esc(r.name)}</div><div class="fmeta">${meta}</div></td>
+      <td class="num">${fmtDate(r.importedAt)}</td><td class="num">${fmtBytes(r.size)}</td>
+      <td>${tags}</td><td>${status}</td>
+      <td class="rowmenu"><button class="rowmenu-btn" data-menu="${r.id}">⋯</button>${menuHtml(r.id)}</td>
+    </tr>`;
+  }
+  function menuHtml(id){ return `<div class="menu" id="menu-${id}">
+    <button data-act="open">📂 ${tr('act-open')}</button>
+    <button data-act="download">⬇ ${tr('act-download')}</button>
+    <div class="sep"></div>
+    <button data-act="rename">✏️ ${tr('act-rename')}</button>
+    <button data-act="tag">🏷 ${tr('act-tag')}</button>
+    <button data-act="note">📝 ${tr('act-note')}</button>
+    <button data-act="reindex">🔄 ${tr('act-reindex')}</button>
+    <div class="sep"></div>
+    <button data-act="delete" class="danger">🗑 ${tr('act-delete')}</button>
+  </div>`; }
+
+  function wireJump(root){ $$('[data-view-jump]',root).forEach(b=>b.onclick=()=>switchView(b.dataset.viewJump)); }
+  function wireLibrary(el, rows){
+    wireJump(el);
+    $$('[data-libtype]',el).forEach(c=>c.onclick=()=>{ state.lib.type=c.dataset.libtype; renderLibrary(); });
+    $$('[data-libtag]',el).forEach(c=>c.onclick=()=>{ state.lib.tag=state.lib.tag===c.dataset.libtag?null:c.dataset.libtag; renderLibrary(); });
+    const q=$('#lib-q',el); if(q)q.oninput=()=>{ state.lib.q=q.value; const p=q.selectionStart; renderLibrary(); const nq=$('#lib-q'); if(nq){nq.focus();nq.setSelectionRange(p,p);} };
+    $$('th.sortable',el).forEach(th=>th.onclick=()=>{ const k=th.dataset.sort; if(state.lib.sort===k)state.lib.dir=state.lib.dir==='asc'?'desc':'asc'; else{state.lib.sort=k;state.lib.dir=k==='name'?'asc':'desc';} renderLibrary(); });
+    const selall=$('#lib-selall',el); if(selall)selall.onchange=()=>{ if(selall.checked)rows.forEach(r=>state.lib.selected.add(r.id)); else state.lib.selected.clear(); renderLibrary(); };
+    $$('.rowsel',el).forEach(cb=>cb.onchange=()=>{ const id=cb.closest('tr').dataset.id; if(cb.checked)state.lib.selected.add(id); else state.lib.selected.delete(id); renderLibrary(); });
+    $$('[data-menu]',el).forEach(b=>b.onclick=(e)=>{ e.stopPropagation(); const m=$('#menu-'+b.dataset.menu); const open=m.classList.contains('show'); $$('.menu.show').forEach(x=>x.classList.remove('show')); if(!open)m.classList.add('show'); });
+    $$('.menu button',el).forEach(b=>b.onclick=(e)=>{ e.stopPropagation(); const id=b.closest('.menu').id.replace('menu-',''); $$('.menu.show').forEach(x=>x.classList.remove('show')); docAction(b.dataset.act, id); });
+    const bt=$('#batch-tag',el); if(bt)bt.onclick=()=>batchTag(); const bd=$('#batch-del',el); if(bd)bd.onclick=()=>batchDelete(); const bc=$('#batch-clear',el); if(bc)bc.onclick=()=>{state.lib.selected.clear();renderLibrary();};
+    $$('.fname',el).forEach(f=>{ const tr_=f.closest('tr'); if(tr_)f.style.cursor='pointer', f.onclick=()=>openDoc(tr_.dataset.id); });
+  }
+  document.addEventListener('click',()=>$$('.menu.show').forEach(x=>x.classList.remove('show')));
+
+  async function docAction(act, id){
+    const doc=await getIndex(id).catch(()=>null); if(!doc)return;
+    if(act==='open'||act==='download'){ const f=await state.dirs.originals.getFileHandle(doc.storedAs).then(h=>h.getFile()); const url=URL.createObjectURL(f); if(act==='open')window.open(url,'_blank'); else download(f, doc.name); setTimeout(()=>URL.revokeObjectURL(url),20000); }
+    else if(act==='rename'){ promptDlg('rename', doc.name, async(v)=>{ if(!v||v===doc.name)return; doc.name=v; await writeIndex(doc); updateCatalogEntry(doc); await saveCatalog(); renderLibrary(); toast('OK','ok'); }); }
+    else if(act==='tag'){ promptDlg('tag','', async(v)=>{ v=(v||'').trim(); if(!v)return; doc.tags=doc.tags||[]; if(!doc.tags.includes(v))doc.tags.push(v); await writeIndex(doc); updateCatalogEntry(doc); await saveCatalog(); renderLibrary(); renderFilters(); }); }
+    else if(act==='note'){ promptDlg('note', doc.note||'', async(v)=>{ doc.note=v||''; await writeIndex(doc); updateCatalogEntry(doc); await saveCatalog(); renderLibrary(); }); }
+    else if(act==='reindex'){ await reindexDoc(doc); }
+    else if(act==='delete'){ if(confirm((state.settings.lang==='de'?'Wirklich löschen? ':'Really delete? ')+doc.name)){ await deleteDoc(id); renderLibrary(); renderFilters(); renderBackupStats(); toast(state.settings.lang==='de'?'Gelöscht.':'Deleted.'); } }
+  }
+  function updateCatalogEntry(doc){ const i=state.catalog.findIndex(c=>c.id===doc.id); if(i>=0)state.catalog[i]=summaryOf(doc); }
+  async function deleteDoc(id, silent){ const doc=await getIndex(id).catch(()=>null); if(doc){ await removeFile(state.dirs.originals, doc.storedAs); } await removeFile(state.dirs.index, id+'.json'); state.indexCache.delete(id); state.catalog=state.catalog.filter(c=>c.id!==id); state.lib.selected.delete(id); if(!silent)await saveCatalog(); updateCount(); }
+  async function reindexDoc(doc){
+    try{ toast(state.settings.lang==='de'?'Neu-Indexierung…':'Re-indexing…'); const f=await (await state.dirs.originals.getFileHandle(doc.storedAs)).getFile(); const buffer=await f.arrayBuffer(); const res=await parseFile(doc.id, doc.ext, buffer, null); doc.units=res.units||[]; doc.scanned=!!res.scanned; doc.pageCount=res.pageCount||null; await writeIndex(doc); updateCatalogEntry(doc); await saveCatalog(); renderLibrary(); toast('OK','ok'); }catch(e){ toast('Fehler: '+e.message,'err'); }
+  }
+  async function batchTag(){ promptDlg('tag','', async(v)=>{ v=(v||'').trim(); if(!v)return; for(const id of state.lib.selected){ const doc=await getIndex(id).catch(()=>null); if(!doc)continue; doc.tags=doc.tags||[]; if(!doc.tags.includes(v))doc.tags.push(v); await writeIndex(doc); updateCatalogEntry(doc); } await saveCatalog(); renderLibrary(); renderFilters(); toast('OK','ok'); }); }
+  async function batchDelete(){ if(!confirm((state.settings.lang==='de'?'Ausgewählte löschen? ':'Delete selected? ')+state.lib.selected.size)){return;} for(const id of Array.from(state.lib.selected)) await deleteDoc(id,true); await saveCatalog(); renderLibrary(); renderFilters(); renderBackupStats(); toast(state.settings.lang==='de'?'Gelöscht.':'Deleted.'); }
+
+  // ---------- Suche ----------
+  function tokenize(q){ return q.toLowerCase().split(/\s+/).map(s=>s.trim()).filter(Boolean); }
+  function snippet(text, terms){
+    const lower=text.toLowerCase(); let pos=-1; for(const t of terms){ const i=lower.indexOf(t); if(i>=0&&(pos<0||i<pos))pos=i; }
+    if(pos<0)pos=0; const start=Math.max(0,pos-60), end=Math.min(text.length,pos+120);
+    let s=(start>0?'…':'')+text.slice(start,end)+(end<text.length?'…':'');
+    let out=esc(s);
+    for(const t of terms){ const re=new RegExp('('+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'); out=out.replace(re,'<mark>$1</mark>'); }
+    return out;
+  }
+  async function runSearch(){
+    const q=$('#search-input').value.trim(); state.search.q=q;
+    const resEl=$('#search-results'); state.search.selected.clear();
+    if(!q){ resEl.innerHTML=`<div class="empty"><div class="big">🔎</div><p>${tr('type-search-hint')}</p></div>`; $('#search-count').textContent='—'; return; }
+    resEl.innerHTML=`<div class="empty"><span class="busy"></span></div>`;
+    await loadAllIndexes();
+    const terms=tokenize(q);
+    const S=state.search; const hits=[];
+    for(const c of state.catalog){
+      if(!S.types.has(c.type))continue;
+      if(S.tag&&!(c.tags||[]).includes(S.tag))continue;
+      if(S.from&&c.importedAt&&c.importedAt.slice(0,10)<S.from)continue;
+      if(S.to&&c.importedAt&&c.importedAt.slice(0,10)>S.to)continue;
+      const doc=state.indexCache.get(c.id); if(!doc)continue;
+      for(const u of (doc.units||[])){
+        const lower=u.text.toLowerCase(); let matched=0; for(const t of terms)if(lower.includes(t))matched++;
+        if(matched>0) hits.push({docId:c.id, name:c.name, type:c.type, ref:u.ref, text:u.text, score:matched, tags:c.tags||[], importedAt:c.importedAt});
+      }
+    }
+    hits.sort((a,b)=>b.score-a.score);
+    state.lastHits=hits; state.search.terms=terms;
+    renderSearchResults();
+  }
+  function refLabel(ref){ if(!ref)return ''; if(ref.page!=null)return `${tr('page')} ${ref.page}`; if(ref.sheet!=null)return `${tr('sheet')} „${ref.sheet}"${ref.cell?` · ${tr('cell')} ${ref.cell}`:''}`; if(ref.section!=null)return `${tr('section')} ${ref.section}`; return ''; }
+  function renderSearchResults(){
+    const resEl=$('#search-results'); if(!resEl)return; const hits=state.lastHits; const terms=state.search.terms||[];
+    if(!state.search.q){ resEl.innerHTML=`<div class="empty"><div class="big">🔎</div><p>${tr('type-search-hint')}</p></div>`; $('#search-count').textContent='—'; return; }
+    $('#search-count').textContent=`${hits.length} ${tr('hits')}`;
+    if(!hits.length){ resEl.innerHTML=`<div class="empty"><p>${tr('no-hits')}</p></div>`; return; }
+    resEl.innerHTML=hits.slice(0,300).map((h,i)=>`
+      <div class="result" data-i="${i}">
+        <div class="r-top"><input type="checkbox" class="hitsel" ${state.search.selected.has(i)?'checked':''}><span class="ftype t-${h.type}">${h.type.toUpperCase().slice(0,3)}</span><span class="r-title">${esc(h.name)}</span><span class="src">${refLabel(h.ref)}</span></div>
+        <div class="snippet">${snippet(h.text, terms)}</div>
+        <div class="r-foot">${(h.tags||[]).map(t=>`<span class="chip tag">${esc(t)}</span>`).join(' ')}<button class="btn sm ghost openhit">${tr('open-hit')}</button></div>
+      </div>`).join('') + (hits.length>300?`<p style="color:var(--text-muted);text-align:center">… ${hits.length-300} ${state.settings.lang==='de'?'weitere Treffer (verfeinere die Suche)':'more results (refine your search)'}</p>`:'');
+    $$('.result',resEl).forEach(r=>{ const i=+r.dataset.i; $('.hitsel',r).onchange=(e)=>{ if(e.target.checked)state.search.selected.add(i); else state.search.selected.delete(i); }; $('.openhit',r).onclick=()=>openHit(i); $('.r-title',r).onclick=()=>openHit(i); });
+  }
+  function renderFilters(){
+    const types=[['pdf','PDF'],['docx','DOCX'],['xlsx','XLSX'],['csv','CSV'],['txt','TXT'],['md','MD']];
+    const ft=$('#filter-types'); if(ft) ft.innerHTML=types.map(([k,l])=>{ const n=state.catalog.filter(c=>c.type===k).length; return `<label class="check"><input type="checkbox" data-ftype="${k}" ${state.search.types.has(k)?'checked':''}> ${l} <span style="margin-left:auto;color:var(--text-muted)">${n}</span></label>`; }).join('');
+    const ftg=$('#filter-tags'); if(ftg) ftg.innerHTML=allTags().map(t=>`<span class="chip ${state.search.tag===t?'on':''}" data-stag="${esc(t)}">${esc(t)}</span>`).join(' ')||`<span style="color:var(--text-muted);font-size:12px">${state.settings.lang==='de'?'Keine Tags':'No tags'}</span>`;
+    if(ft)$$('[data-ftype]',ft).forEach(cb=>cb.onchange=()=>{ if(cb.checked)state.search.types.add(cb.dataset.ftype); else state.search.types.delete(cb.dataset.ftype); if(state.search.q)runSearch(); });
+    if(ftg)$$('[data-stag]',ftg).forEach(c=>c.onclick=()=>{ state.search.tag=state.search.tag===c.dataset.stag?null:c.dataset.stag; renderFilters(); if(state.search.q)runSearch(); });
   }
 
-  // kurze Laufzeit-Übersetzung für Toasts
-  function t(key) {
-    const M = {
-      'perm-denied': ['Zugriff verweigert. Ohne Ordner-Berechtigung kann nicht gespeichert werden.', 'Access denied. Without folder permission nothing can be saved.'],
-      'folder-err': ['Ordner konnte nicht geöffnet werden.', 'Could not open the folder.'],
-      'disconnected': ['Ordner getrennt.', 'Folder disconnected.'],
-      'theme-saved': ['Gespeichert.', 'Saved.'],
-    };
-    return (M[key] || ['', ''])[state.settings.lang === 'de' ? 0 : 1];
+  // ---------- Fundstelle ----------
+  async function openHit(i){ const h=state.lastHits[i]; if(!h)return; const doc=await getIndex(h.docId); state.curDoc={doc, ref:h.ref, terms:state.search.terms||[], page:h.ref&&h.ref.page||1}; await renderDoc(); switchView('doc'); }
+  async function openDoc(id){ const doc=await getIndex(id); state.curDoc={doc, ref:(doc.units[0]||{}).ref||null, terms:[], page:1}; await renderDoc(); switchView('doc'); }
+  async function renderDoc(){
+    const {doc, terms}=state.curDoc; const main=$('#doc-main'), info=$('#doc-info');
+    $('#doc-sub').innerHTML=`${esc(doc.name)}${doc.scanned?` <span class="badge-scan">⚠ ${state.settings.lang==='de'?'Gescannt – kein Text':'Scanned – no text'}</span>`:''}`;
+    $('#nav-doc').style.display='';
+    // Info-Panel
+    const tags=(doc.tags||[]).map(t=>`<span class="chip tag">${esc(t)}</span>`).join(' ')||'—';
+    info.innerHTML=`<h4 style="margin-bottom:10px">${tr('doc-info')}</h4>
+      <div class="fmeta" style="margin-bottom:8px">${doc.type.toUpperCase()} · ${fmtBytes(doc.size)} · ${fmtDate(doc.importedAt)}${doc.pageCount?` · ${doc.pageCount} ${tr('page')}`:''}</div>
+      <div style="margin-bottom:8px"><b>Tags:</b> ${tags}</div>
+      ${doc.note?`<div class="notice info" style="margin-top:8px"><span>📝</span><span>${esc(doc.note)}</span></div>`:''}
+      ${doc.scanned?`<div class="notice warn" style="margin-top:8px"><span>⚠</span><span>${tr('scan-warn')}</span></div>`:''}`;
+    if(doc.type==='pdf'){
+      main.innerHTML=`<div class="pdf-canvas-wrap"><canvas id="pdf-canvas"></canvas></div>
+        <div class="pdf-toolbar"><button class="btn sm neutral" id="pg-prev">‹</button> ${tr('page')} <input id="pg-num" value="${state.curDoc.page}" style="width:48px;text-align:center;padding:4px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)"> / ${doc.pageCount||'?'} <button class="btn sm neutral" id="pg-next">›</button></div>`;
+      await renderPdfPage();
+      $('#pg-prev').onclick=()=>{ state.curDoc.page=Math.max(1,state.curDoc.page-1); $('#pg-num').value=state.curDoc.page; renderPdfPage(); };
+      $('#pg-next').onclick=()=>{ state.curDoc.page=Math.min(doc.pageCount||1,state.curDoc.page+1); $('#pg-num').value=state.curDoc.page; renderPdfPage(); };
+      $('#pg-num').onchange=(e)=>{ let p=parseInt(e.target.value)||1; p=Math.max(1,Math.min(doc.pageCount||1,p)); state.curDoc.page=p; e.target.value=p; renderPdfPage(); };
+    } else {
+      // betroffenen Abschnitt anzeigen
+      const ref=state.curDoc.ref; let unit=null; if(ref) unit=(doc.units||[]).find(u=>JSON.stringify(u.ref)===JSON.stringify(ref));
+      const body=(doc.units||[]).map(u=>{ const isHit=unit&&JSON.stringify(u.ref)===JSON.stringify(unit.ref); const label=refLabel(u.ref); const txt= isHit&&terms.length? snippetFull(u.text,terms): esc(u.text); return `<div style="margin-bottom:10px${isHit?';background:var(--surface-accent);padding:8px;border-radius:6px':''}"><div class="fmeta">${label}</div>${txt}</div>`; }).join('') || `<p style="color:var(--text-muted)">${state.settings.lang==='de'?'Kein extrahierbarer Text.':'No extractable text.'}</p>`;
+      main.innerHTML=`<div class="section-text">${body}</div>`;
+      const hit=main.querySelector('[style*="surface-accent"]'); if(hit)hit.scrollIntoView({block:'center'});
+    }
+    $('#doc-download').onclick=()=>docAction('download',doc.id);
+    $('#doc-reindex').onclick=async()=>{ await reindexDoc(doc); await renderDoc(); };
+  }
+  function snippetFull(text, terms){ let out=esc(text); for(const t of terms){ const re=new RegExp('('+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'); out=out.replace(re,'<mark>$1</mark>'); } return out; }
+  async function renderPdfPage(){
+    const doc=state.curDoc.doc; try{
+      const f=await (await state.dirs.originals.getFileHandle(doc.storedAs)).getFile(); const buf=await f.arrayBuffer();
+      const pdf=await pdfjsLib.getDocument({data:buf}).promise; const page=await pdf.getPage(state.curDoc.page);
+      const scale=1.4; const vp=page.getViewport({scale}); const canvas=$('#pdf-canvas'); if(!canvas){await pdf.destroy();return;} const ctx=canvas.getContext('2d'); canvas.width=vp.width; canvas.height=vp.height;
+      await page.render({canvasContext:ctx, viewport:vp}).promise; await pdf.destroy();
+    }catch(e){ const w=$('.pdf-canvas-wrap'); if(w)w.innerHTML=`<p class="notice err">${state.settings.lang==='de'?'Seite konnte nicht gerendert werden.':'Could not render page.'} ${esc(e.message)}</p>`; }
   }
 
-  // ---------- Offline-/PWA-Statusanzeige ----------
-  let offlineReady = false;
-  function updateOfflineLabel() {
-    const sw = $('#sw-offline'), lbl = $('#offline-label');
-    if (!lbl) return;
-    sw.classList.toggle('on', offlineReady);
-    const i = state.settings.lang === 'de' ? 0 : 1;
-    lbl.innerHTML = offlineReady ? I18N['set-offline-on'][i] : (('serviceWorker' in navigator && window.isSecureContext) ? I18N['set-offline'][i] : I18N['set-offline-off'][i]);
+  // ---------- Zusammenfassung ----------
+  function getSummarySourceDocs(){
+    const src=($('input[name=sumsrc]:checked')||{}).value||'selected';
+    if(src==='all') return state.catalog.map(c=>c.id);
+    if(src==='hits'){ const ids=new Set(); (state.lastHits||[]).forEach((h,i)=>{ if(state.search.selected.size===0||state.search.selected.has(i))ids.add(h.docId); }); return Array.from(ids); }
+    return Array.from(state.lib.selected);
   }
+  function renderSumPicklist(){
+    const el=$('#sum-picklist'); if(!el)return; const src=($('input[name=sumsrc]:checked')||{}).value||'selected';
+    if(src==='selected'){ const ids=Array.from(state.lib.selected); el.innerHTML=ids.length?ids.map(id=>{const c=state.catalog.find(x=>x.id===id);return c?`<div class="fmeta">• ${esc(c.name)}</div>`:'';}).join(''):`<div class="fmeta">${state.settings.lang==='de'?'In der Bibliothek Dokumente anhaken.':'Check documents in the library.'}</div>`; }
+    else if(src==='hits'){ el.innerHTML=`<div class="fmeta">${(state.lastHits||[]).length} ${state.settings.lang==='de'?'Treffer aus der Suche':'hits from search'}</div>`; }
+    else el.innerHTML=`<div class="fmeta">${state.catalog.length} ${state.settings.lang==='de'?'Dokumente':'documents'}</div>`;
+  }
+  function splitSentences(text){ return text.replace(/\s+/g,' ').match(/[^.!?]+[.!?]+|\S[^.!?]*$/g)||[]; }
+  async function extractiveSummary(ids, maxSentences=7){
+    const sentences=[]; const sources=[];
+    for(const id of ids){ const doc=await getIndex(id); sources.push(doc); for(const u of (doc.units||[])){ for(const s of splitSentences(u.text)){ const clean=s.trim(); if(clean.length>=40&&clean.length<=400) sentences.push({s:clean, docId:id, name:doc.name, ref:u.ref}); } } }
+    if(!sentences.length) return {text:(state.settings.lang==='de'?'Kein ausreichender Text für eine Zusammenfassung.':'Not enough text to summarize.'), sources:[], picked:[]};
+    // Wortfrequenz (TF) über alle Sätze
+    const freq=Object.create(null); const stop=new Set('der die das und oder ist sind ein eine einen dem den des mit von zu im in auf für als auch nicht sich the a an of to and or is are be for with on at by this that as it'.split(' '));
+    for(const {s} of sentences){ for(const w of s.toLowerCase().match(/[a-zäöüß0-9]+/g)||[]){ if(w.length<3||stop.has(w))continue; freq[w]=(freq[w]||0)+1; } }
+    sentences.forEach((o,idx)=>{ let sc=0; for(const w of o.s.toLowerCase().match(/[a-zäöüß0-9]+/g)||[]){ if(freq[w])sc+=freq[w]; } o.score=sc/Math.sqrt((o.s.match(/\S+/g)||[]).length+1); o.idx=idx; });
+    const picked=sentences.slice().sort((a,b)=>b.score-a.score).slice(0,maxSentences).sort((a,b)=>a.idx-b.idx);
+    const text=picked.map(p=>p.s).join(' ');
+    return {text, sources, picked};
+  }
+  function sourceListHtml(picked, sources){
+    // eindeutige Quellen (Datei + Fundstelle)
+    const seen=new Set(); const items=[];
+    for(const p of picked){ const key=p.docId+'|'+JSON.stringify(p.ref); if(seen.has(key))continue; seen.add(key); items.push(`${esc(p.name)} — ${refLabel(p.ref)}`); }
+    if(!items.length) sources.forEach(d=>items.push(esc(d.name)));
+    return `<div class="sourcelist"><b>${tr('sum-sources')}</b><ol>${items.map(x=>`<li>${x}</li>`).join('')}</ol></div>`;
+  }
+  async function claudeSummary(ids){
+    if(!state.apiKey) throw new Error(state.settings.lang==='de'?'Kein API-Key hinterlegt (Einstellungen).':'No API key set (Settings).');
+    if(!navigator.onLine) throw new Error(state.settings.lang==='de'?'Keine Internetverbindung.':'No internet connection.');
+    let corpus=''; const sources=[];
+    for(const id of ids){ const doc=await getIndex(id); sources.push(doc); corpus+=`\n\n### ${doc.name}\n`; for(const u of (doc.units||[])){ corpus+=`[${refLabel(u.ref)}] ${u.text}\n`; } }
+    corpus=corpus.slice(0,60000);
+    const lang=state.settings.lang==='de'?'Deutsch':'English';
+    const prompt=`Fasse die folgenden Dokumente prägnant auf ${lang} zusammen. Nenne am Ende KEINE Quellen (die fügt die App hinzu). Nur die inhaltliche Zusammenfassung:\n${corpus}`;
+    const r=await fetch('https://api.anthropic.com/v1/messages',{ method:'POST', headers:{'content-type':'application/json','x-api-key':state.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'}, body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1024,messages:[{role:'user',content:prompt}]}) });
+    if(!r.ok){ const t=await r.text().catch(()=>''); throw new Error('API '+r.status+': '+t.slice(0,200)); }
+    const data=await r.json(); const text=(data.content||[]).map(c=>c.text||'').join('\n').trim();
+    return {text, sources, picked: sources.flatMap(d=>(d.units||[]).slice(0,1).map(u=>({docId:d.id,name:d.name,ref:u.ref})))};
+  }
+  async function generateSummary(){
+    const ids=getSummarySourceDocs(); const out=$('#sum-output');
+    if(!ids.length){ toast(state.settings.lang==='de'?'Keine Quelle ausgewählt.':'No source selected.','err'); return; }
+    out.innerHTML=`<div class="empty"><span class="busy"></span> <span style="margin-left:8px">${state.sumMode==='ai'?'Claude API…':(state.settings.lang==='de'?'Analysiere…':'Analyzing…')}</span></div>`;
+    $('#sum-export-row').style.display='none';
+    try{
+      const r = state.sumMode==='ai' ? await claudeSummary(ids) : await extractiveSummary(ids);
+      const title=state.settings.lang==='de'?`Zusammenfassung – ${ids.length} Dokument(e)`:`Summary – ${ids.length} document(s)`;
+      out.innerHTML=`<div class="summary-out"><h3>${esc(title)}</h3><p>${esc(r.text)}</p>${sourceListHtml(r.picked||[], r.sources||[])}</div>`;
+      state.lastSummary={ title, text:r.text, picked:r.picked||[], sources:r.sources||[], mode:state.sumMode };
+      $('#sum-export-row').style.display='';
+    }catch(e){ out.innerHTML=`<div class="notice err"><span>⚠</span><span>${esc(e.message)}</span></div>`; }
+  }
+
+  // ---------- Export (DOCX / PDF / XLSX) ----------
+  const _loaded={};
+  function loadScript(src){ return new Promise((res,rej)=>{ if(_loaded[src])return res(); const s=document.createElement('script'); s.src=src; s.onload=()=>{_loaded[src]=1;res();}; s.onerror=()=>rej(new Error('load '+src)); document.head.appendChild(s); }); }
+  function download(blob, name){ const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),10000); }
+  async function saveToExports(name, blob){ try{ await writeFile(state.dirs.exports, name, blob); }catch(e){ console.warn('exports speichern:',e); } }
+  function stamp(){ const d=new Date(); const p=(n)=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`; }
+
+  function buildReportItems(kind){
+    // kind: 'hits' | 'summary'
+    if(kind==='summary'&&state.lastSummary){ const s=state.lastSummary; return { title:s.title, params:(state.settings.lang==='de'?'Modus: ':'Mode: ')+(s.mode==='ai'?'Claude API':(state.settings.lang==='de'?'Extraktiv':'Extractive')), summary:s.text, items:(s.picked||[]).map(p=>({file:p.name,ref:refLabel(p.ref),snippet:'',tags:'',date:''})) }; }
+    const idxs = state.search.selected.size? Array.from(state.search.selected): state.lastHits.map((_,i)=>i);
+    const items=idxs.map(i=>state.lastHits[i]).filter(Boolean).map(h=>({file:h.name, ref:refLabel(h.ref), snippet:h.text.slice(0,300), tags:(h.tags||[]).join(', '), date:fmtDate(h.importedAt)}));
+    return { title:(state.settings.lang==='de'?'Suchbericht':'Search report'), params:(state.settings.lang==='de'?'Suchbegriff: ':'Query: ')+'"'+state.search.q+'" · '+items.length+' '+tr('hits'), summary:'', items };
+  }
+  async function exportReport(fmt, kind){
+    const data=buildReportItems(kind); const base='wissensarchiv_'+(kind==='summary'?'zusammenfassung':'bericht')+'_'+stamp();
+    try{
+      if(fmt==='xlsx'){ await loadScript('vendor/xlsx.full.min.js'); const XLSX=window.XLSX; const head=['Datei','Fundstelle','Snippet','Tags','Datum']; const rows=[head, ...data.items.map(it=>[it.file,it.ref,it.snippet,it.tags,it.date])]; const ws=XLSX.utils.aoa_to_sheet(rows); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Treffer'); const out=XLSX.write(wb,{type:'array',bookType:'xlsx'}); const blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}); await saveToExports(base+'.xlsx',blob); download(blob,base+'.xlsx'); }
+      else if(fmt==='pdf'){ await loadScript('vendor/jspdf.umd.min.js'); const {jsPDF}=window.jspdf; const doc=new jsPDF(); let y=18; doc.setFontSize(16); doc.text(data.title,14,y); y+=8; doc.setFontSize(10); doc.setTextColor(90); doc.text(doc.splitTextToSize(data.params,180),14,y); y+=10; doc.setTextColor(20);
+        if(data.summary){ doc.setFontSize(11); doc.text(doc.splitTextToSize(data.summary,180),14,y); y+=doc.splitTextToSize(data.summary,180).length*5+6; }
+        doc.setFontSize(11);
+        for(const it of data.items){ if(y>270){doc.addPage();y=18;} doc.setFont(undefined,'bold'); doc.text(doc.splitTextToSize(`• ${it.file} — ${it.ref}`,180),14,y); y+=6; doc.setFont(undefined,'normal'); doc.setTextColor(80); if(it.snippet){ const sn=doc.splitTextToSize('"'+it.snippet+'"',180); doc.text(sn,18,y); y+=sn.length*5; } if(it.tags){doc.text('Tags: '+it.tags,18,y);y+=6;} doc.setTextColor(20); y+=2; }
+        const blob=doc.output('blob'); await saveToExports(base+'.pdf',blob); download(blob,base+'.pdf'); }
+      else { await loadScript('vendor/docx.umd.js'); const D=window.docx; const kids=[ new D.Paragraph({text:data.title, heading:D.HeadingLevel.HEADING_1}), new D.Paragraph({text:data.params, spacing:{after:200}}) ];
+        if(data.summary) kids.push(new D.Paragraph({text:data.summary, spacing:{after:200}}));
+        for(const it of data.items){ kids.push(new D.Paragraph({children:[new D.TextRun({text:`${it.file} — ${it.ref}`, bold:true})], spacing:{before:120}})); if(it.snippet)kids.push(new D.Paragraph({children:[new D.TextRun({text:'„'+it.snippet+'"', italics:true})]})); if(it.tags)kids.push(new D.Paragraph({text:'Tags: '+it.tags})); }
+        const docx=new D.Document({sections:[{children:kids}]}); const blob=await D.Packer.toBlob(docx); await saveToExports(base+'.docx',blob); download(blob,base+'.docx'); }
+      toast((state.settings.lang==='de'?'Exportiert nach /exports und heruntergeladen.':'Exported to /exports and downloaded.'),'ok');
+    }catch(e){ console.error(e); toast('Export-Fehler: '+e.message,'err'); }
+  }
+
+  // ---------- Backup ----------
+  function renderBackupStats(){ const el=$('#backup-stats'); if(!el)return; const total=state.catalog.reduce((a,c)=>a+(c.size||0),0); el.innerHTML=`<span class="chip">${state.catalog.length} ${state.settings.lang==='de'?'Dok.':'docs'}</span><span class="chip">${fmtBytes(total)}</span>`; }
+  async function exportBackup(){
+    try{
+      toast(state.settings.lang==='de'?'Backup wird erstellt…':'Creating backup…');
+      await loadScript('vendor/jszip.min.js'); const zip=new window.JSZip();
+      const add=async(dirHandle, folder)=>{ for await(const [name,h] of dirHandle.entries()){ if(h.kind==='file'){ const f=await h.getFile(); zip.file(folder+'/'+name, await f.arrayBuffer()); } } };
+      await add(state.dirs.originals,'originals'); await add(state.dirs.index,'index'); await add(state.dirs.meta,'meta');
+      const blob=await zip.generateAsync({type:'blob'}); const name='wissensarchiv_backup_'+stamp()+'.zip';
+      await saveToExports(name, blob); download(blob, name);
+      toast(state.settings.lang==='de'?'Backup erstellt (in /exports und Download).':'Backup created (in /exports and download).','ok');
+    }catch(e){ console.error(e); toast('Backup-Fehler: '+e.message,'err'); }
+  }
+  async function importBackup(file){
+    try{
+      toast(state.settings.lang==='de'?'Backup wird eingelesen…':'Reading backup…');
+      await loadScript('vendor/jszip.min.js'); const zip=await window.JSZip.loadAsync(await file.arrayBuffer());
+      const targets={originals:state.dirs.originals, index:state.dirs.index, meta:state.dirs.meta};
+      const entries=Object.keys(zip.files);
+      for(const path of entries){ const zf=zip.files[path]; if(zf.dir)continue; const [folder,...rest]=path.split('/'); const fname=rest.join('/'); if(!targets[folder]||!fname)continue; if(folder==='meta'&&fname==='catalog.json')continue; const content=await zf.async('arraybuffer'); await writeFile(targets[folder], fname, content); }
+      state.indexCache.clear(); state.catalog=await rebuildCatalog(); await saveCatalog(); await loadSettings();
+      updateCount(); applyTheme(state.settings.theme); applyLang(state.settings.lang);
+      renderLibrary(); renderFilters(); renderBackupStats();
+      toast((state.settings.lang==='de'?'Wiederhergestellt: ':'Restored: ')+state.catalog.length+(state.settings.lang==='de'?' Dokumente.':' documents.'),'ok');
+    }catch(e){ console.error(e); toast('Import-Fehler: '+e.message,'err'); }
+  }
+
+  // ---------- Prompt-Dialog ----------
+  function promptDlg(kind, value, onOk){
+    const map={rename:['rename-t','rename-l','✏️'],tag:['tag-t','tag-l','🏷'],note:['note-t','note-l','📝']};
+    const [t,l,ic]=map[kind]||['rename-t','rename-l','✏️'];
+    $('#prompt-title').textContent=tr(t); $('#prompt-label').textContent=tr(l); $('#prompt-icon').textContent=ic;
+    const inp=$('#prompt-input'); inp.value=value||''; const dlg=$('#dlg-prompt'); dlg.classList.add('show'); inp.focus(); inp.select();
+    const ok=()=>{ dlg.classList.remove('show'); onOk(inp.value); cleanup(); };
+    const cancel=()=>{ dlg.classList.remove('show'); cleanup(); };
+    const key=(e)=>{ if(e.key==='Enter')ok(); if(e.key==='Escape')cancel(); };
+    function cleanup(){ $('#prompt-ok').onclick=null; $('#prompt-cancel').onclick=null; inp.removeEventListener('keydown',key); }
+    $('#prompt-ok').onclick=ok; $('#prompt-cancel').onclick=cancel; inp.addEventListener('keydown',key);
+  }
+
+  // ---------- Offline / SW ----------
+  let offlineReady=false;
+  function updateOfflineLabel(){ const sw=$('#sw-offline'), lbl=$('#offline-label'); if(!lbl)return; sw.classList.toggle('on',offlineReady); const i=state.settings.lang==='de'?0:1; lbl.innerHTML=offlineReady?I18N['set-offline-on'][i]:(('serviceWorker'in navigator&&window.isSecureContext)?I18N['set-offline'][i]:I18N['set-offline-off'][i]); }
+  async function registerSW(){ if(!('serviceWorker'in navigator)||!window.isSecureContext){ updateOfflineLabel(); return; } try{ const reg=await navigator.serviceWorker.register('service-worker.js'); const check=()=>{ if(navigator.serviceWorker.controller||reg.active){offlineReady=true;updateOfflineLabel();} }; check(); navigator.serviceWorker.addEventListener('controllerchange',check); }catch(e){console.warn(e);} updateOfflineLabel(); }
 
   // ---------- Navigation ----------
-  function switchView(view) {
-    $$('.view').forEach((v) => v.classList.remove('show'));
-    const el = $('#view-' + view);
-    if (el) el.classList.add('show');
-    $$('.nav-item').forEach((n) => n.classList.toggle('active', n.dataset.view === view));
-    $('.main').scrollTop = 0;
+  function switchView(view){ $$('.view').forEach(v=>v.classList.remove('show')); const el=$('#view-'+view); if(el)el.classList.add('show'); $$('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.view===view)); $('.main').scrollTop=0;
+    if(view==='lib')renderLibrary(); if(view==='search'){renderFilters();renderSearchResults();} if(view==='summary')renderSumPicklist(); if(view==='backup')renderBackupStats(); }
+
+  // ---------- Boot ----------
+  async function bootApp(){
+    await ensureStructure(); await loadSettings(); await loadCatalog();
+    applyTheme(state.settings.theme); applyLang(state.settings.lang);
+    const path=state.rootHandle.name; $('#foot-path').textContent=path; $('#set-path').textContent=path; $('#api-key').value=state.apiKey||'';
+    updateCount(); renderLibrary(); renderFilters(); renderBackupStats();
+    showScreen('app'); toast(state.settings.lang==='de'?'Ordner verbunden.':'Folder connected.','ok');
   }
-
-  // ---------- Event-Verdrahtung ----------
-  function wireEvents() {
-    $('#btn-pick').addEventListener('click', pickFolder);
-    $('#rc-connect').addEventListener('click', reconnect);
-    $('#rc-other').addEventListener('click', () => { $('#dlg-reconnect').classList.remove('show'); pickFolder(); });
-    $('#theme-btn').addEventListener('click', cycleTheme);
-    $('#btn-change-folder').addEventListener('click', pickFolder);
-    $('#btn-disconnect').addEventListener('click', disconnect);
-
-    $$('.nav-item').forEach((b) => b.addEventListener('click', () => switchView(b.dataset.view)));
-    $$('[data-view-jump]').forEach((b) => b.addEventListener('click', () => switchView(b.dataset.viewJump)));
-
-    $$('#theme-seg button').forEach((b) => b.addEventListener('click', () => { applyTheme(b.dataset.themeVal); persistSettings(); }));
-    $$('#lang-seg button, #lang-seg2 button').forEach((b) => b.addEventListener('click', () => { applyLang(b.dataset.lang); persistSettings(); }));
-
-    $$('.overlay').forEach((o) => o.addEventListener('click', (e) => { if (e.target === o) o.classList.remove('show'); }));
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $$('.overlay').forEach((o) => o.classList.remove('show')); });
+  async function pickFolder(){
+    try{ const handle=window.__WA_MOCK_ROOT__ || await window.showDirectoryPicker({id:'wissensarchiv',mode:'readwrite'}); if(!(await ensurePermission(handle))){toast(tr2('perm-denied'),'err');return;} state.rootHandle=handle; await IDB.set('rootHandle',handle); await bootApp(); }
+    catch(e){ if(e&&e.name==='AbortError')return; console.error(e); toast(tr2('folder-err'),'err'); }
   }
+  async function reconnect(){ const h=state.pendingHandle; if(!h)return; try{ if(!(await ensurePermission(h))){toast(tr2('perm-denied'),'err');return;} state.rootHandle=h; await IDB.set('rootHandle',h); $('#dlg-reconnect').classList.remove('show'); await bootApp(); }catch(e){console.error(e);toast(tr2('folder-err'),'err');} }
+  async function disconnect(){ await IDB.del('rootHandle'); state.rootHandle=null; state.dirs={}; state.catalog=[]; state.indexCache.clear(); showScreen('onboard'); }
+  function tr2(k){ const M={'perm-denied':['Zugriff verweigert. Ohne Ordner-Berechtigung kann nicht gespeichert werden.','Access denied. Without folder permission nothing can be saved.'],'folder-err':['Ordner konnte nicht geöffnet werden.','Could not open the folder.']}; return (M[k]||['',''])[state.settings.lang==='de'?0:1]; }
 
-  // ---------- Service Worker ----------
-  async function registerSW() {
-    if (!('serviceWorker' in navigator) || !window.isSecureContext) { updateOfflineLabel(); return; }
-    try {
-      const reg = await navigator.serviceWorker.register('service-worker.js');
-      const check = () => { if (navigator.serviceWorker.controller) { offlineReady = true; updateOfflineLabel(); } };
-      check();
-      navigator.serviceWorker.addEventListener('controllerchange', check);
-      if (reg.active && !navigator.serviceWorker.controller) {
-        // erster Aufruf: SW aktiv, übernimmt Kontrolle beim Neuladen
-        offlineReady = true; updateOfflineLabel();
-      }
-    } catch (e) { console.warn('SW-Registrierung fehlgeschlagen', e); }
-    updateOfflineLabel();
+  // ---------- Events ----------
+  function wire(){
+    $('#btn-pick').onclick=pickFolder;
+    $('#rc-connect').onclick=reconnect;
+    $('#rc-other').onclick=()=>{ $('#dlg-reconnect').classList.remove('show'); pickFolder(); };
+    $('#theme-btn').onclick=cycleTheme;
+    $('#btn-change-folder').onclick=pickFolder; $('#btn-disconnect').onclick=disconnect;
+    $$('.nav-item').forEach(b=>b.onclick=()=>switchView(b.dataset.view));
+    $$('#theme-seg button').forEach(b=>b.onclick=()=>{applyTheme(b.dataset.themeVal);persistSettings();});
+    $$('#lang-seg button, #lang-seg2 button').forEach(b=>b.onclick=()=>{applyLang(b.dataset.lang);persistSettings();});
+    $$('.overlay').forEach(o=>o.onclick=(e)=>{ if(e.target===o)o.classList.remove('show'); });
+    document.addEventListener('keydown',(e)=>{ if(e.key==='Escape')$$('.overlay.show').forEach(o=>{ if(o.id!=='dlg-prompt')o.classList.remove('show'); }); });
+
+    // Suche
+    $('#search-btn').onclick=runSearch; $('#search-input').onkeydown=(e)=>{ if(e.key==='Enter')runSearch(); };
+    $('#top-search-input').onkeydown=(e)=>{ if(e.key==='Enter'){ $('#search-input').value=e.target.value; switchView('search'); runSearch(); } };
+    $('#filter-from').onchange=(e)=>{state.search.from=e.target.value; if(state.search.q)runSearch();};
+    $('#filter-to').onchange=(e)=>{state.search.to=e.target.value; if(state.search.q)runSearch();};
+    $('#filter-reset').onclick=()=>{ state.search.types=new Set(SUPPORTED.map(typeOf)); state.search.tag=null; state.search.from=''; state.search.to=''; $('#filter-from').value=''; $('#filter-to').value=''; renderFilters(); if(state.search.q)runSearch(); };
+    $('#sel-all-hits').onclick=()=>{ state.lastHits.forEach((_,i)=>state.search.selected.add(i)); renderSearchResults(); };
+    $('#sum-hits').onclick=()=>{ switchView('summary'); $('input[name=sumsrc][value=hits]').checked=true; renderSumPicklist(); };
+    $('#export-hits').onclick=()=>openExport('hits');
+
+    // Import
+    const dz=$('#dropzone');
+    ['dragover','dragenter'].forEach(ev=>dz.addEventListener(ev,(e)=>{e.preventDefault();dz.classList.add('drag');}));
+    ['dragleave','dragend'].forEach(ev=>dz.addEventListener(ev,()=>dz.classList.remove('drag')));
+    dz.addEventListener('drop',async(e)=>{ e.preventDefault(); dz.classList.remove('drag'); const files=await filesFromDataTransfer(e.dataTransfer); importFiles(files); });
+    $('#pick-files').onclick=async()=>{ if(window.showOpenFilePicker){ try{ const handles=await window.showOpenFilePicker({multiple:true}); const files=await Promise.all(handles.map(h=>h.getFile())); importFiles(files); }catch(err){ if(err.name!=='AbortError')console.error(err); } } else { const inp=document.createElement('input'); inp.type='file'; inp.multiple=true; inp.onchange=()=>importFiles(Array.from(inp.files)); inp.click(); } };
+    $('#pick-folder').onclick=async()=>{ try{ const dir=await window.showDirectoryPicker(); const files=[]; const walk=async(d)=>{ for await(const [n,h] of d.entries()){ if(h.kind==='file')files.push(await h.getFile()); else await walk(h); } }; await walk(dir); importFiles(files); }catch(err){ if(err.name!=='AbortError')console.error(err); } };
+
+    // Summary
+    $$('#sum-mode button').forEach(b=>b.onclick=()=>{ $$('#sum-mode button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); state.sumMode=b.dataset.mode; });
+    $$('input[name=sumsrc]').forEach(r=>r.onchange=renderSumPicklist);
+    $('#sum-generate').onclick=generateSummary;
+    $$('#sum-export-row [data-export]').forEach(b=>b.onclick=()=>exportReport(b.dataset.export,'summary'));
+
+    // Export-Dialog
+    $$('#dlg-export [data-expfmt]').forEach(b=>b.onclick=()=>{ $('#dlg-export').classList.remove('show'); exportReport(b.dataset.expfmt,'hits'); });
+    $('#exp-cancel').onclick=()=>$('#dlg-export').classList.remove('show');
+
+    // Backup
+    $('#backup-export').onclick=exportBackup;
+    const bd=$('#backup-drop');
+    bd.addEventListener('dragover',(e)=>{e.preventDefault();bd.classList.add('drag');}); bd.addEventListener('dragleave',()=>bd.classList.remove('drag'));
+    bd.addEventListener('drop',(e)=>{ e.preventDefault(); bd.classList.remove('drag'); const f=(e.dataTransfer.files||[])[0]; if(f)importBackup(f); });
+    bd.onclick=()=>{ const inp=document.createElement('input'); inp.type='file'; inp.accept='.zip'; inp.onchange=()=>{ if(inp.files[0])importBackup(inp.files[0]); }; inp.click(); };
+
+    // API
+    $('#api-save').onclick=async()=>{ await saveApiKey($('#api-key').value); toast('OK','ok'); };
+    $('#api-test').onclick=async()=>{ const st=$('#api-status'); st.innerHTML='<span class="busy"></span>'; try{ await saveApiKey($('#api-key').value); if(!state.apiKey)throw new Error(state.settings.lang==='de'?'Kein Key':'No key'); if(!navigator.onLine)throw new Error(state.settings.lang==='de'?'Offline':'Offline'); const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':state.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:16,messages:[{role:'user',content:'ping'}]})}); st.innerHTML=r.ok?'<span class="chip" style="color:var(--good)">● OK</span>':`<span class="chip" style="color:var(--danger)">● ${r.status}</span>`; }catch(e){ st.innerHTML=`<span class="chip" style="color:var(--danger)">● ${esc(e.message)}</span>`; } };
   }
+  function openExport(kind){ const data=buildReportItems(kind); $('#exp-text').textContent=(state.settings.lang==='de'?`${data.items.length} Treffer werden exportiert.`:`${data.items.length} results will be exported.`); $('#dlg-export').classList.add('show'); }
 
-  // ---------- Start ----------
-  async function init() {
-    wireEvents();
-
-    // UI-Vorbelegung aus localStorage (unkritischer Zustand, für sofortiges Rendern vor Ordner-Anbindung)
-    try {
-      const th = localStorage.getItem('wa.theme'); if (th) state.settings.theme = th;
-      const lg = localStorage.getItem('wa.lang'); if (lg) state.settings.lang = lg;
-    } catch (e) {}
-    applyTheme(state.settings.theme);
-    applyLang(state.settings.lang);
-
+  // ---------- Init ----------
+  async function init(){
+    wire();
+    try{ const th=localStorage.getItem('wa.theme'); if(th)state.settings.theme=th; const lg=localStorage.getItem('wa.lang'); if(lg)state.settings.lang=lg; }catch(e){}
+    applyTheme(state.settings.theme); applyLang(state.settings.lang);
+    pdfjsLib.GlobalWorkerOptions.workerSrc='vendor/pdf.worker.min.js';
     registerSW();
-
-    if (!fsSupported()) { showScreen('unsupported'); return; }
-
-    // Handle wiederherstellen
-    let handle = null;
-    try { handle = await IDB.get('rootHandle'); } catch (e) {}
-
-    if (!handle) { showScreen('onboard'); return; }
-
-    try {
-      if ((await handle.queryPermission({ mode: 'readwrite' })) === 'granted') {
-        state.rootHandle = handle;
-        await bootApp();
-      } else {
-        state.pendingHandle = handle;
-        $('#rc-name').textContent = handle.name;
-        showScreen('onboard');           // Hintergrund
-        $('#dlg-reconnect').classList.add('show');
-      }
-    } catch (e) {
-      console.error(e);
-      showScreen('onboard');
+    if(!fsSupported()){ showScreen('unsupported'); return; }
+    let handle=null; try{ handle=await IDB.get('rootHandle'); }catch(e){}
+    if(window.__WA_MOCK_ROOT__){
+      // Test-Brücke – nur aktiv, wenn ein Mock-Ordner injiziert wurde (automatisierte Prüfung).
+      window.WA={ importFiles, runSearch, generateSummary, exportBackup, importBackup, exportReport, openDoc, openHit, switchView, getIndex, state, setMode:(m)=>{state.sumMode=m;} };
+      state.rootHandle=window.__WA_MOCK_ROOT__; await bootApp(); return;
     }
+    if(!handle){ showScreen('onboard'); return; }
+    try{
+      if((await handle.queryPermission({mode:'readwrite'}))==='granted'){ state.rootHandle=handle; await bootApp(); }
+      else{ state.pendingHandle=handle; $('#rc-name').textContent=handle.name; showScreen('onboard'); $('#dlg-reconnect').classList.add('show'); }
+    }catch(e){ console.error(e); showScreen('onboard'); }
   }
-
   window.addEventListener('DOMContentLoaded', init);
 })();
 </script>
