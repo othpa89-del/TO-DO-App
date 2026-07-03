@@ -539,6 +539,8 @@
     lib:{ sort:'importedAt', dir:'desc', type:'all', tag:null, q:'' , selected:new Set() },
     search:{ q:'', types:new Set(SUPPORTED.map(typeOf)), from:'', to:'', tag:null, selected:new Set() },
     curDoc:null,                // {doc, ref, terms, page}
+    pdfView:{docId:null,pdf:null}, // gecachtes PDF.js-Dokument fuer den Viewer
+    _renderSeq:0, _renderTask:null,
     parseWorker:null,
     sumMode:'extractive', lastSummary:null,
   };
@@ -586,7 +588,7 @@
     'set-api':['Claude API (optional)','Claude API (optional)'],'set-api-p':['Für Online-Zusammenfassungen (Modell claude-sonnet-4-6). Wird lokal in /meta/apikey.txt gespeichert – nicht im Browser.','For online summaries (model claude-sonnet-4-6). Stored locally in /meta/apikey.txt – not in the browser.'],'api-test':['Verbindung testen','Test connection'],'save':['Speichern','Save'],
     'set-storage':['Speicherort','Storage location'],'set-storage-p':['Alle Daten liegen als echte Dateien in diesem Ordner.','All data lives as real files in this folder.'],'set-change':['Ordner wechseln','Change folder'],'set-disconnect':['Trennen','Disconnect'],
     'set-offline':['Offline-Betrieb wird eingerichtet …','Setting up offline mode …'],'set-offline-on':['Offline-Betrieb aktiv (App als PWA installierbar).','Offline mode active (installable as a PWA).'],'set-offline-off':['Offline-Betrieb nicht verfügbar (nur über https/localhost).','Offline mode unavailable (needs https/localhost).'],
-    'set-about':['Über','About'],'set-about-p':['Wissensarchiv · Keine Konten, kein Server – deine Daten bleiben bei dir.','Knowledge Archive · No accounts, no server – your data stays with you.'],
+    'set-about':['Über','About'],'set-about-p':['Wissensarchiv v1.1 · Keine Konten, kein Server – deine Daten bleiben bei dir.','Knowledge Archive v1.1 · No accounts, no server – your data stays with you.'],
     'rc-h':['Ordner erneut verbinden','Reconnect folder'],'rc-p':['Der Browser hat die Berechtigung für deinen Datenordner zurückgesetzt. Deine Dateien sind unverändert auf der Festplatte – bitte den Ordner einmal neu bestätigen.','The browser reset permission for your data folder. Your files are untouched on disk – please confirm the folder once more.'],'rc-other':['Anderen Ordner wählen','Choose another folder'],'rc-btn':['Verbinden','Connect'],
     'dup-h':['Duplikat gefunden','Duplicate found'],'dup-all':['Für alle weiteren Duplikate übernehmen','Apply to all further duplicates'],'dup-skip':['Überspringen','Skip'],'dup-replace':['Ersetzen','Replace'],
     'cancel':['Abbrechen','Cancel'],'ok':['OK','OK'],'close':['Schließen','Close'],
@@ -632,7 +634,7 @@
   // ---------- Katalog & Index ----------
   async function loadCatalog(){
     try{ state.catalog=JSON.parse(await readFileText(state.dirs.meta,'catalog.json')); if(!Array.isArray(state.catalog))state.catalog=[]; }
-    catch(e){ state.catalog=await rebuildCatalog(); }
+    catch(e){ state.catalog=await rebuildCatalog(); if(state.catalog.length)await saveCatalog(); }
   }
   async function saveCatalog(){ await writeFile(state.dirs.meta,'catalog.json',JSON.stringify(state.catalog,null,2)); }
   function summaryOf(doc){ return {id:doc.id,name:doc.name,ext:doc.ext,type:doc.type,size:doc.size,importedAt:doc.importedAt,scanned:!!doc.scanned,pageCount:doc.pageCount||null,tags:doc.tags||[],note:doc.note||'',unitCount:(doc.units||[]).length,hash:doc.hash||''}; }
@@ -821,7 +823,11 @@
     else if(act==='delete'){ if(confirm((state.settings.lang==='de'?'Wirklich löschen? ':'Really delete? ')+doc.name)){ await deleteDoc(id); renderLibrary(); renderFilters(); renderBackupStats(); toast(state.settings.lang==='de'?'Gelöscht.':'Deleted.'); } }
   }
   function updateCatalogEntry(doc){ const i=state.catalog.findIndex(c=>c.id===doc.id); if(i>=0)state.catalog[i]=summaryOf(doc); }
-  async function deleteDoc(id, silent){ const doc=await getIndex(id).catch(()=>null); if(doc){ await removeFile(state.dirs.originals, doc.storedAs); } await removeFile(state.dirs.index, id+'.json'); state.indexCache.delete(id); state.catalog=state.catalog.filter(c=>c.id!==id); state.lib.selected.delete(id); if(!silent)await saveCatalog(); updateCount(); }
+  async function deleteDoc(id, silent){ const doc=await getIndex(id).catch(()=>null); if(doc){ await removeFile(state.dirs.originals, doc.storedAs); } await removeFile(state.dirs.index, id+'.json'); state.indexCache.delete(id); state.catalog=state.catalog.filter(c=>c.id!==id); state.lib.selected.delete(id);
+    if(state.pdfView.docId===id) closePdfView();
+    if(state.curDoc&&state.curDoc.doc&&state.curDoc.doc.id===id){ state.curDoc=null; const nd=$('#nav-doc'); if(nd)nd.style.display='none'; }
+    state.lastHits=state.lastHits.filter(h=>h.docId!==id); state.search.selected.clear();
+    if(!silent)await saveCatalog(); updateCount(); }
   async function reindexDoc(doc){
     try{ toast(state.settings.lang==='de'?'Neu-Indexierung…':'Re-indexing…'); const f=await (await state.dirs.originals.getFileHandle(doc.storedAs)).getFile(); const buffer=await f.arrayBuffer(); const res=await parseFile(doc.id, doc.ext, buffer, null); doc.units=res.units||[]; doc.scanned=!!res.scanned; doc.pageCount=res.pageCount||null; await writeIndex(doc); updateCatalogEntry(doc); await saveCatalog(); renderLibrary(); toast('OK','ok'); }catch(e){ toast('Fehler: '+e.message,'err'); }
   }
@@ -869,7 +875,7 @@
     if(!hits.length){ resEl.innerHTML=`<div class="empty"><p>${tr('no-hits')}</p></div>`; return; }
     resEl.innerHTML=hits.slice(0,300).map((h,i)=>`
       <div class="result" data-i="${i}">
-        <div class="r-top"><input type="checkbox" class="hitsel" ${state.search.selected.has(i)?'checked':''}><span class="ftype t-${h.type}">${h.type.toUpperCase().slice(0,3)}</span><span class="r-title">${esc(h.name)}</span><span class="src">${refLabel(h.ref)}</span></div>
+        <div class="r-top"><input type="checkbox" class="hitsel" ${state.search.selected.has(i)?'checked':''}><span class="ftype t-${h.type}">${h.type.toUpperCase().slice(0,3)}</span><span class="r-title">${esc(h.name)}</span><span class="src">${esc(refLabel(h.ref))}</span></div>
         <div class="snippet">${snippet(h.text, terms)}</div>
         <div class="r-foot">${(h.tags||[]).map(t=>`<span class="chip tag">${esc(t)}</span>`).join(' ')}<button class="btn sm ghost openhit">${tr('open-hit')}</button></div>
       </div>`).join('') + (hits.length>300?`<p style="color:var(--text-muted);text-align:center">… ${hits.length-300} ${state.settings.lang==='de'?'weitere Treffer (verfeinere die Suche)':'more results (refine your search)'}</p>`:'');
@@ -884,8 +890,8 @@
   }
 
   // ---------- Fundstelle ----------
-  async function openHit(i){ const h=state.lastHits[i]; if(!h)return; const doc=await getIndex(h.docId); state.curDoc={doc, ref:h.ref, terms:state.search.terms||[], page:h.ref&&h.ref.page||1}; await renderDoc(); switchView('doc'); }
-  async function openDoc(id){ const doc=await getIndex(id); state.curDoc={doc, ref:(doc.units[0]||{}).ref||null, terms:[], page:1}; await renderDoc(); switchView('doc'); }
+  async function openHit(i){ const h=state.lastHits[i]; if(!h)return; try{ const doc=await getIndex(h.docId); state.curDoc={doc, ref:h.ref, terms:state.search.terms||[], page:h.ref&&h.ref.page||1}; await renderDoc(); switchView('doc'); }catch(e){ toast(state.settings.lang==='de'?'Dokument nicht mehr vorhanden.':'Document no longer exists.','err'); } }
+  async function openDoc(id){ try{ const doc=await getIndex(id); state.curDoc={doc, ref:(doc.units[0]||{}).ref||null, terms:[], page:1}; await renderDoc(); switchView('doc'); }catch(e){ toast(state.settings.lang==='de'?'Dokument nicht mehr vorhanden.':'Document no longer exists.','err'); } }
   async function renderDoc(){
     const {doc, terms}=state.curDoc; const main=$('#doc-main'), info=$('#doc-info');
     $('#doc-sub').innerHTML=`${esc(doc.name)}${doc.scanned?` <span class="badge-scan">⚠ ${state.settings.lang==='de'?'Gescannt – kein Text':'Scanned – no text'}</span>`:''}`;
@@ -905,23 +911,57 @@
       $('#pg-next').onclick=()=>{ state.curDoc.page=Math.min(doc.pageCount||1,state.curDoc.page+1); $('#pg-num').value=state.curDoc.page; renderPdfPage(); };
       $('#pg-num').onchange=(e)=>{ let p=parseInt(e.target.value)||1; p=Math.max(1,Math.min(doc.pageCount||1,p)); state.curDoc.page=p; e.target.value=p; renderPdfPage(); };
     } else {
-      // betroffenen Abschnitt anzeigen
-      const ref=state.curDoc.ref; let unit=null; if(ref) unit=(doc.units||[]).find(u=>JSON.stringify(u.ref)===JSON.stringify(ref));
-      const body=(doc.units||[]).map(u=>{ const isHit=unit&&JSON.stringify(u.ref)===JSON.stringify(unit.ref); const label=refLabel(u.ref); const txt= isHit&&terms.length? snippetFull(u.text,terms): esc(u.text); return `<div style="margin-bottom:10px${isHit?';background:var(--surface-accent);padding:8px;border-radius:6px':''}"><div class="fmeta">${label}</div>${txt}</div>`; }).join('') || `<p style="color:var(--text-muted)">${state.settings.lang==='de'?'Kein extrahierbarer Text.':'No extractable text.'}</p>`;
-      main.innerHTML=`<div class="section-text">${body}</div>`;
+      // betroffenen Abschnitt anzeigen – bei sehr vielen Einheiten (grosse Tabellen)
+      // nur ein Fenster um den Treffer rendern, sonst friert das DOM ein.
+      const ref=state.curDoc.ref; const all=doc.units||[];
+      let hitIdx=-1; if(ref) hitIdx=all.findIndex(u=>JSON.stringify(u.ref)===JSON.stringify(ref));
+      const CAPV=300; let units=all, offset=0, capNote='';
+      if(all.length>CAPV){
+        const center=hitIdx>=0?hitIdx:0;
+        offset=Math.max(0,Math.min(center-Math.floor(CAPV/2), all.length-CAPV));
+        units=all.slice(offset, offset+CAPV);
+        capNote=`<div class="notice info" style="margin-bottom:10px"><span>ℹ️</span><span>${state.settings.lang==='de'?`Zeige ${offset+1}–${offset+units.length} von ${all.length} Abschnitten (Ausschnitt um die Fundstelle).`:`Showing ${offset+1}–${offset+units.length} of ${all.length} sections (window around the hit).`}</span></div>`;
+      }
+      const body=units.map((u,j)=>{ const isHit=(offset+j)===hitIdx; const txt=isHit&&terms.length?snippetFull(u.text,terms):esc(u.text); return `<div style="margin-bottom:10px${isHit?';background:var(--surface-accent);padding:8px;border-radius:6px':''}"><div class="fmeta">${esc(refLabel(u.ref))}</div>${txt}</div>`; }).join('') || `<p style="color:var(--text-muted)">${state.settings.lang==='de'?'Kein extrahierbarer Text.':'No extractable text.'}</p>`;
+      main.innerHTML=`${capNote}<div class="section-text">${body}</div>`;
       const hit=main.querySelector('[style*="surface-accent"]'); if(hit)hit.scrollIntoView({block:'center'});
     }
     $('#doc-download').onclick=()=>docAction('download',doc.id);
     $('#doc-reindex').onclick=async()=>{ await reindexDoc(doc); await renderDoc(); };
   }
   function snippetFull(text, terms){ let out=esc(text); for(const t of terms){ const re=new RegExp('('+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'); out=out.replace(re,'<mark>$1</mark>'); } return out; }
+  async function closePdfView(){
+    if(state._renderTask){ try{state._renderTask.cancel();}catch(e){} state._renderTask=null; }
+    if(state.pdfView.pdf){ try{await state.pdfView.pdf.destroy();}catch(e){} }
+    state.pdfView={docId:null,pdf:null};
+  }
+  async function getPdfForDoc(doc){
+    // Dokument einmal laden und fuer die Blaetter-Navigation cachen –
+    // sonst wuerde ein 60-MB-PDF bei jedem Seitenwechsel neu gelesen.
+    if(state.pdfView.pdf&&state.pdfView.docId===doc.id) return state.pdfView.pdf;
+    await closePdfView();
+    const f=await (await state.dirs.originals.getFileHandle(doc.storedAs)).getFile();
+    const pdf=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;
+    state.pdfView={docId:doc.id,pdf};
+    return pdf;
+  }
   async function renderPdfPage(){
-    const doc=state.curDoc.doc; try{
-      const f=await (await state.dirs.originals.getFileHandle(doc.storedAs)).getFile(); const buf=await f.arrayBuffer();
-      const pdf=await pdfjsLib.getDocument({data:buf}).promise; const page=await pdf.getPage(state.curDoc.page);
-      const scale=1.4; const vp=page.getViewport({scale}); const canvas=$('#pdf-canvas'); if(!canvas){await pdf.destroy();return;} const ctx=canvas.getContext('2d'); canvas.width=vp.width; canvas.height=vp.height;
-      await page.render({canvasContext:ctx, viewport:vp}).promise; await pdf.destroy();
-    }catch(e){ const w=$('.pdf-canvas-wrap'); if(w)w.innerHTML=`<p class="notice err">${state.settings.lang==='de'?'Seite konnte nicht gerendert werden.':'Could not render page.'} ${esc(e.message)}</p>`; }
+    const doc=state.curDoc.doc; const seq=++state._renderSeq;
+    try{
+      const pdf=await getPdfForDoc(doc);
+      if(seq!==state._renderSeq)return;               // Nutzer hat weitergeblaettert
+      const page=await pdf.getPage(state.curDoc.page);
+      if(seq!==state._renderSeq)return;
+      const canvas=$('#pdf-canvas'); if(!canvas)return;
+      const vp=page.getViewport({scale:1.4});
+      if(state._renderTask){ try{state._renderTask.cancel();}catch(e){} }
+      canvas.width=vp.width; canvas.height=vp.height;
+      state._renderTask=page.render({canvasContext:canvas.getContext('2d'), viewport:vp});
+      await state._renderTask.promise; state._renderTask=null;
+    }catch(e){
+      if(e&&(e.name==='RenderingCancelledException'||/cancelled/i.test(e.message||'')))return;
+      const w=$('.pdf-canvas-wrap'); if(w)w.innerHTML=`<p class="notice err">${state.settings.lang==='de'?'Seite konnte nicht gerendert werden.':'Could not render page.'} ${esc(e.message)}</p>`;
+    }
   }
 
   // ---------- Zusammenfassung ----------
@@ -939,8 +979,8 @@
   }
   function splitSentences(text){ return text.replace(/\s+/g,' ').match(/[^.!?]+[.!?]+|\S[^.!?]*$/g)||[]; }
   async function extractiveSummary(ids, maxSentences=7){
-    const sentences=[]; const sources=[];
-    for(const id of ids){ const doc=await getIndex(id); sources.push(doc); for(const u of (doc.units||[])){ for(const s of splitSentences(u.text)){ const clean=s.trim(); if(clean.length>=40&&clean.length<=400) sentences.push({s:clean, docId:id, name:doc.name, ref:u.ref}); } } }
+    const sentences=[]; const sources=[]; const SCAP=20000; // Obergrenze gegen Jank bei Riesen-Archiven
+    for(const id of ids){ const doc=await getIndex(id); sources.push(doc); for(const u of (doc.units||[])){ for(const s of splitSentences(u.text)){ const clean=s.trim(); if(clean.length>=40&&clean.length<=400) sentences.push({s:clean, docId:id, name:doc.name, ref:u.ref}); } if(sentences.length>=SCAP)break; } if(sentences.length>=SCAP)break; }
     if(!sentences.length) return {text:(state.settings.lang==='de'?'Kein ausreichender Text für eine Zusammenfassung.':'Not enough text to summarize.'), sources:[], picked:[]};
     // Wortfrequenz (TF) über alle Sätze
     const freq=Object.create(null); const stop=new Set('der die das und oder ist sind ein eine einen dem den des mit von zu im in auf für als auch nicht sich the a an of to and or is are be for with on at by this that as it'.split(' '));
@@ -951,24 +991,25 @@
     return {text, sources, picked};
   }
   function sourceListHtml(picked, sources){
-    // eindeutige Quellen (Datei + Fundstelle)
+    // eindeutige Quellen (Datei + Fundstelle); alles escapen – Blattnamen etc. stammen aus Dateien
     const seen=new Set(); const items=[];
-    for(const p of picked){ const key=p.docId+'|'+JSON.stringify(p.ref); if(seen.has(key))continue; seen.add(key); items.push(`${esc(p.name)} — ${refLabel(p.ref)}`); }
+    for(const p of picked){ const key=p.docId+'|'+JSON.stringify(p.ref); if(seen.has(key))continue; seen.add(key); const lbl=refLabel(p.ref); items.push(esc(p.name)+(lbl?' — '+esc(lbl):'')); }
     if(!items.length) sources.forEach(d=>items.push(esc(d.name)));
     return `<div class="sourcelist"><b>${tr('sum-sources')}</b><ol>${items.map(x=>`<li>${x}</li>`).join('')}</ol></div>`;
   }
   async function claudeSummary(ids){
     if(!state.apiKey) throw new Error(state.settings.lang==='de'?'Kein API-Key hinterlegt (Einstellungen).':'No API key set (Settings).');
     if(!navigator.onLine) throw new Error(state.settings.lang==='de'?'Keine Internetverbindung.':'No internet connection.');
-    let corpus=''; const sources=[];
-    for(const id of ids){ const doc=await getIndex(id); sources.push(doc); corpus+=`\n\n### ${doc.name}\n`; for(const u of (doc.units||[])){ corpus+=`[${refLabel(u.ref)}] ${u.text}\n`; } }
-    corpus=corpus.slice(0,60000);
+    let corpus=''; const sources=[]; const LIMIT=60000;
+    for(const id of ids){ const doc=await getIndex(id); sources.push(doc); corpus+=`\n\n### ${doc.name}\n`; for(const u of (doc.units||[])){ corpus+=`[${refLabel(u.ref)}] ${u.text}\n`; if(corpus.length>LIMIT)break; } if(corpus.length>LIMIT){ corpus=corpus.slice(0,LIMIT); break; } }
     const lang=state.settings.lang==='de'?'Deutsch':'English';
     const prompt=`Fasse die folgenden Dokumente prägnant auf ${lang} zusammen. Nenne am Ende KEINE Quellen (die fügt die App hinzu). Nur die inhaltliche Zusammenfassung:\n${corpus}`;
     const r=await fetch('https://api.anthropic.com/v1/messages',{ method:'POST', headers:{'content-type':'application/json','x-api-key':state.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'}, body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1024,messages:[{role:'user',content:prompt}]}) });
     if(!r.ok){ const t=await r.text().catch(()=>''); throw new Error('API '+r.status+': '+t.slice(0,200)); }
     const data=await r.json(); const text=(data.content||[]).map(c=>c.text||'').join('\n').trim();
-    return {text, sources, picked: sources.flatMap(d=>(d.units||[]).slice(0,1).map(u=>({docId:d.id,name:d.name,ref:u.ref})))};
+    // Quellenverzeichnis: jedes eingeflossene Dokument mit Seitenumfang (PDF) bzw. ohne Zusatz
+    const picked=sources.map(d=>({docId:d.id, name:d.name, ref: d.pageCount ? {page:(d.pageCount>1?('1–'+d.pageCount):1)} : null}));
+    return {text, sources, picked};
   }
   async function generateSummary(){
     const ids=getSummarySourceDocs(); const out=$('#sum-output');
@@ -978,7 +1019,7 @@
     try{
       const r = state.sumMode==='ai' ? await claudeSummary(ids) : await extractiveSummary(ids);
       const title=state.settings.lang==='de'?`Zusammenfassung – ${ids.length} Dokument(e)`:`Summary – ${ids.length} document(s)`;
-      out.innerHTML=`<div class="summary-out"><h3>${esc(title)}</h3><p>${esc(r.text)}</p>${sourceListHtml(r.picked||[], r.sources||[])}</div>`;
+      out.innerHTML=`<div class="summary-out"><h3>${esc(title)}</h3><p style="white-space:pre-line">${esc(r.text)}</p>${sourceListHtml(r.picked||[], r.sources||[])}</div>`;
       state.lastSummary={ title, text:r.text, picked:r.picked||[], sources:r.sources||[], mode:state.sumMode };
       $('#sum-export-row').style.display='';
     }catch(e){ out.innerHTML=`<div class="notice err"><span>⚠</span><span>${esc(e.message)}</span></div>`; }
@@ -999,9 +1040,11 @@
     return { title:(state.settings.lang==='de'?'Suchbericht':'Search report'), params:(state.settings.lang==='de'?'Suchbegriff: ':'Query: ')+'"'+state.search.q+'" · '+items.length+' '+tr('hits'), summary:'', items };
   }
   async function exportReport(fmt, kind){
-    const data=buildReportItems(kind); const base='wissensarchiv_'+(kind==='summary'?'zusammenfassung':'bericht')+'_'+stamp();
+    const data=buildReportItems(kind); const de=state.settings.lang==='de';
+    if(!data.items.length&&!data.summary){ toast(de?'Nichts zu exportieren – erst suchen oder zusammenfassen.':'Nothing to export – search or summarize first.','err'); return; }
+    const base='wissensarchiv_'+(kind==='summary'?(de?'zusammenfassung':'summary'):(de?'bericht':'report'))+'_'+stamp();
     try{
-      if(fmt==='xlsx'){ await loadScript('vendor/xlsx.full.min.js'); const XLSX=window.XLSX; const head=['Datei','Fundstelle','Snippet','Tags','Datum']; const rows=[head, ...data.items.map(it=>[it.file,it.ref,it.snippet,it.tags,it.date])]; const ws=XLSX.utils.aoa_to_sheet(rows); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Treffer'); const out=XLSX.write(wb,{type:'array',bookType:'xlsx'}); const blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}); await saveToExports(base+'.xlsx',blob); download(blob,base+'.xlsx'); }
+      if(fmt==='xlsx'){ await loadScript('vendor/xlsx.full.min.js'); const XLSX=window.XLSX; const head=de?['Datei','Seite/Blatt','Snippet','Tags','Datum']:['File','Page/Sheet','Snippet','Tags','Date']; const rows=[head, ...data.items.map(it=>[it.file,it.ref,it.snippet,it.tags,it.date])]; const ws=XLSX.utils.aoa_to_sheet(rows); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Treffer'); const out=XLSX.write(wb,{type:'array',bookType:'xlsx'}); const blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}); await saveToExports(base+'.xlsx',blob); download(blob,base+'.xlsx'); }
       else if(fmt==='pdf'){ await loadScript('vendor/jspdf.umd.min.js'); const {jsPDF}=window.jspdf; const doc=new jsPDF(); let y=18; doc.setFontSize(16); doc.text(data.title,14,y); y+=8; doc.setFontSize(10); doc.setTextColor(90); doc.text(doc.splitTextToSize(data.params,180),14,y); y+=10; doc.setTextColor(20);
         if(data.summary){ doc.setFontSize(11); doc.text(doc.splitTextToSize(data.summary,180),14,y); y+=doc.splitTextToSize(data.summary,180).length*5+6; }
         doc.setFontSize(11);
@@ -1034,7 +1077,7 @@
       await loadScript('vendor/jszip.min.js'); const zip=await window.JSZip.loadAsync(await file.arrayBuffer());
       const targets={originals:state.dirs.originals, index:state.dirs.index, meta:state.dirs.meta};
       const entries=Object.keys(zip.files);
-      for(const path of entries){ const zf=zip.files[path]; if(zf.dir)continue; const [folder,...rest]=path.split('/'); const fname=rest.join('/'); if(!targets[folder]||!fname)continue; if(folder==='meta'&&fname==='catalog.json')continue; const content=await zf.async('arraybuffer'); await writeFile(targets[folder], fname, content); }
+      for(const path of entries){ const zf=zip.files[path]; if(zf.dir)continue; const [folder,...rest]=path.split('/'); if(!targets[folder]||rest.length!==1)continue; const fname=rest[0]; if(!fname||fname==='..')continue; if(folder==='meta'&&fname==='catalog.json')continue; const content=await zf.async('arraybuffer'); await writeFile(targets[folder], fname, content); }
       state.indexCache.clear(); state.catalog=await rebuildCatalog(); await saveCatalog(); await loadSettings();
       updateCount(); applyTheme(state.settings.theme); applyLang(state.settings.lang);
       renderLibrary(); renderFilters(); renderBackupStats();
@@ -1077,7 +1120,7 @@
     catch(e){ if(e&&e.name==='AbortError')return; console.error(e); toast(tr2('folder-err'),'err'); }
   }
   async function reconnect(){ const h=state.pendingHandle; if(!h)return; try{ if(!(await ensurePermission(h))){toast(tr2('perm-denied'),'err');return;} state.rootHandle=h; await IDB.set('rootHandle',h); $('#dlg-reconnect').classList.remove('show'); await bootApp(); }catch(e){console.error(e);toast(tr2('folder-err'),'err');} }
-  async function disconnect(){ await IDB.del('rootHandle'); state.rootHandle=null; state.dirs={}; state.catalog=[]; state.indexCache.clear(); showScreen('onboard'); }
+  async function disconnect(){ await IDB.del('rootHandle'); await closePdfView(); state.rootHandle=null; state.dirs={}; state.catalog=[]; state.indexCache.clear(); state.lastHits=[]; state.curDoc=null; state.lib.selected.clear(); const nd=$('#nav-doc'); if(nd)nd.style.display='none'; showScreen('onboard'); }
   function tr2(k){ const M={'perm-denied':['Zugriff verweigert. Ohne Ordner-Berechtigung kann nicht gespeichert werden.','Access denied. Without folder permission nothing can be saved.'],'folder-err':['Ordner konnte nicht geöffnet werden.','Could not open the folder.']}; return (M[k]||['',''])[state.settings.lang==='de'?0:1]; }
 
   // ---------- Events ----------
@@ -1090,8 +1133,11 @@
     $$('.nav-item').forEach(b=>b.onclick=()=>switchView(b.dataset.view));
     $$('#theme-seg button').forEach(b=>b.onclick=()=>{applyTheme(b.dataset.themeVal);persistSettings();});
     $$('#lang-seg button, #lang-seg2 button').forEach(b=>b.onclick=()=>{applyLang(b.dataset.lang);persistSettings();});
-    $$('.overlay').forEach(o=>o.onclick=(e)=>{ if(e.target===o)o.classList.remove('show'); });
-    document.addEventListener('keydown',(e)=>{ if(e.key==='Escape')$$('.overlay.show').forEach(o=>{ if(o.id!=='dlg-prompt')o.classList.remove('show'); }); });
+    // dlg-dup und dlg-prompt warten auf eine Antwort (Promise/Callback) – sie dürfen
+    // nur über ihre eigenen Buttons geschlossen werden, sonst hängt der Aufrufer.
+    const MODAL_LOCKED=new Set(['dlg-dup','dlg-prompt']);
+    $$('.overlay').forEach(o=>o.onclick=(e)=>{ if(e.target===o&&!MODAL_LOCKED.has(o.id))o.classList.remove('show'); });
+    document.addEventListener('keydown',(e)=>{ if(e.key==='Escape')$$('.overlay.show').forEach(o=>{ if(!MODAL_LOCKED.has(o.id))o.classList.remove('show'); }); });
 
     // Suche
     $('#search-btn').onclick=runSearch; $('#search-input').onkeydown=(e)=>{ if(e.key==='Enter')runSearch(); };
@@ -1132,7 +1178,7 @@
     $('#api-save').onclick=async()=>{ await saveApiKey($('#api-key').value); toast('OK','ok'); };
     $('#api-test').onclick=async()=>{ const st=$('#api-status'); st.innerHTML='<span class="busy"></span>'; try{ await saveApiKey($('#api-key').value); if(!state.apiKey)throw new Error(state.settings.lang==='de'?'Kein Key':'No key'); if(!navigator.onLine)throw new Error(state.settings.lang==='de'?'Offline':'Offline'); const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':state.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:16,messages:[{role:'user',content:'ping'}]})}); st.innerHTML=r.ok?'<span class="chip" style="color:var(--good)">● OK</span>':`<span class="chip" style="color:var(--danger)">● ${r.status}</span>`; }catch(e){ st.innerHTML=`<span class="chip" style="color:var(--danger)">● ${esc(e.message)}</span>`; } };
   }
-  function openExport(kind){ const data=buildReportItems(kind); $('#exp-text').textContent=(state.settings.lang==='de'?`${data.items.length} Treffer werden exportiert.`:`${data.items.length} results will be exported.`); $('#dlg-export').classList.add('show'); }
+  function openExport(kind){ const data=buildReportItems(kind); if(!data.items.length&&!data.summary){ toast(state.settings.lang==='de'?'Keine Treffer zum Exportieren.':'No results to export.','err'); return; } $('#exp-text').textContent=(state.settings.lang==='de'?`${data.items.length} Treffer werden exportiert.`:`${data.items.length} results will be exported.`); $('#dlg-export').classList.add('show'); }
 
   // ---------- Init ----------
   async function init(){

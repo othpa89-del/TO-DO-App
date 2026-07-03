@@ -4,7 +4,7 @@
  * Strategie: cache-first für gleiche Origin, mit Laufzeit-Caching neuer Dateien
  * (z. B. vendor-Libs, die in späteren Etappen dazukommen). */
 
-const VERSION = 'wa-v2';
+const VERSION = 'wa-v3';
 const CACHE = `wissensarchiv-${VERSION}`;
 
 // Kern der App-Shell, der beim Installieren fest vorgeladen wird.
@@ -51,6 +51,16 @@ self.addEventListener('message', (event) => {
   if (event.data === 'skipWaiting') self.skipWaiting();
 });
 
+// App-Code (index.html, parse-worker.js) laden wir network-first, damit Updates
+// sofort ankommen; offline faellt er auf den Cache zurueck. Bibliotheken und
+// Icons sind quasi unveraenderlich -> cache-first (schnell, offline).
+function isAppCode(req, url) {
+  return req.mode === 'navigate'
+    || url.pathname.endsWith('/index.html')
+    || url.pathname.endsWith('/')
+    || url.pathname.endsWith('/parse-worker.js');
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
@@ -61,18 +71,28 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE);
-      const cached = await cache.match(req, { ignoreSearch: false });
-      if (cached) return cached;
 
+      if (isAppCode(req, url)) {
+        try {
+          const res = await fetch(req);
+          if (res && res.ok) cache.put(req, res.clone());
+          return res;
+        } catch (err) {
+          const cached = await cache.match(req) || await cache.match('./index.html');
+          if (cached) return cached;
+          throw err;
+        }
+      }
+
+      const cached = await cache.match(req);
+      if (cached) return cached;
       try {
         const res = await fetch(req);
-        // Erfolgreiche, cachebare Antworten für Offline-Nutzung ablegen (vendor-Libs etc.).
         if (res && res.ok && (res.type === 'basic' || res.type === 'default')) {
           cache.put(req, res.clone());
         }
         return res;
       } catch (err) {
-        // Offline und nicht im Cache: für Navigationsanfragen die App-Shell liefern.
         if (req.mode === 'navigate') {
           const shell = await cache.match('./index.html');
           if (shell) return shell;
