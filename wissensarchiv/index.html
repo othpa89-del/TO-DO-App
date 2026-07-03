@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wissensarchiv</title>
+  <meta name="description" content="Persönliche, offline-fähige Wissensdatenbank – alle Daten liegen als echte Dateien auf deiner Festplatte.">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#00A6CF">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <style>
+    :root {
+      --primary:#00A6CF; --primary-hover:#0090b4; --secondary:#6BCCE0; --surface-accent:#E6F5F9;
+      --text:#212529; --text-muted:#575757; --line:#D7D7D7;
+      --bg:#F8F9FA; --bg-alt:#F1F3F5; --panel:#FFFFFF;
+      --shadow:0 1px 3px rgba(33,37,41,.08),0 1px 2px rgba(33,37,41,.04);
+      --radius:8px; --sidebar-w:236px;
+      --good:#2f9e44; --warn:#e8a13a; --danger:#e03131;
+      font-family:Arial,Helvetica,sans-serif;
+    }
+    @media (prefers-color-scheme:dark){:root{
+      --text:#E9ECEF; --text-muted:#A0A6AC; --line:#3a3f45;
+      --bg:#16191c; --bg-alt:#1e2226; --panel:#22272b; --surface-accent:#123641;
+      --shadow:0 1px 3px rgba(0,0,0,.4);
+    }}
+    :root[data-theme="light"]{--text:#212529;--text-muted:#575757;--line:#D7D7D7;--bg:#F8F9FA;--bg-alt:#F1F3F5;--panel:#FFFFFF;--surface-accent:#E6F5F9;--shadow:0 1px 3px rgba(33,37,41,.08),0 1px 2px rgba(33,37,41,.04);}
+    :root[data-theme="dark"]{--text:#E9ECEF;--text-muted:#A0A6AC;--line:#3a3f45;--bg:#16191c;--bg-alt:#1e2226;--panel:#22272b;--surface-accent:#123641;--shadow:0 1px 3px rgba(0,0,0,.4);}
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+    h1,h2,h3,h4{margin:0;font-weight:bold;text-wrap:balance}
+    button{font-family:inherit;cursor:pointer}
+    a{color:var(--primary)}
+    code{background:var(--bg-alt);padding:2px 6px;border-radius:5px;font-family:Consolas,Menlo,monospace;font-size:.92em}
+    .num{font-variant-numeric:tabular-nums}
+    :focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+
+    .btn{border:1px solid var(--primary);background:var(--primary);color:#fff;padding:8px 15px;border-radius:8px;font-size:13px;font-weight:bold;display:inline-flex;align-items:center;gap:7px}
+    .btn:hover{background:var(--primary-hover);border-color:var(--primary-hover)}
+    .btn.neutral{background:var(--panel);color:var(--text);border-color:var(--line)}
+    .btn.neutral:hover{background:var(--bg-alt)}
+    .btn.ghost{background:transparent;color:var(--primary)}
+    .btn.ghost:hover{background:var(--surface-accent)}
+    .btn.danger{background:transparent;color:var(--danger);border-color:var(--line)}
+    .btn.danger:hover{background:rgba(224,49,49,.08)}
+    .btn.sm{padding:5px 10px;font-size:12px}
+    .btn.lg{font-size:15px;padding:11px 22px}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+
+    /* ---------- Vollbild-Screens (Onboarding / nicht unterstützt) ---------- */
+    .fullscreen{position:fixed;inset:0;background:var(--bg);z-index:60;display:none;place-items:center;padding:24px;overflow:auto}
+    .fullscreen.show{display:grid}
+    .card-center{max-width:560px;text-align:center}
+    .onboard-logo{width:68px;height:68px;border-radius:16px;background:linear-gradient(135deg,var(--primary),var(--secondary));display:grid;place-items:center;color:#fff;font-size:30px;font-weight:bold;margin:0 auto 20px}
+    .card-center h1{font-size:26px;margin-bottom:8px}
+    .card-center p{color:var(--text-muted);margin:0 auto 20px;max-width:460px}
+    .folder-preview{text-align:left;background:var(--bg-alt);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:18px 0;font-size:13px}
+    .folder-preview div{padding:2px 0;color:var(--text-muted)}
+    .folder-preview .root{color:var(--text);font-weight:bold}
+    .small-note{font-size:12px;color:var(--text-muted);margin-top:18px}
+
+    /* ---------- App-Shell ---------- */
+    .app{display:none;grid-template-columns:var(--sidebar-w) 1fr;grid-template-rows:56px 1fr;height:100vh;min-height:560px}
+    .app.show{display:grid}
+    .topbar{grid-column:1/-1;display:flex;align-items:center;gap:14px;padding:0 18px;background:var(--panel);border-bottom:1px solid var(--line)}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:bold;font-size:16px}
+    .logo{width:30px;height:30px;border-radius:7px;background:linear-gradient(135deg,var(--primary),var(--secondary));display:grid;place-items:center;color:#fff;font-weight:bold;font-size:15px}
+    .top-spacer{flex:1}
+    .seg{display:inline-flex;border:1px solid var(--line);border-radius:20px;overflow:hidden}
+    .seg button{border:0;background:var(--panel);color:var(--text-muted);padding:5px 11px;font-size:12px}
+    .seg button.on{background:var(--primary);color:#fff}
+    .icon-btn{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:8px;width:34px;height:34px;display:grid;place-items:center;font-size:15px}
+    .icon-btn:hover{background:var(--bg-alt)}
+
+    .sidebar{background:var(--panel);border-right:1px solid var(--line);padding:14px 12px;display:flex;flex-direction:column;gap:4px;overflow-y:auto}
+    .nav-label{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);padding:12px 10px 6px}
+    .nav-item{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:8px;color:var(--text);border:0;background:transparent;width:100%;text-align:left;font-size:14px}
+    .nav-item .ic{width:20px;text-align:center;opacity:.85}
+    .nav-item:hover{background:var(--bg-alt)}
+    .nav-item.active{background:var(--surface-accent);color:var(--primary);font-weight:bold}
+    .nav-item .count{margin-left:auto;font-size:11px;background:var(--bg-alt);color:var(--text-muted);border-radius:10px;padding:1px 7px}
+    .nav-item.active .count{background:var(--primary);color:#fff}
+    .sidebar-foot{margin-top:auto;padding:10px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--line)}
+    .storage-ok{display:flex;align-items:center;gap:6px}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--good);display:inline-block;flex:none}
+
+    .main{overflow-y:auto;padding:22px 26px 48px}
+    .view{display:none}
+    .view.show{display:block;animation:fade .18s ease}
+    @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+    @media (prefers-reduced-motion:reduce){.view.show{animation:none}}
+    .page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap}
+    .page-head h2{font-size:22px}
+    .page-head p{margin:4px 0 0;color:var(--text-muted)}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+    .panel-pad{padding:18px}
+    .cards{display:grid;grid-template-columns:1fr;gap:16px;max-width:720px}
+    .field{display:flex;flex-direction:column;gap:5px}
+    .field label{font-size:12px;color:var(--text-muted);font-weight:bold}
+    .field input{padding:8px 11px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-family:inherit;font-size:13px;outline:none}
+    .field input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(0,166,207,.15)}
+    .chip{border:1px solid var(--line);background:var(--panel);color:var(--text-muted);border-radius:16px;padding:4px 11px;font-size:12px;display:inline-flex;align-items:center;gap:6px}
+    .switch{position:relative;width:42px;height:24px;background:var(--line);border-radius:12px;transition:.2s;flex:none;border:0}
+    .switch.on{background:var(--primary)}
+    .switch::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.2s}
+    .switch.on::after{left:21px}
+
+    .empty{display:grid;place-items:center;text-align:center;padding:60px 20px;color:var(--text-muted)}
+    .empty .big{font-size:40px;margin-bottom:12px}
+    .stage-tag{display:inline-block;background:var(--surface-accent);color:var(--primary);border:1px solid var(--secondary);border-radius:14px;padding:2px 10px;font-size:12px;font-weight:bold;margin-bottom:10px}
+
+    /* ---------- Overlay-Dialoge ---------- */
+    .overlay{position:fixed;inset:0;background:rgba(20,24,28,.55);display:none;align-items:center;justify-content:center;z-index:70;padding:20px}
+    .overlay.show{display:flex}
+    .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;max-width:480px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.25);overflow:hidden}
+    .modal-head{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+    .modal-head .mi{width:40px;height:40px;border-radius:9px;background:var(--surface-accent);color:var(--primary);display:grid;place-items:center;font-size:20px;flex:none}
+    .modal-body{padding:20px}
+    .modal-foot{padding:14px 20px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end;background:var(--bg-alt)}
+
+    /* ---------- Toast ---------- */
+    #toasts{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:90;display:flex;flex-direction:column;gap:8px;align-items:center}
+    .toast{background:var(--text);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:90vw;animation:fade .18s ease}
+    .toast.err{background:var(--danger);color:#fff}
+    .toast.ok{background:var(--good);color:#fff}
+
+    @media (max-width:860px){
+      .app{grid-template-columns:64px 1fr}
+      .nav-item span.txt,.nav-label,.sidebar-foot{display:none}
+    }
+  </style>
+</head>
+<body>
+
+<!-- ============ SCREEN: Browser nicht unterstützt ============ -->
+<div class="fullscreen" id="screen-unsupported">
+  <div class="card-center">
+    <div class="onboard-logo">W</div>
+    <h1 data-i18n="uns-h">Nicht unterstützter Browser</h1>
+    <p data-i18n="uns-p">Das Wissensarchiv benötigt die <b>File System Access API</b>, um deine Daten direkt auf der Festplatte zu speichern. Diese ist aktuell nur in <b>Google Chrome</b> und <b>Microsoft Edge</b> (Desktop) verfügbar.</p>
+    <p class="small-note" data-i18n="uns-note">Bitte öffne diese Seite in Chrome oder Edge. Hinweis: Die App muss über <code>https://</code> oder <code>localhost</code> laufen – nicht per Doppelklick als lokale Datei.</p>
+  </div>
+</div>
+
+<!-- ============ SCREEN: Onboarding / Ordner wählen ============ -->
+<div class="fullscreen" id="screen-onboard">
+  <div class="card-center">
+    <div class="onboard-logo">W</div>
+    <h1 data-i18n="ob-title">Willkommen im Wissensarchiv</h1>
+    <p data-i18n="ob-sub">Deine persönliche, offline-fähige Wissensdatenbank. Wähle einen Ordner auf der Festplatte – dort werden alle Originaldateien, der Suchindex und deine Metadaten als echte Dateien gespeichert. Das übersteht auch das Löschen von Browser-Daten.</p>
+    <div class="folder-preview">
+      <div class="root">📁 <span data-i18n="ob-yourfolder">Dein Ordner</span>/</div>
+      <div>&nbsp;&nbsp;├─ 📁 originals/ &nbsp;<span style="opacity:.7" data-i18n="ob-d1">– Originaldateien</span></div>
+      <div>&nbsp;&nbsp;├─ 📁 index/ &nbsp;<span style="opacity:.7" data-i18n="ob-d2">– ein JSON-Index pro Dokument</span></div>
+      <div>&nbsp;&nbsp;├─ 📁 meta/ &nbsp;<span style="opacity:.7" data-i18n="ob-d3">– Tags, Notizen, Einstellungen, API-Key</span></div>
+      <div>&nbsp;&nbsp;└─ 📁 exports/ &nbsp;<span style="opacity:.7" data-i18n="ob-d4">– Berichte & Backups</span></div>
+    </div>
+    <button class="btn lg" id="btn-pick">📂 <span data-i18n="ob-choose">Ordner wählen</span></button>
+    <p class="small-note" data-i18n="ob-browser">Erfordert Chrome oder Edge (Desktop).</p>
+  </div>
+</div>
+
+<!-- ============ APP-SHELL ============ -->
+<div class="app" id="app">
+  <header class="topbar">
+    <div class="brand"><div class="logo">W</div> Wissensarchiv</div>
+    <div class="top-spacer"></div>
+    <div class="seg" id="lang-seg" title="Sprache / Language">
+      <button data-lang="de">DE</button>
+      <button data-lang="en">EN</button>
+    </div>
+    <button class="icon-btn" id="theme-btn" title="Theme wechseln">🌓</button>
+  </header>
+
+  <nav class="sidebar">
+    <div class="nav-label" data-i18n="nav-nav">Navigation</div>
+    <button class="nav-item active" data-view="lib"><span class="ic">📚</span><span class="txt" data-i18n="nav-lib">Bibliothek</span><span class="count" id="cnt-lib">0</span></button>
+    <button class="nav-item" data-view="search"><span class="ic">🔎</span><span class="txt" data-i18n="nav-search">Suche</span></button>
+    <button class="nav-item" data-view="summary"><span class="ic">✨</span><span class="txt" data-i18n="nav-sum">Zusammenfassung</span></button>
+    <button class="nav-item" data-view="backup"><span class="ic">💾</span><span class="txt" data-i18n="nav-backup">Backup</span></button>
+    <button class="nav-item" data-view="settings"><span class="ic">⚙️</span><span class="txt" data-i18n="nav-set">Einstellungen</span></button>
+
+    <div class="nav-label" data-i18n="nav-actions">Aktionen</div>
+    <button class="nav-item" data-view="import"><span class="ic">⬆️</span><span class="txt" data-i18n="nav-import">Importieren</span></button>
+
+    <div class="sidebar-foot">
+      <div class="storage-ok"><span class="dot"></span> <span data-i18n="foot-connected">Ordner verbunden</span></div>
+      <div style="margin-top:4px;opacity:.85" id="foot-path">—</div>
+    </div>
+  </nav>
+
+  <main class="main">
+    <!-- Bibliothek -->
+    <section class="view show" id="view-lib">
+      <div class="page-head">
+        <div><h2 data-i18n="lib-h">Bibliothek</h2><p id="lib-sub" data-i18n="lib-p">Alle Dokumente an einem Ort.</p></div>
+        <div class="row"><button class="btn" data-view-jump="import">⬆️ <span data-i18n="nav-import">Importieren</span></button></div>
+      </div>
+      <div class="empty panel">
+        <div class="big">📚</div>
+        <div class="stage-tag" data-i18n="stage2">Kommt in Etappe 2</div>
+        <h3 data-i18n="lib-empty-h">Noch keine Dokumente</h3>
+        <p style="max-width:420px" data-i18n="lib-empty-p">Import, Volltextindex und Verwaltung folgen in den nächsten Etappen. Das Fundament (Ordner-Anbindung, Offline-Betrieb, Einstellungen) steht bereits.</p>
+      </div>
+    </section>
+
+    <!-- Suche -->
+    <section class="view" id="view-search">
+      <div class="page-head"><div><h2 data-i18n="nav-search">Suche</h2><p data-i18n="search-p">Volltext über alle Indizes.</p></div></div>
+      <div class="empty panel"><div class="big">🔎</div><div class="stage-tag" data-i18n="stage2">Kommt in Etappe 2</div><h3 data-i18n="soon-h">Bald verfügbar</h3><p style="max-width:420px" data-i18n="search-soon">Volltextsuche mit Filtern, Snippets und Quellenreferenz folgt zusammen mit dem Import.</p></div>
+    </section>
+
+    <!-- Zusammenfassung -->
+    <section class="view" id="view-summary">
+      <div class="page-head"><div><h2 data-i18n="nav-sum">Zusammenfassung</h2><p data-i18n="sum-p">Extraktiv (offline) oder per Claude API.</p></div></div>
+      <div class="empty panel"><div class="big">✨</div><div class="stage-tag" data-i18n="stage4">Kommt in Etappe 4</div><h3 data-i18n="soon-h">Bald verfügbar</h3><p style="max-width:420px" data-i18n="sum-soon">Zusammenfassungen mit vollständigem Quellenverzeichnis und Export als DOCX/PDF/XLSX.</p></div>
+    </section>
+
+    <!-- Backup -->
+    <section class="view" id="view-backup">
+      <div class="page-head"><div><h2 data-i18n="nav-backup">Backup</h2><p data-i18n="backup-p">Komplettes Archiv als ZIP.</p></div></div>
+      <div class="empty panel"><div class="big">💾</div><div class="stage-tag" data-i18n="stage3">Kommt in Etappe 3</div><h3 data-i18n="soon-h">Bald verfügbar</h3><p style="max-width:420px" data-i18n="backup-soon">Export und Wiederherstellung des gesamten Archivs inklusive Tags und Notizen.</p></div>
+    </section>
+
+    <!-- Import -->
+    <section class="view" id="view-import">
+      <div class="page-head"><div><h2 data-i18n="nav-import">Importieren</h2><p data-i18n="import-p">PDF · DOCX · XLSX · CSV · TXT · MD</p></div></div>
+      <div class="empty panel"><div class="big">⬆️</div><div class="stage-tag" data-i18n="stage2">Kommt in Etappe 2</div><h3 data-i18n="soon-h">Bald verfügbar</h3><p style="max-width:420px" data-i18n="import-soon">Import per Drag & Drop, Dateiauswahl oder ganzem Ordner. Parsing im Web Worker, PDF seitenweise, mit Fortschrittsanzeige.</p></div>
+    </section>
+
+    <!-- Einstellungen (in E1 voll funktionsfähig) -->
+    <section class="view" id="view-settings">
+      <div class="page-head"><div><h2 data-i18n="nav-set">Einstellungen</h2><p data-i18n="set-p">Lokal gespeichert in /meta/settings.json</p></div></div>
+      <div class="cards">
+        <div class="panel panel-pad">
+          <h4 style="margin-bottom:14px" data-i18n="set-appear">Darstellung</h4>
+          <div class="row" style="justify-content:space-between;margin-bottom:14px">
+            <span data-i18n="set-theme">Theme</span>
+            <div class="seg" id="theme-seg" style="border-radius:8px">
+              <button data-theme-val="auto" data-i18n="theme-auto">Auto</button>
+              <button data-theme-val="light" data-i18n="theme-light">Hell</button>
+              <button data-theme-val="dark" data-i18n="theme-dark">Dunkel</button>
+            </div>
+          </div>
+          <div class="row" style="justify-content:space-between">
+            <span data-i18n="set-lang">Sprache / Language</span>
+            <div class="seg" id="lang-seg2" style="border-radius:8px">
+              <button data-lang="de">Deutsch</button>
+              <button data-lang="en">English</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel panel-pad">
+          <h4 style="margin-bottom:6px" data-i18n="set-storage">Speicherort</h4>
+          <p style="color:var(--text-muted);margin:0 0 12px" data-i18n="set-storage-p">Alle Daten liegen als echte Dateien in diesem Ordner.</p>
+          <div class="row" style="justify-content:space-between">
+            <code id="set-path">—</code>
+            <div class="row">
+              <button class="btn sm neutral" id="btn-change-folder" data-i18n="set-change">Ordner wechseln</button>
+              <button class="btn sm danger" id="btn-disconnect" data-i18n="set-disconnect">Trennen</button>
+            </div>
+          </div>
+          <div class="row" style="margin-top:14px">
+            <span class="switch" id="sw-offline"></span>
+            <span id="offline-label" data-i18n="set-offline">Offline-Betrieb wird eingerichtet …</span>
+          </div>
+        </div>
+
+        <div class="panel panel-pad">
+          <h4 style="margin-bottom:6px" data-i18n="set-api">Claude API (optional)</h4>
+          <p style="color:var(--text-muted);margin:0 0 4px" data-i18n="set-api-p">Für Online-Zusammenfassungen (Modell claude-sonnet-4-6). Wird lokal in /meta gespeichert.</p>
+          <div class="stage-tag" data-i18n="stage4">Kommt in Etappe 4</div>
+        </div>
+
+        <div class="panel panel-pad">
+          <h4 style="margin-bottom:6px" data-i18n="set-about">Über</h4>
+          <p style="color:var(--text-muted);margin:0" data-i18n="set-about-p">Wissensarchiv · Etappe 1 (Fundament). Keine Konten, kein Server – deine Daten bleiben bei dir.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ============ Reconnect-Dialog ============ -->
+<div class="overlay" id="dlg-reconnect">
+  <div class="modal">
+    <div class="modal-head"><div class="mi">🔌</div><h3 data-i18n="rc-h">Ordner erneut verbinden</h3></div>
+    <div class="modal-body">
+      <p data-i18n="rc-p">Der Browser hat die Berechtigung für deinen Datenordner zurückgesetzt (z. B. nach dem Löschen von Website-Daten). Deine Dateien sind unverändert auf der Festplatte – bitte den Ordner einmal neu bestätigen.</p>
+      <div class="folder-preview"><div class="root">📁 <span id="rc-name">—</span></div></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn neutral" id="rc-other" data-i18n="rc-other">Anderen Ordner wählen</button>
+      <button class="btn" id="rc-connect">📂 <span data-i18n="rc-btn">Verbinden</span></button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+/* =====================================================================
+   Wissensarchiv – Etappe 1 (Fundament)
+   Vanilla JS, modular. Alle Daten liegen im vom Nutzer gewählten Ordner.
+   ===================================================================== */
+(() => {
+  'use strict';
+
+  // ---------- kleiner IndexedDB-Key/Value-Store (nur Handle-Cache + UI-State) ----------
+  const IDB = {
+    _db: null,
+    async open() {
+      if (this._db) return this._db;
+      this._db = await new Promise((res, rej) => {
+        const r = indexedDB.open('wissensarchiv', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('kv');
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+      });
+      return this._db;
+    },
+    async get(key) {
+      const db = await this.open();
+      return new Promise((res, rej) => {
+        const tx = db.transaction('kv', 'readonly').objectStore('kv').get(key);
+        tx.onsuccess = () => res(tx.result);
+        tx.onerror = () => rej(tx.error);
+      });
+    },
+    async set(key, val) {
+      const db = await this.open();
+      return new Promise((res, rej) => {
+        const tx = db.transaction('kv', 'readwrite');
+        tx.objectStore('kv').put(val, key);
+        tx.oncomplete = () => res();
+        tx.onerror = () => rej(tx.error);
+      });
+    },
+    async del(key) {
+      const db = await this.open();
+      return new Promise((res, rej) => {
+        const tx = db.transaction('kv', 'readwrite');
+        tx.objectStore('kv').delete(key);
+        tx.oncomplete = () => res();
+        tx.onerror = () => rej(tx.error);
+      });
+    },
+  };
+
+  // ---------- App-Zustand ----------
+  const state = {
+    rootHandle: null,
+    dirs: {},                       // originals, index, meta, exports (Directory-Handles)
+    settings: { theme: 'auto', lang: 'de' },
+    pendingHandle: null,            // Handle, das auf Reconnect wartet
+  };
+
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+  // ---------- Toast ----------
+  function toast(msg, kind = '') {
+    const el = document.createElement('div');
+    el.className = 'toast' + (kind ? ' ' + kind : '');
+    el.textContent = msg;
+    $('#toasts').appendChild(el);
+    setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; }, 2600);
+    setTimeout(() => el.remove(), 3000);
+  }
+
+  // ---------- Screens umschalten ----------
+  function showScreen(name) {
+    $('#screen-unsupported').classList.toggle('show', name === 'unsupported');
+    $('#screen-onboard').classList.toggle('show', name === 'onboard');
+    $('#app').classList.toggle('show', name === 'app');
+  }
+
+  // ---------- Theme ----------
+  function applyTheme(t) {
+    state.settings.theme = t;
+    if (t === 'auto') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', t);
+    $('#theme-btn').textContent = t === 'dark' ? '🌙' : t === 'light' ? '☀️' : '🌓';
+    $$('#theme-seg button').forEach((b) => b.classList.toggle('on', b.dataset.themeVal === t));
+    try { localStorage.setItem('wa.theme', t); } catch (e) {}
+  }
+  function cycleTheme() {
+    const order = ['auto', 'light', 'dark'];
+    const next = order[(order.indexOf(state.settings.theme) + 1) % 3];
+    applyTheme(next);
+    persistSettings();
+  }
+
+  // ---------- Sprache / i18n ----------
+  const I18N = {
+    'uns-h': ['Nicht unterstützter Browser', 'Unsupported browser'],
+    'uns-p': ['Das Wissensarchiv benötigt die <b>File System Access API</b>, um deine Daten direkt auf der Festplatte zu speichern. Diese ist aktuell nur in <b>Google Chrome</b> und <b>Microsoft Edge</b> (Desktop) verfügbar.', 'Knowledge Archive needs the <b>File System Access API</b> to store your data directly on disk. It is currently only available in <b>Google Chrome</b> and <b>Microsoft Edge</b> (desktop).'],
+    'uns-note': ['Bitte öffne diese Seite in Chrome oder Edge. Hinweis: Die App muss über <code>https://</code> oder <code>localhost</code> laufen – nicht per Doppelklick als lokale Datei.', 'Please open this page in Chrome or Edge. Note: the app must run over <code>https://</code> or <code>localhost</code> – not as a double-clicked local file.'],
+    'ob-title': ['Willkommen im Wissensarchiv', 'Welcome to your Knowledge Archive'],
+    'ob-sub': ['Deine persönliche, offline-fähige Wissensdatenbank. Wähle einen Ordner auf der Festplatte – dort werden alle Originaldateien, der Suchindex und deine Metadaten als echte Dateien gespeichert. Das übersteht auch das Löschen von Browser-Daten.', 'Your personal, offline-capable knowledge base. Choose a folder on disk – all original files, the search index and your metadata are stored there as real files. This survives clearing your browser data.'],
+    'ob-yourfolder': ['Dein Ordner', 'Your folder'],
+    'ob-d1': ['– Originaldateien', '– original files'],
+    'ob-d2': ['– ein JSON-Index pro Dokument', '– one JSON index per document'],
+    'ob-d3': ['– Tags, Notizen, Einstellungen, API-Key', '– tags, notes, settings, API key'],
+    'ob-d4': ['– Berichte & Backups', '– reports & backups'],
+    'ob-choose': ['Ordner wählen', 'Choose folder'],
+    'ob-browser': ['Erfordert Chrome oder Edge (Desktop).', 'Requires Chrome or Edge (desktop).'],
+    'nav-nav': ['Navigation', 'Navigation'], 'nav-actions': ['Aktionen', 'Actions'],
+    'nav-lib': ['Bibliothek', 'Library'], 'nav-search': ['Suche', 'Search'],
+    'nav-sum': ['Zusammenfassung', 'Summary'], 'nav-backup': ['Backup', 'Backup'],
+    'nav-set': ['Einstellungen', 'Settings'], 'nav-import': ['Importieren', 'Import'],
+    'foot-connected': ['Ordner verbunden', 'Folder connected'],
+    'lib-h': ['Bibliothek', 'Library'], 'lib-p': ['Alle Dokumente an einem Ort.', 'All your documents in one place.'],
+    'lib-empty-h': ['Noch keine Dokumente', 'No documents yet'],
+    'lib-empty-p': ['Import, Volltextindex und Verwaltung folgen in den nächsten Etappen. Das Fundament (Ordner-Anbindung, Offline-Betrieb, Einstellungen) steht bereits.', 'Import, full-text index and management come in the next stages. The foundation (folder access, offline operation, settings) is already in place.'],
+    'search-p': ['Volltext über alle Indizes.', 'Full-text across all indexes.'],
+    'search-soon': ['Volltextsuche mit Filtern, Snippets und Quellenreferenz folgt zusammen mit dem Import.', 'Full-text search with filters, snippets and source references arrives together with import.'],
+    'sum-p': ['Extraktiv (offline) oder per Claude API.', 'Extractive (offline) or via Claude API.'],
+    'sum-soon': ['Zusammenfassungen mit vollständigem Quellenverzeichnis und Export als DOCX/PDF/XLSX.', 'Summaries with a full source list and export to DOCX/PDF/XLSX.'],
+    'backup-p': ['Komplettes Archiv als ZIP.', 'Full archive as a ZIP.'],
+    'backup-soon': ['Export und Wiederherstellung des gesamten Archivs inklusive Tags und Notizen.', 'Export and restore the whole archive including tags and notes.'],
+    'import-p': ['PDF · DOCX · XLSX · CSV · TXT · MD', 'PDF · DOCX · XLSX · CSV · TXT · MD'],
+    'import-soon': ['Import per Drag & Drop, Dateiauswahl oder ganzem Ordner. Parsing im Web Worker, PDF seitenweise, mit Fortschrittsanzeige.', 'Import via drag & drop, file picker or a whole folder. Parsing in a web worker, PDF page by page, with a progress bar.'],
+    'soon-h': ['Bald verfügbar', 'Coming soon'],
+    'stage2': ['Kommt in Etappe 2', 'Coming in stage 2'],
+    'stage3': ['Kommt in Etappe 3', 'Coming in stage 3'],
+    'stage4': ['Kommt in Etappe 4', 'Coming in stage 4'],
+    'set-p': ['Lokal gespeichert in /meta/settings.json', 'Stored locally in /meta/settings.json'],
+    'set-appear': ['Darstellung', 'Appearance'], 'set-theme': ['Theme', 'Theme'],
+    'theme-auto': ['Auto', 'Auto'], 'theme-light': ['Hell', 'Light'], 'theme-dark': ['Dunkel', 'Dark'],
+    'set-lang': ['Sprache / Language', 'Language / Sprache'],
+    'set-storage': ['Speicherort', 'Storage location'],
+    'set-storage-p': ['Alle Daten liegen als echte Dateien in diesem Ordner.', 'All data lives as real files in this folder.'],
+    'set-change': ['Ordner wechseln', 'Change folder'], 'set-disconnect': ['Trennen', 'Disconnect'],
+    'set-offline': ['Offline-Betrieb wird eingerichtet …', 'Setting up offline mode …'],
+    'set-offline-on': ['Offline-Betrieb aktiv (App als PWA installierbar).', 'Offline mode active (installable as a PWA).'],
+    'set-offline-off': ['Offline-Betrieb nicht verfügbar (nur über https/localhost).', 'Offline mode unavailable (needs https/localhost).'],
+    'set-api': ['Claude API (optional)', 'Claude API (optional)'],
+    'set-api-p': ['Für Online-Zusammenfassungen (Modell claude-sonnet-4-6). Wird lokal in /meta gespeichert.', 'For online summaries (model claude-sonnet-4-6). Stored locally in /meta.'],
+    'set-about': ['Über', 'About'],
+    'set-about-p': ['Wissensarchiv · Etappe 1 (Fundament). Keine Konten, kein Server – deine Daten bleiben bei dir.', 'Knowledge Archive · Stage 1 (foundation). No accounts, no server – your data stays with you.'],
+    'rc-h': ['Ordner erneut verbinden', 'Reconnect folder'],
+    'rc-p': ['Der Browser hat die Berechtigung für deinen Datenordner zurückgesetzt (z. B. nach dem Löschen von Website-Daten). Deine Dateien sind unverändert auf der Festplatte – bitte den Ordner einmal neu bestätigen.', 'The browser reset permission for your data folder (e.g. after clearing site data). Your files are untouched on disk – please confirm the folder once more.'],
+    'rc-other': ['Anderen Ordner wählen', 'Choose another folder'], 'rc-btn': ['Verbinden', 'Connect'],
+  };
+
+  function applyLang(lang) {
+    state.settings.lang = lang;
+    const i = lang === 'de' ? 0 : 1;
+    document.documentElement.lang = lang;
+    $$('[data-i18n]').forEach((n) => { const t = I18N[n.getAttribute('data-i18n')]; if (t) n.innerHTML = t[i]; });
+    $$('#lang-seg button, #lang-seg2 button').forEach((b) => b.classList.toggle('on', b.dataset.lang === lang));
+    updateOfflineLabel();
+    try { localStorage.setItem('wa.lang', lang); } catch (e) {}
+  }
+
+  // ---------- File System Access ----------
+  function fsSupported() { return 'showDirectoryPicker' in window; }
+
+  async function ensurePermission(handle, mode = 'readwrite') {
+    const opts = { mode };
+    if ((await handle.queryPermission(opts)) === 'granted') return true;
+    if ((await handle.requestPermission(opts)) === 'granted') return true;
+    return false;
+  }
+
+  async function ensureStructure() {
+    const names = ['originals', 'index', 'meta', 'exports'];
+    for (const n of names) {
+      state.dirs[n] = await state.rootHandle.getDirectoryHandle(n, { create: true });
+    }
+  }
+
+  async function loadSettings() {
+    // Autoritative Quelle: /meta/settings.json im Datenordner.
+    try {
+      const fh = await state.dirs.meta.getFileHandle('settings.json', { create: false });
+      const txt = await (await fh.getFile()).text();
+      const parsed = JSON.parse(txt);
+      state.settings = Object.assign({ theme: 'auto', lang: 'de' }, parsed);
+    } catch (e) {
+      // Datei fehlt oder unlesbar -> Defaults schreiben.
+      state.settings = { theme: 'auto', lang: 'de' };
+      await persistSettings();
+    }
+  }
+
+  let _persistTimer = null;
+  function persistSettings() {
+    // debounced Schreiben, damit schnelle Klicks nicht mehrfach schreiben.
+    return new Promise((res) => {
+      clearTimeout(_persistTimer);
+      _persistTimer = setTimeout(async () => {
+        try {
+          if (state.dirs.meta) {
+            const fh = await state.dirs.meta.getFileHandle('settings.json', { create: true });
+            const w = await fh.createWritable();
+            await w.write(JSON.stringify(state.settings, null, 2));
+            await w.close();
+          }
+        } catch (e) { console.warn('settings speichern fehlgeschlagen', e); }
+        res();
+      }, 150);
+    });
+  }
+
+  async function countDocuments() {
+    let n = 0;
+    try {
+      for await (const [name, h] of state.dirs.index.entries()) {
+        if (h.kind === 'file' && name.endsWith('.json')) n++;
+      }
+    } catch (e) {}
+    return n;
+  }
+
+  // ---------- Boot / Verbindung ----------
+  async function bootApp() {
+    await ensureStructure();
+    await loadSettings();
+    applyTheme(state.settings.theme);
+    applyLang(state.settings.lang);
+
+    const path = state.rootHandle.name;
+    $('#foot-path').textContent = path;
+    $('#set-path').textContent = path;
+    $('#cnt-lib').textContent = String(await countDocuments());
+
+    showScreen('app');
+    toast(state.settings.lang === 'de' ? 'Ordner verbunden.' : 'Folder connected.', 'ok');
+  }
+
+  async function pickFolder() {
+    try {
+      const handle = await window.showDirectoryPicker({ id: 'wissensarchiv', mode: 'readwrite' });
+      if (!(await ensurePermission(handle))) { toast(t('perm-denied'), 'err'); return; }
+      state.rootHandle = handle;
+      await IDB.set('rootHandle', handle);
+      await bootApp();
+    } catch (e) {
+      if (e && e.name === 'AbortError') return; // Nutzer hat abgebrochen
+      console.error(e);
+      toast(t('folder-err'), 'err');
+    }
+  }
+
+  async function reconnect() {
+    const h = state.pendingHandle;
+    if (!h) return;
+    try {
+      if (!(await ensurePermission(h))) { toast(t('perm-denied'), 'err'); return; }
+      state.rootHandle = h;
+      await IDB.set('rootHandle', h);
+      $('#dlg-reconnect').classList.remove('show');
+      await bootApp();
+    } catch (e) { console.error(e); toast(t('folder-err'), 'err'); }
+  }
+
+  async function disconnect() {
+    await IDB.del('rootHandle');
+    state.rootHandle = null;
+    state.dirs = {};
+    showScreen('onboard');
+    toast(t('disconnected'));
+  }
+
+  // kurze Laufzeit-Übersetzung für Toasts
+  function t(key) {
+    const M = {
+      'perm-denied': ['Zugriff verweigert. Ohne Ordner-Berechtigung kann nicht gespeichert werden.', 'Access denied. Without folder permission nothing can be saved.'],
+      'folder-err': ['Ordner konnte nicht geöffnet werden.', 'Could not open the folder.'],
+      'disconnected': ['Ordner getrennt.', 'Folder disconnected.'],
+      'theme-saved': ['Gespeichert.', 'Saved.'],
+    };
+    return (M[key] || ['', ''])[state.settings.lang === 'de' ? 0 : 1];
+  }
+
+  // ---------- Offline-/PWA-Statusanzeige ----------
+  let offlineReady = false;
+  function updateOfflineLabel() {
+    const sw = $('#sw-offline'), lbl = $('#offline-label');
+    if (!lbl) return;
+    sw.classList.toggle('on', offlineReady);
+    const i = state.settings.lang === 'de' ? 0 : 1;
+    lbl.innerHTML = offlineReady ? I18N['set-offline-on'][i] : (('serviceWorker' in navigator && window.isSecureContext) ? I18N['set-offline'][i] : I18N['set-offline-off'][i]);
+  }
+
+  // ---------- Navigation ----------
+  function switchView(view) {
+    $$('.view').forEach((v) => v.classList.remove('show'));
+    const el = $('#view-' + view);
+    if (el) el.classList.add('show');
+    $$('.nav-item').forEach((n) => n.classList.toggle('active', n.dataset.view === view));
+    $('.main').scrollTop = 0;
+  }
+
+  // ---------- Event-Verdrahtung ----------
+  function wireEvents() {
+    $('#btn-pick').addEventListener('click', pickFolder);
+    $('#rc-connect').addEventListener('click', reconnect);
+    $('#rc-other').addEventListener('click', () => { $('#dlg-reconnect').classList.remove('show'); pickFolder(); });
+    $('#theme-btn').addEventListener('click', cycleTheme);
+    $('#btn-change-folder').addEventListener('click', pickFolder);
+    $('#btn-disconnect').addEventListener('click', disconnect);
+
+    $$('.nav-item').forEach((b) => b.addEventListener('click', () => switchView(b.dataset.view)));
+    $$('[data-view-jump]').forEach((b) => b.addEventListener('click', () => switchView(b.dataset.viewJump)));
+
+    $$('#theme-seg button').forEach((b) => b.addEventListener('click', () => { applyTheme(b.dataset.themeVal); persistSettings(); }));
+    $$('#lang-seg button, #lang-seg2 button').forEach((b) => b.addEventListener('click', () => { applyLang(b.dataset.lang); persistSettings(); }));
+
+    $$('.overlay').forEach((o) => o.addEventListener('click', (e) => { if (e.target === o) o.classList.remove('show'); }));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $$('.overlay').forEach((o) => o.classList.remove('show')); });
+  }
+
+  // ---------- Service Worker ----------
+  async function registerSW() {
+    if (!('serviceWorker' in navigator) || !window.isSecureContext) { updateOfflineLabel(); return; }
+    try {
+      const reg = await navigator.serviceWorker.register('service-worker.js');
+      const check = () => { if (navigator.serviceWorker.controller) { offlineReady = true; updateOfflineLabel(); } };
+      check();
+      navigator.serviceWorker.addEventListener('controllerchange', check);
+      if (reg.active && !navigator.serviceWorker.controller) {
+        // erster Aufruf: SW aktiv, übernimmt Kontrolle beim Neuladen
+        offlineReady = true; updateOfflineLabel();
+      }
+    } catch (e) { console.warn('SW-Registrierung fehlgeschlagen', e); }
+    updateOfflineLabel();
+  }
+
+  // ---------- Start ----------
+  async function init() {
+    wireEvents();
+
+    // UI-Vorbelegung aus localStorage (unkritischer Zustand, für sofortiges Rendern vor Ordner-Anbindung)
+    try {
+      const th = localStorage.getItem('wa.theme'); if (th) state.settings.theme = th;
+      const lg = localStorage.getItem('wa.lang'); if (lg) state.settings.lang = lg;
+    } catch (e) {}
+    applyTheme(state.settings.theme);
+    applyLang(state.settings.lang);
+
+    registerSW();
+
+    if (!fsSupported()) { showScreen('unsupported'); return; }
+
+    // Handle wiederherstellen
+    let handle = null;
+    try { handle = await IDB.get('rootHandle'); } catch (e) {}
+
+    if (!handle) { showScreen('onboard'); return; }
+
+    try {
+      if ((await handle.queryPermission({ mode: 'readwrite' })) === 'granted') {
+        state.rootHandle = handle;
+        await bootApp();
+      } else {
+        state.pendingHandle = handle;
+        $('#rc-name').textContent = handle.name;
+        showScreen('onboard');           // Hintergrund
+        $('#dlg-reconnect').classList.add('show');
+      }
+    } catch (e) {
+      console.error(e);
+      showScreen('onboard');
+    }
+  }
+
+  window.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>
