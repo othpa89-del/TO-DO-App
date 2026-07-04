@@ -1439,7 +1439,7 @@ export default function App() {
             <button className="ub-x" onClick={() => setSwUpdate(false)} title={L("Später", "Later")}><X size={15} /></button>
           </div>
         )}
-        <footer className="app-foot">© Copyright by Patrick Thorn</footer>
+        <footer className="app-foot">© Copyright by Patrick Thorn<span className="app-ver">Version {__APP_VERSION__} · {fmtDay(__BUILD_DATE__)}</span></footer>
       </div>
 
       {/* Globale Suche */}
@@ -1896,6 +1896,7 @@ aside.panel .card{position:sticky;top:16px;}
 .prow-topics{display:flex;flex-wrap:wrap;gap:4px;max-width:260px;}
 .prow-count{font-size:12px;font-weight:700;color:${C.grey};white-space:nowrap;}
 .app-foot{text-align:center;font-size:14px;font-weight:700;color:#8b93a7;border-top:1px solid ${C.fill};margin-top:6px;padding:18px 12px calc(22px + env(safe-area-inset-bottom));}
+.app-ver{display:block;margin-top:4px;font-size:11px;font-weight:600;color:${C.cool};}
 .dash{padding:20px 24px 48px;max-width:1180px;margin:0 auto;}
 .dash-head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:16px;}
 .dash-hi{font-size:24px;font-weight:900;color:${C.ink};margin:0;}
