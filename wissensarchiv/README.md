@@ -110,16 +110,26 @@ wissensarchiv/
 - **Import:** Drag & Drop, Dateiauswahl oder ganzer Ordner. Formate PDF, DOCX,
   XLSX, CSV, TXT, MD. Parsing im Web Worker (UI bleibt bedienbar); PDF seitenweise
   mit Fortschrittsanzeige „Seite x von y". Gescannte PDFs ohne Textebene werden
-  erkannt und markiert (kein OCR). Duplikate (Name/Inhalt) → Überspringen/Ersetzen.
-- **Suche:** Volltext über alle Index-JSONs (Originale werden nie geladen). Filter
+  erkannt und markiert. Duplikate (Name/Inhalt) → Überspringen/Ersetzen.
+- **OCR (lokal):** Gescannte PDFs lassen sich per „Text erkennen (OCR)" durchsuchbar
+  machen – tesseract.js läuft komplett auf deinem Gerät (Deutsch + Englisch,
+  aus `vendor/` mitgeliefert, funktioniert offline; nichts wird hochgeladen).
+- **Suche:** Volltext über alle Index-JSONs (Originale werden nie geladen).
+  Mehrere Wörter = UND-Suche; `"in Anführungszeichen"` = Phrasensuche;
+  Umlaut-tolerant (Kündigung findet auch „Kuendigung" und umgekehrt). Filter
   nach Dateityp, Importzeitraum und Tags. Treffer mit Kontext-Snippet,
   hervorgehobenem Begriff und präziser Quelle (Seite / Blatt + Zelle / Abschnitt).
-  Klick öffnet die Fundstelle – bei PDF wird nur die betroffene Seite gerendert.
+  Klick öffnet die Fundstelle – bei PDF wird nur die betroffene Seite gerendert
+  und die Suchbegriffe werden direkt auf der Seite markiert.
 - **Bibliothek:** Sortierung (Name/Datum/Größe), Filter, Bestandssuche; pro Datei
   Umbenennen, Tags, Notizen, Löschen, Original öffnen/herunterladen, Neu-Indexieren;
   Mehrfachauswahl für Batch-Aktionen (Taggen/Löschen).
-- **Backup:** Komplett-Export des Archivs als eine ZIP (Originale + Index + Meta)
-  und ZIP-Import zur vollständigen Wiederherstellung inkl. Tags und Notizen.
+- **Backup:** Komplett-Export des Archivs als eine ZIP (Originale + Index + Meta,
+  bewusst **ohne API-Key**) und ZIP-Import zur vollständigen Wiederherstellung
+  inkl. Tags und Notizen. Zusätzlich **automatische Backups** (täglich/wöchentlich,
+  abschaltbar) – die letzten 5 werden in `/exports` aufbewahrt.
+- **Mehrfach-Tab-Schutz:** Die App läuft nur in einem Tab gleichzeitig, damit sich
+  parallele Schreibvorgänge nicht gegenseitig überschreiben können.
 - **Zusammenfassung:** extraktiv (offline, Satz-Ranking) oder per Claude API
   (`claude-sonnet-4-6`, API-Key lokal in `/meta/apikey.txt`, sauberes Fehler-
   handling offline). Jede Zusammenfassung endet mit vollständigem Quellenverzeichnis.
@@ -133,6 +143,26 @@ wissensarchiv/
   Schnappschüsse und werden nicht automatisch aktualisiert.
 - **Oberfläche:** Seitenleiste + Hauptbereich, Farbwelt exakt nach Vorgabe, Arial,
   Dark/Light/Auto-Theme, Sprache Deutsch/Englisch umschaltbar.
+
+---
+
+## Tests
+
+Unter `tests/` liegt eine End-to-End-Suite (Playwright/Chromium), die Import,
+Suche, Fundstelle, Exporte, Backup, Duplikate, XSS-Härtung, Live-Exporte,
+OPFS-Modus, iPhone-Layout, Tab-Lock und OCR abdeckt:
+
+```bash
+cd tests
+npm install
+npx playwright install chromium
+npm test
+```
+
+Der GitHub-Actions-Workflow `.github/workflows/wissensarchiv-tests.yml` führt die
+Suite bei jedem Push automatisch aus. **Beim Umzug in ein eigenes Repository die
+Workflow-Datei mitnehmen** (sie liegt repo-weit unter `.github/`, nicht in diesem
+Ordner).
 
 ---
 

@@ -4,7 +4,7 @@
  * Strategie: cache-first für gleiche Origin, mit Laufzeit-Caching neuer Dateien
  * (z. B. vendor-Libs, die in späteren Etappen dazukommen). */
 
-const VERSION = 'wa-v4';
+const VERSION = 'wa-v5';
 const CACHE = `wissensarchiv-${VERSION}`;
 
 // Kern der App-Shell, der beim Installieren fest vorgeladen wird.
@@ -24,6 +24,14 @@ const APP_SHELL = [
   './vendor/jszip.min.js',
   './vendor/docx.umd.js',
   './vendor/jspdf.umd.min.js',
+  // OCR (tesseract.js) – vorab gecacht, damit Texterkennung auch offline geht
+  './vendor/tesseract/tesseract.min.js',
+  './vendor/tesseract/worker.min.js',
+  './vendor/tesseract/tesseract-core-simd-lstm.wasm.js',
+  './vendor/tesseract/tesseract-core-relaxedsimd-lstm.wasm.js',
+  './vendor/tesseract/tesseract-core-lstm.wasm.js',
+  './vendor/tesseract/lang/deu.traineddata.gz',
+  './vendor/tesseract/lang/eng.traineddata.gz',
 ];
 
 self.addEventListener('install', (event) => {

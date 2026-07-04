@@ -237,6 +237,17 @@
   </div>
 </div>
 
+<!-- Bereits in anderem Tab geöffnet -->
+<div class="fullscreen" id="screen-locked">
+  <div class="card-center">
+    <div class="onboard-logo">W</div>
+    <h1 data-i18n="lock-h">Bereits geöffnet</h1>
+    <p data-i18n="lock-p">Das Wissensarchiv läuft schon in einem anderen Tab oder Fenster. Um Datenverlust durch gleichzeitige Änderungen zu vermeiden, kann es nur in einem Tab gleichzeitig geöffnet sein.</p>
+    <button class="btn lg" onclick="location.reload()">🔄 <span data-i18n="lock-retry">Erneut versuchen</span></button>
+    <p class="small-note" data-i18n="lock-note">Schließe den anderen Tab und klicke dann auf „Erneut versuchen".</p>
+  </div>
+</div>
+
 <!-- Onboarding -->
 <div class="fullscreen" id="screen-onboard">
   <div class="card-center">
@@ -382,6 +393,15 @@
           <p style="color:var(--text-muted)" data-i18n="backup-exp-p">Erzeugt eine ZIP mit /originals, /index und /meta. Wird in /exports gespeichert und als Download angeboten.</p>
           <div class="row" style="margin-top:10px" id="backup-stats"></div>
           <button class="btn" style="margin-top:14px;width:100%;justify-content:center" id="backup-export">⬇ <span data-i18n="backup-create">Backup-ZIP erstellen</span></button>
+          <div class="row" style="justify-content:space-between;margin-top:14px">
+            <span data-i18n="ab-label">Automatisches Backup</span>
+            <select id="autobackup-sel" style="padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-family:inherit">
+              <option value="off">Aus</option>
+              <option value="daily">Täglich</option>
+              <option value="weekly">Wöchentlich</option>
+            </select>
+          </div>
+          <div class="fmeta" id="ab-last" style="margin-top:6px"></div>
         </div>
         <div class="panel panel-pad">
           <div style="font-size:26px">♻️</div>
@@ -579,7 +599,21 @@
   function toast(msg, kind=''){ const el=document.createElement('div'); el.className='toast'+(kind?' '+kind:''); el.textContent=msg; $('#toasts').appendChild(el); setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .3s';},2800); setTimeout(()=>el.remove(),3200); }
 
   // ---------- Screens ----------
-  function showScreen(name){ $('#screen-unsupported').classList.toggle('show',name==='unsupported'); $('#screen-onboard').classList.toggle('show',name==='onboard'); $('#app').classList.toggle('show',name==='app'); }
+  function showScreen(name){ $('#screen-unsupported').classList.toggle('show',name==='unsupported'); $('#screen-locked').classList.toggle('show',name==='locked'); $('#screen-onboard').classList.toggle('show',name==='onboard'); $('#app').classList.toggle('show',name==='app'); }
+
+  // Nur ein Tab gleichzeitig – zwei Tabs wuerden sich beim Schreiben von
+  // catalog.json/Index-Dateien gegenseitig ueberschreiben (letzter gewinnt).
+  function acquireTabLock(){
+    if(window.__WA_MOCK_ROOT__||window.__WA_TEST__) return Promise.resolve(true);
+    if(!(navigator.locks&&navigator.locks.request)) return Promise.resolve(true);
+    return new Promise((resolve)=>{
+      navigator.locks.request('wissensarchiv-primary',{ifAvailable:true},(lock)=>{
+        if(!lock){ resolve(false); return; }
+        resolve(true);
+        return new Promise(()=>{}); // Lock bis zum Schliessen des Tabs halten
+      }).catch(()=>resolve(true));
+    });
+  }
 
   // ---------- Theme ----------
   function applyTheme(t){ state.settings.theme=t; if(t==='auto')document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme',t); $('#theme-btn').textContent=t==='dark'?'🌙':t==='light'?'☀️':'🌓'; $$('#theme-seg button').forEach(b=>b.classList.toggle('on',b.dataset.themeVal===t)); try{localStorage.setItem('wa.theme',t);}catch(e){} }
@@ -609,7 +643,7 @@
     'sum-hint':['Wähle links eine Quelle und erstelle eine Zusammenfassung.','Pick a source on the left and generate a summary.'],
     'sum-sources':['Quellenverzeichnis','Source list'],'export-as':['Exportieren als:','Export as:'],
     'backup-p':['Komplettes Archiv als eine ZIP – Originale, Indizes, Tags & Notizen.','Full archive as one ZIP – originals, indexes, tags & notes.'],
-    'backup-exp-h':['Archiv exportieren','Export archive'],'backup-exp-p':['Erzeugt eine ZIP mit /originals, /index und /meta. Wird in /exports gespeichert und als Download angeboten.','Creates a ZIP with /originals, /index and /meta. Saved to /exports and offered as a download.'],
+    'backup-exp-h':['Archiv exportieren','Export archive'],'backup-exp-p':['Erzeugt eine ZIP mit /originals, /index und /meta (ohne API-Key). Wird in /exports gespeichert und als Download angeboten.','Creates a ZIP with /originals, /index and /meta (without the API key). Saved to /exports and offered as a download.'],
     'backup-create':['Backup-ZIP erstellen','Create backup ZIP'],'backup-imp-h':['Aus ZIP wiederherstellen','Restore from ZIP'],'backup-imp-p':['Vollständige Wiederherstellung – inklusive Tags und Notizen. Vorhandene Dokumente werden ergänzt.','Full restore – including tags and notes. Existing documents are merged in.'],'backup-drop':['Backup-ZIP hierher ziehen oder klicken','Drop a backup ZIP here or click'],
     'import-p':['PDF · DOCX · XLSX · CSV · TXT · MD','PDF · DOCX · XLSX · CSV · TXT · MD'],
     'imp-drop':['Dateien oder ganzen Ordner hierher ziehen','Drop files or a whole folder here'],'imp-files':['Dateien wählen','Choose files'],'imp-folder':['Ordner wählen','Choose folder'],
@@ -618,7 +652,7 @@
     'set-api':['Claude API (optional)','Claude API (optional)'],'set-api-p':['Für Online-Zusammenfassungen (Modell claude-sonnet-4-6). Wird lokal in /meta/apikey.txt gespeichert – nicht im Browser.','For online summaries (model claude-sonnet-4-6). Stored locally in /meta/apikey.txt – not in the browser.'],'api-test':['Verbindung testen','Test connection'],'save':['Speichern','Save'],
     'set-storage':['Speicherort','Storage location'],'set-storage-p':['Alle Daten liegen als echte Dateien in diesem Ordner.','All data lives as real files in this folder.'],'set-change':['Ordner wechseln','Change folder'],'set-disconnect':['Trennen','Disconnect'],
     'set-offline':['Offline-Betrieb wird eingerichtet …','Setting up offline mode …'],'set-offline-on':['Offline-Betrieb aktiv (App als PWA installierbar).','Offline mode active (installable as a PWA).'],'set-offline-off':['Offline-Betrieb nicht verfügbar (nur über https/localhost).','Offline mode unavailable (needs https/localhost).'],
-    'set-about':['Über','About'],'set-about-p':['Wissensarchiv v1.1 · Keine Konten, kein Server – deine Daten bleiben bei dir.','Knowledge Archive v1.1 · No accounts, no server – your data stays with you.'],
+    'set-about':['Über','About'],'set-about-p':['Wissensarchiv v1.3 · Keine Konten, kein Server – deine Daten bleiben bei dir.','Knowledge Archive v1.3 · No accounts, no server – your data stays with you.'],
     'rc-h':['Ordner erneut verbinden','Reconnect folder'],'rc-p':['Der Browser hat die Berechtigung für deinen Datenordner zurückgesetzt. Deine Dateien sind unverändert auf der Festplatte – bitte den Ordner einmal neu bestätigen.','The browser reset permission for your data folder. Your files are untouched on disk – please confirm the folder once more.'],'rc-other':['Anderen Ordner wählen','Choose another folder'],'rc-btn':['Verbinden','Connect'],
     'dup-h':['Duplikat gefunden','Duplicate found'],'dup-all':['Für alle weiteren Duplikate übernehmen','Apply to all further duplicates'],'dup-skip':['Überspringen','Skip'],'dup-replace':['Ersetzen','Replace'],
     'cancel':['Abbrechen','Cancel'],'ok':['OK','OK'],'close':['Schließen','Close'],
@@ -629,7 +663,7 @@
     'batch-tag':['Taggen','Tag'],'batch-delete':['Löschen','Delete'],'sel-count':['ausgewählt','selected'],
     'hits':['Treffer','hits'],'no-hits':['Keine Treffer.','No results.'],'type-search-hint':['Gib oben einen Suchbegriff ein.','Type a search term above.'],
     'open-hit':['Fundstelle öffnen →','Open source →'],'doc-note-l':['Notiz','Note'],'doc-info':['Dokument-Info','Document info'],
-    'scan-warn':['Dieses PDF hat keine Textebene (gescannt). Suche findet nur den Dateinamen. Kein OCR.','This PDF has no text layer (scanned). Search only matches the file name. No OCR.'],
+    'scan-warn':['Dieses PDF hat keine Textebene (gescannt) und ist noch nicht durchsuchbar. Mit „Text erkennen (OCR)" wird der Text lokal auf deinem Gerät erkannt – es werden keine Daten hochgeladen.','This PDF has no text layer (scanned) and is not searchable yet. Use “Recognize text (OCR)” to extract the text locally on your device – nothing is uploaded.'],
     'page':['Seite','Page'],'section':['Abschnitt','Section'],'sheet':['Blatt','Sheet'],'cell':['Zelle','Cell'],
     'rename-t':['Umbenennen','Rename'],'rename-l':['Neuer Name','New name'],'tag-t':['Tag hinzufügen','Add tag'],'tag-l':['Tag-Name','Tag name'],'note-t':['Notiz bearbeiten','Edit note'],'note-l':['Notiz','Note'],
     'ob-sub-opfs':['Deine persönliche, offline-fähige Wissensdatenbank. Auf diesem Gerät speichert die App alle Daten sicher in ihrem eigenen App-Speicher (iPhone/iPad erlauben keinen direkten Ordnerzugriff). Erstelle regelmäßig Backup-ZIPs, um deine Daten zu sichern oder auf einen anderen Rechner umzuziehen.','Your personal, offline-capable knowledge base. On this device the app stores all data in its own app storage (iPhone/iPad do not allow direct folder access). Create backup ZIPs regularly to secure your data or move it to another computer.'],
@@ -642,6 +676,12 @@
     'exp-live-p':['Jeder Export wird hier registriert und bei jeder Änderung am Archiv (Import, Löschen, Tags …) automatisch neu erzeugt – die Dateien in /exports sind damit immer aktuell.','Every export is registered here and regenerated automatically whenever the archive changes (import, delete, tags …) – the files in /exports stay current at all times.'],
     'exp-none':['Noch keine Exporte. Erstelle einen Export in der Suche oder bei einer Zusammenfassung.','No exports yet. Create one from search results or a summary.'],
     'exp-updated':['Stand:','Updated:'],
+    'act-ocr':['Text erkennen (OCR)','Recognize text (OCR)'],
+    'lock-h':['Bereits geöffnet','Already open'],
+    'lock-p':['Das Wissensarchiv läuft schon in einem anderen Tab oder Fenster. Um Datenverlust durch gleichzeitige Änderungen zu vermeiden, kann es nur in einem Tab gleichzeitig geöffnet sein.','Knowledge Archive is already running in another tab or window. To prevent data loss from concurrent changes it can only be open in one tab at a time.'],
+    'lock-retry':['Erneut versuchen','Try again'],
+    'lock-note':['Schließe den anderen Tab und klicke dann auf „Erneut versuchen".','Close the other tab, then click “Try again”.'],
+    'ab-label':['Automatisches Backup','Automatic backup'],
   };
   const tr = (key) => (I18N[key]||['',''])[state.settings.lang==='de'?0:1];
   function applyLang(lang){ state.settings.lang=lang; const i=lang==='de'?0:1; document.documentElement.lang=lang;
@@ -673,8 +713,8 @@
   async function removeFile(dir, name){ try{ await dir.removeEntry(name); }catch(e){} }
 
   async function loadSettings(){
-    try{ const p=JSON.parse(await readFileText(state.dirs.meta,'settings.json')); state.settings=Object.assign({theme:'auto',lang:'de',autoExports:true},p); }
-    catch(e){ state.settings={theme:'auto',lang:'de',autoExports:true}; await persistSettings(); }
+    try{ const p=JSON.parse(await readFileText(state.dirs.meta,'settings.json')); state.settings=Object.assign({theme:'auto',lang:'de',autoExports:true,autoBackup:'weekly'},p); }
+    catch(e){ state.settings={theme:'auto',lang:'de',autoExports:true,autoBackup:'weekly'}; await persistSettings(); }
     try{ state.apiKey=(await readFileText(state.dirs.meta,'apikey.txt')).trim(); }catch(e){ state.apiKey=''; }
   }
   let _pt=null;
@@ -692,7 +732,7 @@
     // stoesst den Live-Refresh der registrierten Exporte an.
     scheduleExportRefresh();
   }
-  function summaryOf(doc){ return {id:doc.id,name:doc.name,ext:doc.ext,type:doc.type,size:doc.size,importedAt:doc.importedAt,scanned:!!doc.scanned,pageCount:doc.pageCount||null,tags:doc.tags||[],note:doc.note||'',unitCount:(doc.units||[]).length,hash:doc.hash||''}; }
+  function summaryOf(doc){ return {id:doc.id,name:doc.name,ext:doc.ext,type:doc.type,size:doc.size,importedAt:doc.importedAt,scanned:!!doc.scanned,ocr:!!doc.ocr,pageCount:doc.pageCount||null,tags:doc.tags||[],note:doc.note||'',unitCount:(doc.units||[]).length,hash:doc.hash||''}; }
   async function rebuildCatalog(){ const cat=[]; try{ for await(const [name,h] of state.dirs.index.entries()){ if(h.kind==='file'&&name.endsWith('.json')){ try{ const d=JSON.parse(await (await h.getFile()).text()); cat.push(summaryOf(d)); }catch(e){} } } }catch(e){} cat.sort((a,b)=>(b.importedAt||'').localeCompare(a.importedAt||'')); return cat; }
   async function getIndex(id){ if(state.indexCache.has(id))return state.indexCache.get(id); const d=JSON.parse(await readFileText(state.dirs.index,id+'.json')); state.indexCache.set(id,d); return d; }
   async function writeIndex(doc){ await writeFile(state.dirs.index,doc.id+'.json',JSON.stringify(doc)); state.indexCache.set(doc.id,doc); }
@@ -775,6 +815,7 @@
     }
     renderLibrary(); renderFilters(); renderBackupStats();
     toast(`${done} ${state.settings.lang==='de'?'importiert':'imported'}`+(skipped?`, ${skipped} ${state.settings.lang==='de'?'übersprungen':'skipped'}`:''), 'ok');
+    if(done>0) maybeAutoBackup();
   }
 
   // Drag&Drop inkl. Ordner
@@ -829,7 +870,7 @@
   }
   function rowHtml(r, checked){
     const tags=(r.tags||[]).map(t=>`<span class="chip tag">${esc(t)}</span>`).join(' ')||'<span style="color:var(--text-muted)">—</span>';
-    const status=r.scanned?`<span class="badge-scan">⚠ ${state.settings.lang==='de'?'Gescannt':'Scanned'}</span>`:`<span style="color:var(--good)">● ${state.settings.lang==='de'?'indexiert':'indexed'}</span>`;
+    const status=r.scanned?`<span class="badge-scan">⚠ ${state.settings.lang==='de'?'Gescannt':'Scanned'}</span>`:(r.ocr?`<span style="color:var(--good)">● OCR</span>`:`<span style="color:var(--good)">● ${state.settings.lang==='de'?'indexiert':'indexed'}</span>`);
     const meta=r.type==='pdf'&&r.pageCount?`${r.pageCount} ${tr('page')}`:`${r.unitCount} ${state.settings.lang==='de'?'Fundstellen':'units'}`;
     return `<tr class="${checked?'sel':''}" data-id="${r.id}">
       <td><input type="checkbox" class="rowsel" ${checked?'checked':''}></td>
@@ -837,10 +878,10 @@
       <td><div class="fname">${esc(r.name)}</div><div class="fmeta">${meta}</div></td>
       <td class="num">${fmtDate(r.importedAt)}</td><td class="num">${fmtBytes(r.size)}</td>
       <td>${tags}</td><td>${status}</td>
-      <td class="rowmenu"><button class="rowmenu-btn" data-menu="${r.id}">⋯</button>${menuHtml(r.id)}</td>
+      <td class="rowmenu"><button class="rowmenu-btn" data-menu="${r.id}">⋯</button>${menuHtml(r)}</td>
     </tr>`;
   }
-  function menuHtml(id){ return `<div class="menu" id="menu-${id}">
+  function menuHtml(r){ return `<div class="menu" id="menu-${r.id}">
     <button data-act="open">📂 ${tr('act-open')}</button>
     <button data-act="download">⬇ ${tr('act-download')}</button>
     <div class="sep"></div>
@@ -848,6 +889,7 @@
     <button data-act="tag">🏷 ${tr('act-tag')}</button>
     <button data-act="note">📝 ${tr('act-note')}</button>
     <button data-act="reindex">🔄 ${tr('act-reindex')}</button>
+    ${r.type==='pdf'&&(r.scanned||r.ocr)?`<button data-act="ocr">🔍 ${tr('act-ocr')}</button>`:''}
     <div class="sep"></div>
     <button data-act="delete" class="danger">🗑 ${tr('act-delete')}</button>
   </div>`; }
@@ -875,6 +917,7 @@
     else if(act==='tag'){ promptDlg('tag','', async(v)=>{ v=(v||'').trim(); if(!v)return; doc.tags=doc.tags||[]; if(!doc.tags.includes(v))doc.tags.push(v); await writeIndex(doc); updateCatalogEntry(doc); await saveCatalog(); renderLibrary(); renderFilters(); }); }
     else if(act==='note'){ promptDlg('note', doc.note||'', async(v)=>{ doc.note=v||''; await writeIndex(doc); updateCatalogEntry(doc); await saveCatalog(); renderLibrary(); }); }
     else if(act==='reindex'){ await reindexDoc(doc); }
+    else if(act==='ocr'){ await ocrDoc(doc); }
     else if(act==='delete'){ if(confirm((state.settings.lang==='de'?'Wirklich löschen? ':'Really delete? ')+doc.name)){ await deleteDoc(id); renderLibrary(); renderFilters(); renderBackupStats(); toast(state.settings.lang==='de'?'Gelöscht.':'Deleted.'); } }
   }
   function updateCatalogEntry(doc){ const i=state.catalog.findIndex(c=>c.id===doc.id); if(i>=0)state.catalog[i]=summaryOf(doc); }
@@ -886,24 +929,109 @@
   async function reindexDoc(doc){
     try{ toast(state.settings.lang==='de'?'Neu-Indexierung…':'Re-indexing…'); const f=await (await state.dirs.originals.getFileHandle(doc.storedAs)).getFile(); const buffer=await f.arrayBuffer(); const res=await parseFile(doc.id, doc.ext, buffer, null); doc.units=res.units||[]; doc.scanned=!!res.scanned; doc.pageCount=res.pageCount||null; await writeIndex(doc); updateCatalogEntry(doc); await saveCatalog(); renderLibrary(); toast('OK','ok'); }catch(e){ toast('Fehler: '+e.message,'err'); }
   }
+  // ---------- OCR (tesseract.js, komplett lokal aus vendor/) ----------
+  let _ocrWorker=null, _ocrBusy=false;
+  async function getOcrWorker(){
+    if(_ocrWorker)return _ocrWorker;
+    await loadScript('vendor/tesseract/tesseract.min.js');
+    _ocrWorker=await window.Tesseract.createWorker(['deu','eng'],1,{
+      workerPath:'vendor/tesseract/worker.min.js',
+      corePath:'vendor/tesseract',
+      langPath:'vendor/tesseract/lang',
+      gzip:true,
+    });
+    return _ocrWorker;
+  }
+  function ocrProgress(name,p,t){
+    let el=$('#ocr-progress');
+    if(!el){ el=document.createElement('div'); el.id='ocr-progress'; el.className='toast'; $('#toasts').appendChild(el); }
+    el.textContent=`🔍 OCR ${name}: ${p} / ${t}`;
+    if(p>=t){ setTimeout(()=>{ const e=$('#ocr-progress'); if(e)e.remove(); },1200); }
+  }
+  async function ocrDoc(doc){
+    const de=state.settings.lang==='de';
+    if(_ocrBusy){ toast(de?'OCR läuft bereits.':'OCR already running.','err'); return; }
+    _ocrBusy=true;
+    try{
+      toast(de?'OCR startet – das kann je Seite einige Sekunden dauern.':'OCR starting – this can take a few seconds per page.');
+      const worker=await getOcrWorker();
+      // eigenes PDF-Handle, unabhaengig vom Viewer-Cache
+      const f=await (await state.dirs.originals.getFileHandle(doc.storedAs)).getFile();
+      const pdf=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;
+      const units=[];
+      for(let p=1;p<=pdf.numPages;p++){
+        const page=await pdf.getPage(p);
+        const vp=page.getViewport({scale:2});
+        const canvas=document.createElement('canvas'); canvas.width=vp.width; canvas.height=vp.height;
+        await page.render({canvasContext:canvas.getContext('2d'), viewport:vp}).promise;
+        const {data}=await worker.recognize(canvas);
+        const text=norm(data.text||'');
+        if(text)units.push({ref:{page:p}, text});
+        page.cleanup();
+        ocrProgress(doc.name,p,pdf.numPages);
+      }
+      await pdf.destroy();
+      doc.units=units; doc.ocr=units.length>0; doc.scanned=units.length===0;
+      await writeIndex(doc); updateCatalogEntry(doc); await saveCatalog();
+      renderLibrary(); renderFilters();
+      if(state.curDoc&&state.curDoc.doc&&state.curDoc.doc.id===doc.id){ state.curDoc.doc=doc; await renderDoc(); }
+      toast(units.length?((de?'OCR fertig – ':'OCR done – ')+units.length+(de?' Seiten mit Text, jetzt durchsuchbar.':' pages with text, now searchable.')):(de?'OCR fertig – kein Text erkannt.':'OCR done – no text recognized.'), units.length?'ok':'err');
+    }catch(e){ console.error(e); toast('OCR: '+e.message,'err'); }
+    finally{ _ocrBusy=false; const el=$('#ocr-progress'); if(el)el.remove(); }
+  }
+
   async function batchTag(){ promptDlg('tag','', async(v)=>{ v=(v||'').trim(); if(!v)return; for(const id of state.lib.selected){ const doc=await getIndex(id).catch(()=>null); if(!doc)continue; doc.tags=doc.tags||[]; if(!doc.tags.includes(v))doc.tags.push(v); await writeIndex(doc); updateCatalogEntry(doc); } await saveCatalog(); renderLibrary(); renderFilters(); toast('OK','ok'); }); }
   async function batchDelete(){ if(!confirm((state.settings.lang==='de'?'Ausgewählte löschen? ':'Delete selected? ')+state.lib.selected.size)){return;} for(const id of Array.from(state.lib.selected)) await deleteDoc(id,true); await saveCatalog(); renderLibrary(); renderFilters(); renderBackupStats(); toast(state.settings.lang==='de'?'Gelöscht.':'Deleted.'); }
 
   // ---------- Suche ----------
-  function tokenize(q){ return q.toLowerCase().split(/\s+/).map(s=>s.trim()).filter(Boolean); }
+  // Faltung fuer robuste Treffer: Kündigung == Kuendigung == KUENDIGUNG.
+  // Query UND Dokumenttext werden identisch gefaltet, dadurch bleibt der
+  // Vergleich konsistent (auch wenn z.B. "neue" -> "neu" wird).
+  function fold(s){
+    return String(s).toLowerCase()
+      .replace(/ß/g,'ss')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/ae/g,'a').replace(/oe/g,'o').replace(/ue/g,'u');
+  }
+  // "Anführungszeichen" = Phrase (muss am Stueck vorkommen); alle uebrigen
+  // Woerter muessen ALLE vorkommen (UND-Suche).
+  function parseQuery(q){
+    const phrases=[]; const terms=[];
+    q=String(q||'').replace(/"([^"]*)"/g,(m,p)=>{ const t=p.trim(); if(t)phrases.push({raw:t, f:fold(t)}); return ' '; });
+    for(const w of q.split(/\s+/)){ const t=w.trim(); if(t)terms.push({raw:t, f:fold(t)}); }
+    return {terms, phrases};
+  }
+  function countOcc(hay, needle){ if(!needle)return 0; let n=0,i=0; while((i=hay.indexOf(needle,i))>=0){n++;i+=needle.length;} return n; }
+  // Schreibvarianten (ä<->ae …) fuer die Hervorhebung im Originaltext.
+  function highlightVariants(term){
+    const subs=[['ä','ae'],['ö','oe'],['ü','ue'],['ß','ss']];
+    let list=[term.toLowerCase()];
+    for(const [a,b] of subs){
+      const next=[];
+      for(const v of list){ next.push(v); if(v.includes(a))next.push(v.split(a).join(b)); if(v.includes(b))next.push(v.split(b).join(a)); }
+      list=Array.from(new Set(next)); if(list.length>16)break;
+    }
+    return list;
+  }
+  function markRegex(terms){
+    const parts=[];
+    for(const t of terms){ for(const v of highlightVariants(t)){ parts.push(v.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')); } }
+    return parts.length?new RegExp('('+parts.join('|')+')','gi'):null;
+  }
   function snippet(text, terms){
-    const lower=text.toLowerCase(); let pos=-1; for(const t of terms){ const i=lower.indexOf(t); if(i>=0&&(pos<0||i<pos))pos=i; }
+    const lower=text.toLowerCase(); let pos=-1;
+    for(const t of terms){ for(const v of highlightVariants(t)){ const i=lower.indexOf(v); if(i>=0&&(pos<0||i<pos))pos=i; } }
     if(pos<0)pos=0; const start=Math.max(0,pos-60), end=Math.min(text.length,pos+120);
-    let s=(start>0?'…':'')+text.slice(start,end)+(end<text.length?'…':'');
-    let out=esc(s);
-    for(const t of terms){ const re=new RegExp('('+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'); out=out.replace(re,'<mark>$1</mark>'); }
+    let out=esc((start>0?'…':'')+text.slice(start,end)+(end<text.length?'…':''));
+    const re=markRegex(terms); if(re)out=out.replace(re,'<mark>$1</mark>');
     return out;
   }
   // Kern der Suche – arbeitet mit expliziten Parametern, damit auch Live-Exporte
   // dieselbe Suche jederzeit reproduzieren koennen.
   async function searchArchive(p){
-    const terms=tokenize(p.q||'');
-    if(!terms.length) return {terms:[], hits:[]};
+    const qy=parseQuery(p.q||'');
+    const needles=[...qy.terms.map(t=>t.raw), ...qy.phrases.map(t=>t.raw)];
+    if(!qy.terms.length&&!qy.phrases.length) return {terms:[], hits:[]};
     await loadAllIndexes();
     const types=p.types&&p.types.length?new Set(p.types):null;
     const hits=[];
@@ -914,12 +1042,16 @@
       if(p.to&&c.importedAt&&c.importedAt.slice(0,10)>p.to)continue;
       const doc=state.indexCache.get(c.id); if(!doc)continue;
       for(const u of (doc.units||[])){
-        const lower=u.text.toLowerCase(); let matched=0; for(const t of terms)if(lower.includes(t))matched++;
-        if(matched>0) hits.push({docId:c.id, name:c.name, type:c.type, ref:u.ref, text:u.text, score:matched, tags:c.tags||[], importedAt:c.importedAt});
+        const ftext=fold(u.text);
+        // UND-Suche: jedes Wort und jede Phrase muss vorkommen
+        let score=0, ok=true;
+        for(const t of qy.terms){ const n=countOcc(ftext,t.f); if(!n){ok=false;break;} score+=n; }
+        if(ok)for(const ph of qy.phrases){ const n=countOcc(ftext,ph.f); if(!n){ok=false;break;} score+=n*2; }
+        if(ok) hits.push({docId:c.id, name:c.name, type:c.type, ref:u.ref, text:u.text, score, tags:c.tags||[], importedAt:c.importedAt});
       }
     }
     hits.sort((a,b)=>b.score-a.score);
-    return {terms, hits};
+    return {terms:needles, hits};
   }
   function currentSearchParams(){ return {q:state.search.q, types:Array.from(state.search.types), from:state.search.from, to:state.search.to, tag:state.search.tag}; }
   async function runSearch(){
@@ -966,7 +1098,8 @@
       <div class="fmeta" style="margin-bottom:8px">${doc.type.toUpperCase()} · ${fmtBytes(doc.size)} · ${fmtDate(doc.importedAt)}${doc.pageCount?` · ${doc.pageCount} ${tr('page')}`:''}</div>
       <div style="margin-bottom:8px"><b>Tags:</b> ${tags}</div>
       ${doc.note?`<div class="notice info" style="margin-top:8px"><span>📝</span><span>${esc(doc.note)}</span></div>`:''}
-      ${doc.scanned?`<div class="notice warn" style="margin-top:8px"><span>⚠</span><span>${tr('scan-warn')}</span></div>`:''}`;
+      ${doc.scanned?`<div class="notice warn" style="margin-top:8px"><span>⚠</span><span>${tr('scan-warn')}</span></div><button class="btn sm" id="doc-ocr" style="margin-top:10px">🔍 ${tr('act-ocr')}</button>`:''}`;
+    const ocrBtn=$('#doc-ocr'); if(ocrBtn)ocrBtn.onclick=()=>ocrDoc(doc);
     if(doc.type==='pdf'){
       main.innerHTML=`<div class="pdf-canvas-wrap"><canvas id="pdf-canvas"></canvas></div>
         <div class="pdf-toolbar"><button class="btn sm neutral" id="pg-prev">‹</button> ${tr('page')} <input id="pg-num" value="${state.curDoc.page}" style="width:48px;text-align:center;padding:4px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)"> / ${doc.pageCount||'?'} <button class="btn sm neutral" id="pg-next">›</button></div>`;
@@ -993,7 +1126,7 @@
     $('#doc-download').onclick=()=>docAction('download',doc.id);
     $('#doc-reindex').onclick=async()=>{ await reindexDoc(doc); await renderDoc(); };
   }
-  function snippetFull(text, terms){ let out=esc(text); for(const t of terms){ const re=new RegExp('('+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'); out=out.replace(re,'<mark>$1</mark>'); } return out; }
+  function snippetFull(text, terms){ let out=esc(text); const re=markRegex(terms); if(re)out=out.replace(re,'<mark>$1</mark>'); return out; }
   async function closePdfView(){
     if(state._renderTask){ try{state._renderTask.cancel();}catch(e){} state._renderTask=null; }
     if(state.pdfView.pdf){ try{await state.pdfView.pdf.destroy();}catch(e){} }
@@ -1022,6 +1155,21 @@
       canvas.width=vp.width; canvas.height=vp.height;
       state._renderTask=page.render({canvasContext:canvas.getContext('2d'), viewport:vp});
       await state._renderTask.promise; state._renderTask=null;
+      // Suchbegriffe direkt auf der Seite markieren (Sekundaerfarbe, halbtransparent)
+      const needles=(state.curDoc.terms||[]).map(fold).filter(Boolean);
+      if(needles.length&&seq===state._renderSeq){
+        try{
+          const tc=await page.getTextContent();
+          const ctx2=canvas.getContext('2d'); ctx2.fillStyle='rgba(107,204,224,.45)';
+          for(const it of tc.items){
+            if(!it.str)continue;
+            const f=fold(it.str); if(!needles.some(n=>f.includes(n)))continue;
+            const tx=pdfjsLib.Util.transform(vp.transform, it.transform);
+            const h=Math.hypot(tx[2],tx[3])||10;
+            ctx2.fillRect(tx[4], tx[5]-h, (it.width||0)*vp.scale, h*1.18);
+          }
+        }catch(e){}
+      }
     }catch(e){
       if(e&&(e.name==='RenderingCancelledException'||/cancelled/i.test(e.message||'')))return;
       const w=$('.pdf-canvas-wrap'); if(w)w.innerHTML=`<p class="notice err">${state.settings.lang==='de'?'Seite konnte nicht gerendert werden.':'Could not render page.'} ${esc(e.message)}</p>`;
@@ -1257,17 +1405,59 @@
   }
 
   // ---------- Backup ----------
-  function renderBackupStats(){ const el=$('#backup-stats'); if(!el)return; const total=state.catalog.reduce((a,c)=>a+(c.size||0),0); el.innerHTML=`<span class="chip">${state.catalog.length} ${state.settings.lang==='de'?'Dok.':'docs'}</span><span class="chip">${fmtBytes(total)}</span>`; }
+  function renderBackupStats(){
+    const el=$('#backup-stats'); if(!el)return; const de=state.settings.lang==='de';
+    const total=state.catalog.reduce((a,c)=>a+(c.size||0),0);
+    el.innerHTML=`<span class="chip">${state.catalog.length} ${de?'Dok.':'docs'}</span><span class="chip">${fmtBytes(total)}</span>`;
+    const sel=$('#autobackup-sel');
+    if(sel){
+      sel.value=state.settings.autoBackup||'weekly';
+      const labels=de?['Aus','Täglich','Wöchentlich']:['Off','Daily','Weekly'];
+      Array.from(sel.options).forEach((o,i)=>o.textContent=labels[i]);
+    }
+    const ab=$('#ab-last');
+    if(ab) ab.textContent=state.settings.autoBackupLast
+      ? (de?'Letztes Auto-Backup: ':'Last auto backup: ')+new Date(state.settings.autoBackupLast).toLocaleString(de?'de-DE':'en-GB')+(de?' · die letzten 5 werden aufbewahrt':' · the last 5 are kept')
+      : (de?'Noch kein Auto-Backup erstellt.':'No auto backup yet.');
+  }
+  async function buildBackupBlob(){
+    await loadScript('vendor/jszip.min.js'); const zip=new window.JSZip();
+    // apikey.txt bleibt bewusst draussen: Backups wandern auf andere Rechner /
+    // Cloud-Speicher – der API-Key gehoert dort nicht hinein.
+    const add=async(dirHandle, folder, skip)=>{ for await(const [name,h] of dirHandle.entries()){ if(h.kind==='file'){ if(skip&&skip.has(name))continue; const f=await h.getFile(); zip.file(folder+'/'+name, await f.arrayBuffer()); } } };
+    await add(state.dirs.originals,'originals'); await add(state.dirs.index,'index'); await add(state.dirs.meta,'meta', new Set(['apikey.txt']));
+    return await zip.generateAsync({type:'blob'});
+  }
   async function exportBackup(){
     try{
       toast(state.settings.lang==='de'?'Backup wird erstellt…':'Creating backup…');
-      await loadScript('vendor/jszip.min.js'); const zip=new window.JSZip();
-      const add=async(dirHandle, folder)=>{ for await(const [name,h] of dirHandle.entries()){ if(h.kind==='file'){ const f=await h.getFile(); zip.file(folder+'/'+name, await f.arrayBuffer()); } } };
-      await add(state.dirs.originals,'originals'); await add(state.dirs.index,'index'); await add(state.dirs.meta,'meta');
-      const blob=await zip.generateAsync({type:'blob'}); const name='wissensarchiv_backup_'+stamp()+'.zip';
+      const blob=await buildBackupBlob(); const name='wissensarchiv_backup_'+stamp()+'.zip';
       await saveToExports(name, blob); download(blob, name);
       toast(state.settings.lang==='de'?'Backup erstellt (in /exports und Download).':'Backup created (in /exports and download).','ok');
     }catch(e){ console.error(e); toast('Backup-Fehler: '+e.message,'err'); }
+  }
+
+  // ---------- Automatische Backups (taeglich/woechentlich, letzte 5 bleiben) ----------
+  async function rotateAutoBackups(keep){
+    const names=[];
+    try{ for await(const [n,h] of state.dirs.exports.entries()){ if(h.kind==='file'&&/^wissensarchiv_autobackup_/.test(n))names.push(n); } }catch(e){ return; }
+    names.sort();
+    while(names.length>keep){ await removeFile(state.dirs.exports, names.shift()); }
+  }
+  async function maybeAutoBackup(){
+    if(!state.booted||!state.catalog.length)return;
+    const mode=state.settings.autoBackup||'weekly'; if(mode==='off')return;
+    const last=state.settings.autoBackupLast?Date.parse(state.settings.autoBackupLast):0;
+    const iv=mode==='daily'?86400e3:604800e3;
+    if(Date.now()-last<iv)return;
+    try{
+      const blob=await buildBackupBlob();
+      await saveToExports('wissensarchiv_autobackup_'+stamp()+'.zip', blob);
+      await rotateAutoBackups(5);
+      state.settings.autoBackupLast=new Date().toISOString();
+      await persistSettings();
+      renderBackupStats();
+    }catch(e){ console.warn('Auto-Backup fehlgeschlagen', e); }
   }
   async function importBackup(file){
     try{
@@ -1325,6 +1515,7 @@
     state.booted=true;
     showScreen('app');
     toast(state.storageMode==='opfs'?(state.settings.lang==='de'?'Archiv bereit (App-Speicher).':'Archive ready (app storage).'):(state.settings.lang==='de'?'Ordner verbunden.':'Folder connected.'),'ok');
+    setTimeout(()=>{ maybeAutoBackup(); }, 800); // Start nicht blockieren
   }
   async function pickFolder(){
     try{ const handle=window.__WA_MOCK_ROOT__ || await window.showDirectoryPicker({id:'wissensarchiv',mode:'readwrite'}); if(!(await ensurePermission(handle))){toast(tr2('perm-denied'),'err');return;} state.rootHandle=handle; await IDB.set('rootHandle',handle); await bootApp(); }
@@ -1382,6 +1573,7 @@
 
     // Backup
     $('#backup-export').onclick=exportBackup;
+    $('#autobackup-sel').onchange=(e)=>{ state.settings.autoBackup=e.target.value; persistSettings(); maybeAutoBackup(); };
     const bd=$('#backup-drop');
     bd.addEventListener('dragover',(e)=>{e.preventDefault();bd.classList.add('drag');}); bd.addEventListener('dragleave',()=>bd.classList.remove('drag'));
     bd.addEventListener('drop',(e)=>{ e.preventDefault(); bd.classList.remove('drag'); const f=(e.dataTransfer.files||[])[0]; if(f)importBackup(f); });
@@ -1403,8 +1595,10 @@
 
     if(window.__WA_MOCK_ROOT__||window.__WA_TEST__){
       // Test-Brücke – nur aktiv, wenn explizit injiziert (automatisierte Prüfung).
-      window.WA={ importFiles, runSearch, generateSummary, exportBackup, importBackup, exportReport, refreshAllExports, getExportDefs:()=>exportDefs, openDoc, openHit, switchView, getIndex, state, setMode:(m)=>{state.sumMode=m;} };
+      window.WA={ importFiles, runSearch, searchArchive, generateSummary, exportBackup, importBackup, exportReport, refreshAllExports, getExportDefs:()=>exportDefs, maybeAutoBackup, ocrDoc, openDoc, openHit, switchView, getIndex, state, setMode:(m)=>{state.sumMode=m;} };
     }
+
+    if(!(await acquireTabLock())){ showScreen('locked'); return; }
 
     const mode=storageSupport();
     if(!mode){ showScreen('unsupported'); return; }
