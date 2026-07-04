@@ -275,6 +275,7 @@
     <div class="seg" id="lang-seg" title="Sprache / Language">
       <button data-lang="de">DE</button><button data-lang="en">EN</button>
     </div>
+    <button class="icon-btn" id="refresh-btn" title="Neu laden" aria-label="Neu laden" data-i18n-title="refresh-title">🔄</button>
     <button class="icon-btn" id="theme-btn" title="Theme wechseln">🌓</button>
   </header>
 
@@ -684,11 +685,13 @@
     'lock-retry':['Erneut versuchen','Try again'],
     'lock-note':['Schließe den anderen Tab und klicke dann auf „Erneut versuchen".','Close the other tab, then click “Try again”.'],
     'ab-label':['Automatisches Backup','Automatic backup'],
+    'refresh-title':['Neu laden','Reload'],
   };
   const tr = (key) => (I18N[key]||['',''])[state.settings.lang==='de'?0:1];
   function applyLang(lang){ state.settings.lang=lang; const i=lang==='de'?0:1; document.documentElement.lang=lang;
     $$('[data-i18n]').forEach(n=>{const t=I18N[n.getAttribute('data-i18n')];if(t)n.innerHTML=t[i].replace('{v}',APP_VERSION);});
     $$('[data-i18n-ph]').forEach(n=>{const t=I18N[n.getAttribute('data-i18n-ph')];if(t)n.placeholder=t[i];});
+    $$('[data-i18n-title]').forEach(n=>{const t=I18N[n.getAttribute('data-i18n-title')];if(t){n.title=t[i];n.setAttribute('aria-label',t[i]);}});
     const fv=$('#foot-version'); if(fv)fv.textContent='Version '+APP_VERSION;
     $$('#lang-seg button, #lang-seg2 button').forEach(b=>b.classList.toggle('on',b.dataset.lang===lang));
     updateOfflineLabel(); try{localStorage.setItem('wa.lang',lang);}catch(e){}
@@ -1568,6 +1571,23 @@
   function updateOfflineLabel(){ const sw=$('#sw-offline'), lbl=$('#offline-label'); if(!lbl)return; sw.classList.toggle('on',offlineReady); const i=state.settings.lang==='de'?0:1; lbl.innerHTML=offlineReady?I18N['set-offline-on'][i]:(('serviceWorker'in navigator&&window.isSecureContext)?I18N['set-offline'][i]:I18N['set-offline-off'][i]); }
   async function registerSW(){ if(!('serviceWorker'in navigator)||!window.isSecureContext){ updateOfflineLabel(); return; } try{ const reg=await navigator.serviceWorker.register('service-worker.js'); const check=()=>{ if(navigator.serviceWorker.controller||reg.active){offlineReady=true;updateOfflineLabel();} }; check(); navigator.serviceWorker.addEventListener('controllerchange',check); }catch(e){console.warn(e);} updateOfflineLabel(); }
 
+  // ---------- Neu laden ----------
+  // Aktualisiert (falls vorhanden) den Service Worker und lädt die App neu.
+  // Nützlich als App/PWA auf Desktop, iPhone und iPad, wo es keinen sichtbaren
+  // Browser-Reload gibt.
+  let _reloading=false;
+  async function reloadApp(){
+    if(_reloading)return; _reloading=true;
+    const btn=$('#refresh-btn'); if(btn){ btn.textContent='⏳'; btn.disabled=true; }
+    try{
+      if('serviceWorker' in navigator){
+        const reg=await navigator.serviceWorker.getRegistration();
+        if(reg){ try{ await reg.update(); }catch(e){} if(reg.waiting) reg.waiting.postMessage('skipWaiting'); }
+      }
+    }catch(e){}
+    location.reload();
+  }
+
   // ---------- Navigation ----------
   function switchView(view){ $$('.view').forEach(v=>v.classList.remove('show')); const el=$('#view-'+view); if(el)el.classList.add('show'); $$('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.view===view)); $('.main').scrollTop=0;
     if(view==='lib')renderLibrary(); if(view==='search'){renderFilters();renderSearchResults();} if(view==='summary')renderSumPicklist(); if(view==='backup'){renderBackupStats();renderExportsPanel();} }
@@ -1610,6 +1630,7 @@
     $('#rc-connect').onclick=reconnect;
     $('#rc-other').onclick=()=>{ $('#dlg-reconnect').classList.remove('show'); pickFolder(); };
     $('#theme-btn').onclick=cycleTheme;
+    $('#refresh-btn').onclick=reloadApp;
     $('#btn-change-folder').onclick=pickFolder; $('#btn-disconnect').onclick=disconnect;
     $$('.nav-item').forEach(b=>b.onclick=()=>switchView(b.dataset.view));
     $$('#theme-seg button').forEach(b=>b.onclick=()=>{applyTheme(b.dataset.themeVal);persistSettings();});
