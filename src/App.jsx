@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef } from "react";
-import * as XLSX from "xlsx";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import {
   User, Building2, Printer, FileSpreadsheet, Check, Pencil, X, Square, CheckSquare,
   Bell, Settings, Search, ExternalLink, Repeat, Download, Upload, Database, Plus, Mail, Phone,
@@ -7,9 +6,12 @@ import {
   List, Kanban,
 } from "lucide-react";
 import Sortable from "sortablejs";
-import Meetings, { meetingToMarkdown, meetingToText, exportWord, printMeeting, copyMeetingToClipboard, emailMeeting, enrichMeeting } from "./Meetings.jsx";
+import { meetingToMarkdown, meetingToText, exportWord, printMeeting, copyMeetingToClipboard, emailMeeting, enrichMeeting } from "./meetingExport.js";
 import { loadTasks, saveTasks, loadMeetingsData, saveMeetingsData } from "./store.js";
 import { L, useLang, getLang, setLang } from "./i18n.js";
+
+// Meetings-Modul lazy laden (hält das Start-Bundle klein)
+const Meetings = lazy(() => import("./Meetings.jsx"));
 
 // --- Markenfarben (Farbchapter) ---
 const C = {
@@ -662,7 +664,7 @@ export default function App() {
     if (!target.length) { flash(L("Keine Aufgaben zum Export.", "No tasks to export.")); return; }
     setPrintKind("tasks"); setPrintItems(target); setPrintNonce((n) => n + 1);
   }
-  function doExcel(fallback) {
+  async function doExcel(fallback) {
     const target = selectedItems.length ? selectedItems : fallback;
     if (!target.length) { flash(L("Keine Aufgaben zum Export.", "No tasks to export.")); return; }
     const rows = target.map((t) => ({
@@ -681,6 +683,7 @@ export default function App() {
       [L("Erstellt am", "Created on")]: dt(t.createdAt), [L("Erledigt am", "Completed on")]: dt(t.completedAt),
     }));
     try {
+      const XLSX = await import("xlsx");
       const ws = XLSX.utils.json_to_sheet(rows);
       ws["!cols"] = [{ wch: 34 }, { wch: 24 }, { wch: 9 }, { wch: 18 }, { wch: 11 }, { wch: 14 }, { wch: 13 }, { wch: 13 }, { wch: 15 }, { wch: 13 }, { wch: 18 }, { wch: 22 }, { wch: 30 }, { wch: 40 }, { wch: 9 }, { wch: 40 }, { wch: 30 }, { wch: 7 }, { wch: 50 }, { wch: 12 }, { wch: 12 }];
       const wb = XLSX.utils.book_new();
@@ -697,7 +700,7 @@ export default function App() {
     if (!items.length) { flash(L("Keine Personen zum Export.", "No persons to export.")); return; }
     setPrintKind("persons"); setPrintPersons(items); setPrintNonce((n) => n + 1);
   }
-  function doExcelPersons(items) {
+  async function doExcelPersons(items) {
     if (!items.length) { flash(L("Keine Personen zum Export.", "No persons to export.")); return; }
     const rows = items.map((p) => ({
       [L("Name", "Name")]: p.name, [L("Funktion / Rolle", "Function / role")]: p.role || "", [L("Company", "Company")]: p.company || "",
@@ -705,6 +708,7 @@ export default function App() {
       [L("Notiz", "Note")]: p.notes || "", [L("Offene Aufgaben", "Open tasks")]: openTaskCount(p.name),
     }));
     try {
+      const XLSX = await import("xlsx");
       const ws = XLSX.utils.json_to_sheet(rows);
       ws["!cols"] = [{ wch: 24 }, { wch: 20 }, { wch: 22 }, { wch: 28 }, { wch: 18 }, { wch: 40 }, { wch: 40 }, { wch: 14 }];
       const wb = XLSX.utils.book_new();
@@ -947,8 +951,10 @@ export default function App() {
             </div>
           </div>
         ) : view === "meetings" ? (
-          <Meetings persons={persons} categories={sortedCats} profile={profile}
-            companyColor={companyColor} onCreateTask={addExternalTask} onMeetingsChange={setMeetings} openMeetingReq={openMeetingReq} />
+          <Suspense fallback={<div className="empty">{L("Meetings werden geladen …", "Loading meetings …")}</div>}>
+            <Meetings persons={persons} categories={sortedCats} profile={profile}
+              companyColor={companyColor} onCreateTask={addExternalTask} onMeetingsChange={setMeetings} openMeetingReq={openMeetingReq} />
+          </Suspense>
         ) : view === "persons" ? (
           <div className="grid">
             <aside className="panel">
