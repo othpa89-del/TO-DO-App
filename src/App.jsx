@@ -3,7 +3,7 @@ import {
   User, Building2, Printer, FileSpreadsheet, Check, Pencil, X, Square, CheckSquare,
   Bell, Settings, Search, ExternalLink, Repeat, Download, Upload, Database, Plus, Mail, Phone,
   MessageSquare, ChevronUp, ChevronDown, Plane, FileText, Copy, GripVertical, Paperclip, Image as ImageIcon, ListChecks,
-  List, Kanban,
+  List, Kanban, RefreshCw,
 } from "lucide-react";
 import Sortable from "sortablejs";
 import { meetingToMarkdown, meetingToText, exportWord, printMeeting, copyMeetingToClipboard, emailMeeting, enrichMeeting } from "./meetingExport.js";
@@ -880,6 +880,7 @@ export default function App() {
             <Plane className="hd-mark" strokeWidth={2.2} />
             <div><h1>TO DO APP</h1></div>
             <div className="hd-right">
+              <button className="hd-search" onClick={() => { try { if (window.__ctcUpdateSW) window.__ctcUpdateSW(true); } catch {} setTimeout(() => location.reload(), 60); }} title={L("Neu laden", "Reload")}><RefreshCw size={17} /></button>
               <button className="hd-search" onClick={() => setGOpen(true)} title={L("Suche", "Search")}><Search size={18} /></button>
               <div className="lang-switch" title={L("Sprache", "Language")}>
                 <button className={"lang-b" + (lang === "de" ? " on" : "")} onClick={() => setLang("de")}>DE</button>
