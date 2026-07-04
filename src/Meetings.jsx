@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { L, useLang, getLang } from "./i18n.js";
+import { loadMeetingsData, saveMeetingsData } from "./store.js";
 import {
   Plane, Star, Archive, Search, Plus, X, Pencil, Printer, FileText, Download,
   Trash2, Check, Mic, Square as SquareIcon, Image as ImageIcon, Paperclip,
@@ -39,12 +40,12 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const fmtDay = (d) => (d ? new Date(d + "T00:00:00").toLocaleDateString(getLang() === "en" ? "en-GB" : "de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "");
 
+// Meetings liegen als Einzelzeilen im Speicher (siehe store.js)
 export async function loadMeetings() {
-  try { const r = await window.storage.get("meetings", true); return r && r.value ? JSON.parse(r.value) : []; }
-  catch { return []; }
+  try { return await loadMeetingsData(); } catch { return []; }
 }
 async function saveMeetings(arr) {
-  try { await window.storage.set("meetings", JSON.stringify(arr), true); return true; } catch { return false; }
+  try { await saveMeetingsData(arr); return true; } catch { return false; }
 }
 async function loadTypes() {
   try { const r = await window.storage.get("meetingTypes", true); const a = r && r.value ? JSON.parse(r.value) : null; return Array.isArray(a) && a.length ? a : MEETING_TYPES.slice(); }

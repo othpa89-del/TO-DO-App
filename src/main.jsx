@@ -66,6 +66,17 @@ const cKey = (key) => currentUserId + ":" + key;
 const cacheRead = (key) => { const c = lsGet(LS_CACHE, {}); const k = cKey(key); return k in c ? c[k] : null; };
 const cacheWrite = (key, value) => { const c = lsGet(LS_CACHE, {}); c[cKey(key)] = value; return lsSet(LS_CACHE, c); };
 const cacheDelete = (key) => { const c = lsGet(LS_CACHE, {}); delete c[cKey(key)]; return lsSet(LS_CACHE, c); };
+const cacheReadPrefix = (prefix) => {
+  const c = lsGet(LS_CACHE, {}); const userPre = currentUserId + ":";
+  return Object.keys(c).filter((k) => k.startsWith(userPre + prefix)).map((k) => ({ key: k.slice(userPre.length), value: c[k] }));
+};
+// Cache unter einem Prefix in EINEM Schreibvorgang auf den aktuellen Stand bringen
+const cacheSyncPrefix = (prefix, map) => {
+  const c = lsGet(LS_CACHE, {}); const userPre = currentUserId + ":";
+  Object.keys(c).forEach((k) => { if (k.startsWith(userPre + prefix)) delete c[k]; });
+  Object.entries(map).forEach(([key, value]) => { c[cKey(key)] = value; });
+  lsSet(LS_CACHE, c);
+};
 
 // Zeitstempel des letzten EIGENEN Schreibvorgangs. Eigene Cloud-Writes erzeugen
 // ebenfalls ein Realtime-Event (Self-Echo); innerhalb dieses Fensters ignorieren
@@ -165,6 +176,26 @@ window.storage = {
       markSelfWrite();
     } catch { enqueue("delete", key, null); }
     return { key, deleted: true };
+  },
+  // Alle Einträge mit Schlüssel-Prefix in EINER Abfrage lesen (z. B. "task:").
+  async getPrefix(prefix) {
+    if (!currentUserId) return { items: [] };
+    if (isOffline()) return { items: cacheReadPrefix(prefix) };
+    try {
+      const { data, error } = await supabase.from("kv").select("key,value")
+        .eq("user_id", currentUserId).like("key", prefix.replace(/([%_\\])/g, "\\$1") + "%");
+      if (error) throw error;
+      const map = {};
+      (data || []).forEach((r) => { map[r.key] = r.value; });
+      // Lokal ausstehende (noch nicht synchronisierte) Änderungen überlagern
+      lsGet(LS_QUEUE, []).forEach((q) => {
+        if (q.userId === currentUserId && q.key.startsWith(prefix)) {
+          if (q.op === "set") map[q.key] = q.value; else delete map[q.key];
+        }
+      });
+      cacheSyncPrefix(prefix, map);
+      return { items: Object.entries(map).map(([key, value]) => ({ key, value })) };
+    } catch { return { items: cacheReadPrefix(prefix) }; }
   },
   async list(prefix = "") {
     if (!currentUserId) return { keys: [] };

@@ -7,7 +7,8 @@ import {
   List, Kanban,
 } from "lucide-react";
 import Sortable from "sortablejs";
-import Meetings, { loadMeetings, meetingToMarkdown, meetingToText, exportWord, printMeeting, copyMeetingToClipboard, emailMeeting, enrichMeeting } from "./Meetings.jsx";
+import Meetings, { meetingToMarkdown, meetingToText, exportWord, printMeeting, copyMeetingToClipboard, emailMeeting, enrichMeeting } from "./Meetings.jsx";
+import { loadTasks, saveTasks, loadMeetingsData, saveMeetingsData } from "./store.js";
 import { L, useLang, getLang, setLang } from "./i18n.js";
 
 // --- Markenfarben (Farbchapter) ---
@@ -148,13 +149,13 @@ function downloadBlob(data, filename, type) {
   const a = document.createElement("a");
   a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 }
-async function loadScope(scope) {
-  const { key, shared } = SCOPES[scope];
-  try { const r = await window.storage.get(key, shared); return r && r.value ? JSON.parse(r.value) : []; } catch { return []; }
+// Aufgaben liegen jetzt als Einzelzeilen im Speicher (siehe store.js);
+// die Signaturen bleiben erhalten, damit die Aufrufer unverändert funktionieren.
+async function loadScope() {
+  try { return await loadTasks(); } catch { return []; }
 }
 async function saveScope(scope, arr) {
-  const { key, shared } = SCOPES[scope];
-  await window.storage.set(key, JSON.stringify(arr), shared);
+  await saveTasks(arr);
 }
 
 // Ansichts-Einstellungen (Filter/Sortierung/Layout) pro Gerät merken.
@@ -253,7 +254,7 @@ export default function App() {
       if (on) setCompanies(comps);
       try { const r = await window.storage.get("persons", true); if (on && r && r.value) setPersons(JSON.parse(r.value)); } catch {}
       try { const pr = await window.storage.get("profile", false); if (pr && pr.value && on) setProfile(JSON.parse(pr.value)); } catch {}
-      try { const mm = await loadMeetings(); if (on) setMeetings(mm); } catch {}
+      try { const mm = await loadMeetingsData(); if (on) setMeetings(mm); } catch {}
       if (on) setLoaded(true);
     })();
     return () => { on = false; };
@@ -538,7 +539,7 @@ export default function App() {
     let meetingTypes = [];
     let allMeetings = meetings;
     try { const r = await window.storage.get("meetingTypes", true); if (r && r.value) meetingTypes = JSON.parse(r.value); } catch {}
-    try { const r = await window.storage.get("meetings", true); if (r && r.value) allMeetings = JSON.parse(r.value); } catch {}
+    try { allMeetings = await loadMeetingsData(); } catch {}
     const payload = {
       app: "TO DO APP", version: 3, exportedAt: new Date().toISOString(),
       profile, categories, companies, persons,
@@ -564,7 +565,7 @@ export default function App() {
       await window.storage.set("categories", JSON.stringify(cats), true);
       await window.storage.set("companies", JSON.stringify(comps), true);
       await window.storage.set("persons", JSON.stringify(pers), true);
-      if (Array.isArray(obj.meetings)) { await window.storage.set("meetings", JSON.stringify(obj.meetings), true); setMeetings(obj.meetings); }
+      if (Array.isArray(obj.meetings)) { await saveMeetingsData(obj.meetings); setMeetings(obj.meetings); }
       if (Array.isArray(obj.meetingTypes)) await window.storage.set("meetingTypes", JSON.stringify(obj.meetingTypes), true);
       if (typeof obj.profile === "string") { setProfile(obj.profile); await window.storage.set("profile", JSON.stringify(obj.profile), false); }
       flash(L("Sicherung wiederhergestellt (inkl. Meetings).", "Backup restored (incl. meetings)."));
