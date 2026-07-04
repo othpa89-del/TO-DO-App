@@ -24,6 +24,8 @@ jobs:
           node-version: 20
       - name: Install
         run: npm install
+      - name: Test
+        run: npm test
       - name: Build (base = repo name)
         run: npm run build -- --base=/${{ github.event.repository.name }}/
       - uses: actions/configure-pages@v5
