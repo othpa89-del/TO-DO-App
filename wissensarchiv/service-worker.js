@@ -4,7 +4,7 @@
  * Strategie: cache-first für gleiche Origin, mit Laufzeit-Caching neuer Dateien
  * (z. B. vendor-Libs, die in späteren Etappen dazukommen). */
 
-const VERSION = 'wa-v3';
+const VERSION = 'wa-v4';
 const CACHE = `wissensarchiv-${VERSION}`;
 
 // Kern der App-Shell, der beim Installieren fest vorgeladen wird.

@@ -9,6 +9,10 @@
   <meta name="theme-color" content="#00A6CF">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Wissensarchiv">
   <script src="vendor/pdf.min.js"></script>
   <style>
     :root {
@@ -205,8 +209,20 @@
     .busy{display:inline-block;width:15px;height:15px;border:2px solid var(--line);border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px}
     @keyframes spin{to{transform:rotate(360deg)}}
 
+    .cards-2{grid-template-columns:1fr 1fr}
     @media (max-width:900px){.search-layout,.doc-view{grid-template-columns:1fr}}
     @media (max-width:860px){.app{grid-template-columns:64px 1fr}.nav-item span.txt,.nav-label,.sidebar-foot,.top-search{display:none}}
+    @media (max-width:640px){
+      .cards-2{grid-template-columns:1fr}
+      .main{padding:14px 12px 44px}
+      .page-head h2{font-size:19px}
+      .topbar{padding:0 10px;gap:8px}
+      .brand{font-size:14px}
+      .btn{padding:9px 13px}          /* Touch-Ziele */
+      .dropzone{padding:24px 14px}
+      .modal-foot{justify-content:stretch}
+      .modal-foot .btn{flex:1;justify-content:center}
+    }
   </style>
 </head>
 <body>
@@ -359,7 +375,7 @@
     <!-- ===== Backup ===== -->
     <section class="view" id="view-backup">
       <div class="page-head"><div><h2 data-i18n="nav-backup">Backup</h2><p data-i18n="backup-p">Komplettes Archiv als eine ZIP – Originale, Indizes, Tags & Notizen.</p></div></div>
-      <div class="cards" style="grid-template-columns:1fr 1fr;max-width:900px">
+      <div class="cards cards-2" style="max-width:900px">
         <div class="panel panel-pad">
           <div style="font-size:26px">📦</div>
           <h3 style="margin:8px 0" data-i18n="backup-exp-h">Archiv exportieren</h3>
@@ -373,6 +389,17 @@
           <p style="color:var(--text-muted)" data-i18n="backup-imp-p">Vollständige Wiederherstellung – inklusive Tags und Notizen. Vorhandene Dokumente werden ergänzt.</p>
           <div class="dropzone" id="backup-drop" style="margin-top:12px;padding:22px"><div style="font-size:24px">⬆️</div><div data-i18n="backup-drop">Backup-ZIP hierher ziehen oder klicken</div></div>
         </div>
+      </div>
+      <div class="panel panel-pad" style="margin-top:16px;max-width:900px">
+        <div class="row" style="justify-content:space-between;margin-bottom:6px">
+          <h4 data-i18n="exp-live-h">Live-Exporte</h4>
+          <div class="row">
+            <button class="btn sm neutral" id="exp-refresh-all">🔄 <span data-i18n="exp-refresh">Jetzt aktualisieren</span></button>
+            <span class="switch on" id="sw-autoexp" role="switch" tabindex="0"></span> <span data-i18n="exp-auto">Automatisch aktualisieren</span>
+          </div>
+        </div>
+        <p style="color:var(--text-muted);font-size:12px;margin:0 0 10px" data-i18n="exp-live-p">Jeder Export wird hier registriert und bei jeder Änderung am Archiv (Import, Löschen, Tags …) automatisch neu erzeugt – die Dateien in /exports sind damit immer aktuell.</p>
+        <div id="exports-list"></div>
       </div>
     </section>
 
@@ -435,6 +462,7 @@
             </div>
           </div>
           <div class="row" style="margin-top:14px"><span class="switch" id="sw-offline"></span> <span id="offline-label" data-i18n="set-offline">Offline-Betrieb wird eingerichtet …</span></div>
+          <div class="notice warn" id="opfs-hint" style="display:none;margin-top:12px"><span>⚠</span><span data-i18n="opfs-hint">Auf diesem Gerät liegen die Daten im App-Speicher des Browsers. Erstelle regelmäßig Backup-ZIPs – wenn Website-Daten gelöscht werden, wäre das Archiv sonst weg.</span></div>
         </div>
         <div class="panel panel-pad">
           <h4 style="margin-bottom:6px" data-i18n="set-about">Über</h4>
@@ -531,6 +559,8 @@
   // ---------- Zustand ----------
   const state = {
     rootHandle:null, dirs:{}, pendingHandle:null,
+    storageMode:null,           // 'fsa' (echter Ordner) oder 'opfs' (App-Speicher, z.B. iPhone/iPad)
+    booted:false,
     settings:{ theme:'auto', lang:'de' },
     apiKey:'',
     catalog:[],                 // [{id,name,ext,type,size,importedAt,scanned,pageCount,tags,note,unitCount}]
@@ -602,6 +632,16 @@
     'scan-warn':['Dieses PDF hat keine Textebene (gescannt). Suche findet nur den Dateinamen. Kein OCR.','This PDF has no text layer (scanned). Search only matches the file name. No OCR.'],
     'page':['Seite','Page'],'section':['Abschnitt','Section'],'sheet':['Blatt','Sheet'],'cell':['Zelle','Cell'],
     'rename-t':['Umbenennen','Rename'],'rename-l':['Neuer Name','New name'],'tag-t':['Tag hinzufügen','Add tag'],'tag-l':['Tag-Name','Tag name'],'note-t':['Notiz bearbeiten','Edit note'],'note-l':['Notiz','Note'],
+    'ob-sub-opfs':['Deine persönliche, offline-fähige Wissensdatenbank. Auf diesem Gerät speichert die App alle Daten sicher in ihrem eigenen App-Speicher (iPhone/iPad erlauben keinen direkten Ordnerzugriff). Erstelle regelmäßig Backup-ZIPs, um deine Daten zu sichern oder auf einen anderen Rechner umzuziehen.','Your personal, offline-capable knowledge base. On this device the app stores all data in its own app storage (iPhone/iPad do not allow direct folder access). Create backup ZIPs regularly to secure your data or move it to another computer.'],
+    'ob-start':['Loslegen','Get started'],
+    'ob-note-opfs':['Tipp: Über „Teilen → Zum Home-Bildschirm" wird das Wissensarchiv zur App und läuft offline.','Tip: use “Share → Add to Home Screen” to install the archive as an app that works offline.'],
+    'opfs-hint':['Auf diesem Gerät liegen die Daten im App-Speicher des Browsers. Erstelle regelmäßig Backup-ZIPs – wenn Website-Daten gelöscht werden, wäre das Archiv sonst weg.','On this device data lives in the browser’s app storage. Create backup ZIPs regularly – clearing site data would otherwise delete the archive.'],
+    'exp-live-h':['Live-Exporte','Live exports'],
+    'exp-refresh':['Jetzt aktualisieren','Refresh now'],
+    'exp-auto':['Automatisch aktualisieren','Refresh automatically'],
+    'exp-live-p':['Jeder Export wird hier registriert und bei jeder Änderung am Archiv (Import, Löschen, Tags …) automatisch neu erzeugt – die Dateien in /exports sind damit immer aktuell.','Every export is registered here and regenerated automatically whenever the archive changes (import, delete, tags …) – the files in /exports stay current at all times.'],
+    'exp-none':['Noch keine Exporte. Erstelle einen Export in der Suche oder bei einer Zusammenfassung.','No exports yet. Create one from search results or a summary.'],
+    'exp-updated':['Stand:','Updated:'],
   };
   const tr = (key) => (I18N[key]||['',''])[state.settings.lang==='de'?0:1];
   function applyLang(lang){ state.settings.lang=lang; const i=lang==='de'?0:1; document.documentElement.lang=lang;
@@ -610,11 +650,21 @@
     $$('#lang-seg button, #lang-seg2 button').forEach(b=>b.classList.toggle('on',b.dataset.lang===lang));
     updateOfflineLabel(); try{localStorage.setItem('wa.lang',lang);}catch(e){}
     // dynamische Bereiche neu rendern
-    if($('#app').classList.contains('show')){ renderLibrary(); renderFilters(); renderSearchResults(); renderBackupStats(); renderSumPicklist(); }
+    if($('#app').classList.contains('show')){ renderLibrary(); renderFilters(); renderSearchResults(); renderBackupStats(); renderSumPicklist(); renderExportsPanel(); updateStorageLabels(); }
   }
 
   // ---------- File System ----------
-  function fsSupported(){ return 'showDirectoryPicker' in window || !!window.__WA_MOCK_ROOT__; }
+  // 'fsa'  = File System Access API, echter Ordner (Chrome/Edge Desktop)
+  // 'opfs' = Origin Private File System, App-Speicher (iPhone/iPad/Safari/Firefox)
+  function storageSupport(){
+    if(window.__WA_MOCK_ROOT__) return 'fsa';
+    if('showDirectoryPicker' in window) return 'fsa';
+    try{
+      if(navigator.storage && navigator.storage.getDirectory && window.FileSystemFileHandle
+         && FileSystemFileHandle.prototype.createWritable) return 'opfs';
+    }catch(e){}
+    return null;
+  }
   async function ensurePermission(h, mode='readwrite'){ if(!h.queryPermission) return true; const o={mode}; if((await h.queryPermission(o))==='granted')return true; if((await h.requestPermission(o))==='granted')return true; return false; }
   async function ensureStructure(){ for(const n of ['originals','index','meta','exports']) state.dirs[n]=await state.rootHandle.getDirectoryHandle(n,{create:true}); }
 
@@ -623,8 +673,8 @@
   async function removeFile(dir, name){ try{ await dir.removeEntry(name); }catch(e){} }
 
   async function loadSettings(){
-    try{ const p=JSON.parse(await readFileText(state.dirs.meta,'settings.json')); state.settings=Object.assign({theme:'auto',lang:'de'},p); }
-    catch(e){ state.settings={theme:'auto',lang:'de'}; await persistSettings(); }
+    try{ const p=JSON.parse(await readFileText(state.dirs.meta,'settings.json')); state.settings=Object.assign({theme:'auto',lang:'de',autoExports:true},p); }
+    catch(e){ state.settings={theme:'auto',lang:'de',autoExports:true}; await persistSettings(); }
     try{ state.apiKey=(await readFileText(state.dirs.meta,'apikey.txt')).trim(); }catch(e){ state.apiKey=''; }
   }
   let _pt=null;
@@ -636,7 +686,12 @@
     try{ state.catalog=JSON.parse(await readFileText(state.dirs.meta,'catalog.json')); if(!Array.isArray(state.catalog))state.catalog=[]; }
     catch(e){ state.catalog=await rebuildCatalog(); if(state.catalog.length)await saveCatalog(); }
   }
-  async function saveCatalog(){ await writeFile(state.dirs.meta,'catalog.json',JSON.stringify(state.catalog,null,2)); }
+  async function saveCatalog(){
+    await writeFile(state.dirs.meta,'catalog.json',JSON.stringify(state.catalog,null,2));
+    // Jede Katalog-Aenderung (Import, Loeschen, Tags, Umbenennen, Restore …)
+    // stoesst den Live-Refresh der registrierten Exporte an.
+    scheduleExportRefresh();
+  }
   function summaryOf(doc){ return {id:doc.id,name:doc.name,ext:doc.ext,type:doc.type,size:doc.size,importedAt:doc.importedAt,scanned:!!doc.scanned,pageCount:doc.pageCount||null,tags:doc.tags||[],note:doc.note||'',unitCount:(doc.units||[]).length,hash:doc.hash||''}; }
   async function rebuildCatalog(){ const cat=[]; try{ for await(const [name,h] of state.dirs.index.entries()){ if(h.kind==='file'&&name.endsWith('.json')){ try{ const d=JSON.parse(await (await h.getFile()).text()); cat.push(summaryOf(d)); }catch(e){} } } }catch(e){} cat.sort((a,b)=>(b.importedAt||'').localeCompare(a.importedAt||'')); return cat; }
   async function getIndex(id){ if(state.indexCache.has(id))return state.indexCache.get(id); const d=JSON.parse(await readFileText(state.dirs.index,id+'.json')); state.indexCache.set(id,d); return d; }
@@ -815,7 +870,7 @@
 
   async function docAction(act, id){
     const doc=await getIndex(id).catch(()=>null); if(!doc)return;
-    if(act==='open'||act==='download'){ const f=await state.dirs.originals.getFileHandle(doc.storedAs).then(h=>h.getFile()); const url=URL.createObjectURL(f); if(act==='open')window.open(url,'_blank'); else download(f, doc.name); setTimeout(()=>URL.revokeObjectURL(url),20000); }
+    if(act==='open'||act==='download'){ const f=await state.dirs.originals.getFileHandle(doc.storedAs).then(h=>h.getFile()); const url=URL.createObjectURL(f); if(act==='open'){ const w=window.open(url,'_blank'); if(!w)download(f, doc.name); /* iOS/Popup-Blocker: dann herunterladen */ } else download(f, doc.name); setTimeout(()=>URL.revokeObjectURL(url),20000); }
     else if(act==='rename'){ promptDlg('rename', doc.name, async(v)=>{ if(!v||v===doc.name)return; doc.name=v; await writeIndex(doc); updateCatalogEntry(doc); await saveCatalog(); renderLibrary(); toast('OK','ok'); }); }
     else if(act==='tag'){ promptDlg('tag','', async(v)=>{ v=(v||'').trim(); if(!v)return; doc.tags=doc.tags||[]; if(!doc.tags.includes(v))doc.tags.push(v); await writeIndex(doc); updateCatalogEntry(doc); await saveCatalog(); renderLibrary(); renderFilters(); }); }
     else if(act==='note'){ promptDlg('note', doc.note||'', async(v)=>{ doc.note=v||''; await writeIndex(doc); updateCatalogEntry(doc); await saveCatalog(); renderLibrary(); }); }
@@ -844,19 +899,19 @@
     for(const t of terms){ const re=new RegExp('('+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'); out=out.replace(re,'<mark>$1</mark>'); }
     return out;
   }
-  async function runSearch(){
-    const q=$('#search-input').value.trim(); state.search.q=q;
-    const resEl=$('#search-results'); state.search.selected.clear();
-    if(!q){ resEl.innerHTML=`<div class="empty"><div class="big">🔎</div><p>${tr('type-search-hint')}</p></div>`; $('#search-count').textContent='—'; return; }
-    resEl.innerHTML=`<div class="empty"><span class="busy"></span></div>`;
+  // Kern der Suche – arbeitet mit expliziten Parametern, damit auch Live-Exporte
+  // dieselbe Suche jederzeit reproduzieren koennen.
+  async function searchArchive(p){
+    const terms=tokenize(p.q||'');
+    if(!terms.length) return {terms:[], hits:[]};
     await loadAllIndexes();
-    const terms=tokenize(q);
-    const S=state.search; const hits=[];
+    const types=p.types&&p.types.length?new Set(p.types):null;
+    const hits=[];
     for(const c of state.catalog){
-      if(!S.types.has(c.type))continue;
-      if(S.tag&&!(c.tags||[]).includes(S.tag))continue;
-      if(S.from&&c.importedAt&&c.importedAt.slice(0,10)<S.from)continue;
-      if(S.to&&c.importedAt&&c.importedAt.slice(0,10)>S.to)continue;
+      if(types&&!types.has(c.type))continue;
+      if(p.tag&&!(c.tags||[]).includes(p.tag))continue;
+      if(p.from&&c.importedAt&&c.importedAt.slice(0,10)<p.from)continue;
+      if(p.to&&c.importedAt&&c.importedAt.slice(0,10)>p.to)continue;
       const doc=state.indexCache.get(c.id); if(!doc)continue;
       for(const u of (doc.units||[])){
         const lower=u.text.toLowerCase(); let matched=0; for(const t of terms)if(lower.includes(t))matched++;
@@ -864,6 +919,15 @@
       }
     }
     hits.sort((a,b)=>b.score-a.score);
+    return {terms, hits};
+  }
+  function currentSearchParams(){ return {q:state.search.q, types:Array.from(state.search.types), from:state.search.from, to:state.search.to, tag:state.search.tag}; }
+  async function runSearch(){
+    const q=$('#search-input').value.trim(); state.search.q=q;
+    const resEl=$('#search-results'); state.search.selected.clear();
+    if(!q){ resEl.innerHTML=`<div class="empty"><div class="big">🔎</div><p>${tr('type-search-hint')}</p></div>`; $('#search-count').textContent='—'; return; }
+    resEl.innerHTML=`<div class="empty"><span class="busy"></span></div>`;
+    const {terms,hits}=await searchArchive(currentSearchParams());
     state.lastHits=hits; state.search.terms=terms;
     renderSearchResults();
   }
@@ -965,11 +1029,21 @@
   }
 
   // ---------- Zusammenfassung ----------
-  function getSummarySourceDocs(){
+  // liefert die Dokument-IDs UND eine reproduzierbare Spezifikation der Quelle,
+  // damit Live-Exporte die Zusammenfassung spaeter neu erzeugen koennen.
+  function getSummarySource(){
     const src=($('input[name=sumsrc]:checked')||{}).value||'selected';
-    if(src==='all') return state.catalog.map(c=>c.id);
-    if(src==='hits'){ const ids=new Set(); (state.lastHits||[]).forEach((h,i)=>{ if(state.search.selected.size===0||state.search.selected.has(i))ids.add(h.docId); }); return Array.from(ids); }
-    return Array.from(state.lib.selected);
+    if(src==='all') return {ids:state.catalog.map(c=>c.id), spec:{type:'all'}};
+    if(src==='hits'){
+      if(state.search.selected.size){
+        const ids=Array.from(new Set(Array.from(state.search.selected).map(i=>state.lastHits[i]&&state.lastHits[i].docId).filter(Boolean)));
+        return {ids, spec:{type:'ids', ids}};
+      }
+      const ids=Array.from(new Set((state.lastHits||[]).map(h=>h.docId)));
+      return {ids, spec: state.search.q?{type:'query', search:currentSearchParams()}:{type:'ids', ids}};
+    }
+    const ids=Array.from(state.lib.selected);
+    return {ids, spec:{type:'ids', ids}};
   }
   function renderSumPicklist(){
     const el=$('#sum-picklist'); if(!el)return; const src=($('input[name=sumsrc]:checked')||{}).value||'selected';
@@ -1012,7 +1086,7 @@
     return {text, sources, picked};
   }
   async function generateSummary(){
-    const ids=getSummarySourceDocs(); const out=$('#sum-output');
+    const {ids, spec}=getSummarySource(); const out=$('#sum-output');
     if(!ids.length){ toast(state.settings.lang==='de'?'Keine Quelle ausgewählt.':'No source selected.','err'); return; }
     out.innerHTML=`<div class="empty"><span class="busy"></span> <span style="margin-left:8px">${state.sumMode==='ai'?'Claude API…':(state.settings.lang==='de'?'Analysiere…':'Analyzing…')}</span></div>`;
     $('#sum-export-row').style.display='none';
@@ -1020,7 +1094,7 @@
       const r = state.sumMode==='ai' ? await claudeSummary(ids) : await extractiveSummary(ids);
       const title=state.settings.lang==='de'?`Zusammenfassung – ${ids.length} Dokument(e)`:`Summary – ${ids.length} document(s)`;
       out.innerHTML=`<div class="summary-out"><h3>${esc(title)}</h3><p style="white-space:pre-line">${esc(r.text)}</p>${sourceListHtml(r.picked||[], r.sources||[])}</div>`;
-      state.lastSummary={ title, text:r.text, picked:r.picked||[], sources:r.sources||[], mode:state.sumMode };
+      state.lastSummary={ title, text:r.text, picked:r.picked||[], sources:r.sources||[], mode:state.sumMode, sourceSpec:spec };
       $('#sum-export-row').style.display='';
     }catch(e){ out.innerHTML=`<div class="notice err"><span>⚠</span><span>${esc(e.message)}</span></div>`; }
   }
@@ -1039,23 +1113,147 @@
     const items=idxs.map(i=>state.lastHits[i]).filter(Boolean).map(h=>({file:h.name, ref:refLabel(h.ref), snippet:h.text.slice(0,300), tags:(h.tags||[]).join(', '), date:fmtDate(h.importedAt)}));
     return { title:(state.settings.lang==='de'?'Suchbericht':'Search report'), params:(state.settings.lang==='de'?'Suchbegriff: ':'Query: ')+'"'+state.search.q+'" · '+items.length+' '+tr('hits'), summary:'', items };
   }
+  // Blob-Erzeugung fuer alle drei Formate – wird von Downloads UND Live-Refresh genutzt.
+  async function makeExportBlob(fmt, data){
+    const de=state.settings.lang==='de';
+    if(fmt==='xlsx'){
+      await loadScript('vendor/xlsx.full.min.js'); const XLSX=window.XLSX;
+      const head=de?['Datei','Seite/Blatt','Snippet','Tags','Datum']:['File','Page/Sheet','Snippet','Tags','Date'];
+      const rows=[head, ...data.items.map(it=>[it.file,it.ref,it.snippet,it.tags,it.date])];
+      const ws=XLSX.utils.aoa_to_sheet(rows); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Treffer');
+      const out=XLSX.write(wb,{type:'array',bookType:'xlsx'});
+      return new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    }
+    if(fmt==='pdf'){
+      await loadScript('vendor/jspdf.umd.min.js'); const {jsPDF}=window.jspdf; const doc=new jsPDF(); let y=18;
+      doc.setFontSize(16); doc.text(data.title,14,y); y+=8;
+      doc.setFontSize(10); doc.setTextColor(90); doc.text(doc.splitTextToSize(data.params,180),14,y); y+=10; doc.setTextColor(20);
+      if(data.summary){ doc.setFontSize(11); const s=doc.splitTextToSize(data.summary,180); doc.text(s,14,y); y+=s.length*5+6; }
+      doc.setFontSize(11);
+      for(const it of data.items){ if(y>270){doc.addPage();y=18;} doc.setFont(undefined,'bold'); doc.text(doc.splitTextToSize(`• ${it.file} — ${it.ref}`,180),14,y); y+=6; doc.setFont(undefined,'normal'); doc.setTextColor(80); if(it.snippet){ const sn=doc.splitTextToSize('"'+it.snippet+'"',180); doc.text(sn,18,y); y+=sn.length*5; } if(it.tags){doc.text('Tags: '+it.tags,18,y);y+=6;} doc.setTextColor(20); y+=2; }
+      return doc.output('blob');
+    }
+    await loadScript('vendor/docx.umd.js'); const D=window.docx;
+    const kids=[ new D.Paragraph({text:data.title, heading:D.HeadingLevel.HEADING_1}), new D.Paragraph({text:data.params, spacing:{after:200}}) ];
+    if(data.summary) kids.push(new D.Paragraph({text:data.summary, spacing:{after:200}}));
+    for(const it of data.items){ kids.push(new D.Paragraph({children:[new D.TextRun({text:`${it.file} — ${it.ref}`, bold:true})], spacing:{before:120}})); if(it.snippet)kids.push(new D.Paragraph({children:[new D.TextRun({text:'„'+it.snippet+'"', italics:true})]})); if(it.tags)kids.push(new D.Paragraph({text:'Tags: '+it.tags})); }
+    const docx=new D.Document({sections:[{children:kids}]});
+    return await D.Packer.toBlob(docx);
+  }
+
+  // ---------- Live-Exporte: Registry in /meta/exports.json ----------
+  // Jeder Export merkt sich seine Parameter (Suchanfrage bzw. Zusammenfassungs-
+  // Quelle) und wird bei jeder Aenderung am Archiv neu erzeugt – die Dateien
+  // in /exports sind dadurch immer aktuell.
+  let exportDefs=[];
+  const slug=(s)=>String(s||'').toLowerCase().replace(/[^a-z0-9äöüß]+/gi,'-').replace(/^-+|-+$/g,'').slice(0,40)||'export';
+  const defFileName=(def)=>def.fileBase+'.'+def.fmt;
+  async function loadExportDefs(){ try{ exportDefs=JSON.parse(await readFileText(state.dirs.meta,'exports.json')); if(!Array.isArray(exportDefs))exportDefs=[]; }catch(e){ exportDefs=[]; } }
+  async function saveExportDefs(){ try{ await writeFile(state.dirs.meta,'exports.json',JSON.stringify(exportDefs,null,2)); }catch(e){ console.warn(e); } }
+
+  async function buildReportData(def){
+    const de=state.settings.lang==='de';
+    const stand=(de?'Stand: ':'As of: ')+new Date().toLocaleString(de?'de-DE':'en-GB');
+    if(def.kind==='hits'){
+      const {hits}=await searchArchive(def.search||{});
+      const items=hits.map(h=>({file:h.name, ref:refLabel(h.ref), snippet:h.text.slice(0,300), tags:(h.tags||[]).join(', '), date:fmtDate(h.importedAt)}));
+      return { title:de?'Suchbericht':'Search report', params:(de?'Suchbegriff: ':'Query: ')+'"'+(def.search&&def.search.q||'')+'" · '+items.length+' '+tr('hits')+' · '+stand, summary:'', items };
+    }
+    // Zusammenfassung
+    let ids=[]; const src=def.source||{type:'all'};
+    if(src.type==='all') ids=state.catalog.map(c=>c.id);
+    else if(src.type==='ids') ids=(src.ids||[]).filter(id=>state.catalog.some(c=>c.id===id));
+    else if(src.type==='query'){ const {hits}=await searchArchive(src.search||{}); ids=Array.from(new Set(hits.map(h=>h.docId))); }
+    if(!ids.length) throw new Error(de?'Keine Quelldokumente mehr vorhanden.':'No source documents left.');
+    let r, note='';
+    if(def.mode==='ai'){ try{ r=await claudeSummary(ids); }catch(e){ r=await extractiveSummary(ids); note=de?' · (offline: extraktiv)':' · (offline: extractive)'; } }
+    else r=await extractiveSummary(ids);
+    const items=[]; const seen=new Set();
+    for(const p of (r.picked||[])){ const key=p.docId+'|'+JSON.stringify(p.ref); if(seen.has(key))continue; seen.add(key); items.push({file:p.name, ref:refLabel(p.ref), snippet:'', tags:'', date:''}); }
+    return { title:(de?`Zusammenfassung – ${ids.length} Dokument(e)`:`Summary – ${ids.length} document(s)`),
+             params:(de?'Modus: ':'Mode: ')+(def.mode==='ai'?'Claude API':(de?'Extraktiv':'Extractive'))+note+' · '+stand,
+             summary:r.text, items };
+  }
+
+  async function writeExportFile(name, blob, doDownload){ await saveToExports(name, blob); if(doDownload) download(blob, name); }
+
   async function exportReport(fmt, kind){
-    const data=buildReportItems(kind); const de=state.settings.lang==='de';
-    if(!data.items.length&&!data.summary){ toast(de?'Nichts zu exportieren – erst suchen oder zusammenfassen.':'Nothing to export – search or summarize first.','err'); return; }
-    const base='wissensarchiv_'+(kind==='summary'?(de?'zusammenfassung':'summary'):(de?'bericht':'report'))+'_'+stamp();
+    const de=state.settings.lang==='de';
     try{
-      if(fmt==='xlsx'){ await loadScript('vendor/xlsx.full.min.js'); const XLSX=window.XLSX; const head=de?['Datei','Seite/Blatt','Snippet','Tags','Datum']:['File','Page/Sheet','Snippet','Tags','Date']; const rows=[head, ...data.items.map(it=>[it.file,it.ref,it.snippet,it.tags,it.date])]; const ws=XLSX.utils.aoa_to_sheet(rows); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Treffer'); const out=XLSX.write(wb,{type:'array',bookType:'xlsx'}); const blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}); await saveToExports(base+'.xlsx',blob); download(blob,base+'.xlsx'); }
-      else if(fmt==='pdf'){ await loadScript('vendor/jspdf.umd.min.js'); const {jsPDF}=window.jspdf; const doc=new jsPDF(); let y=18; doc.setFontSize(16); doc.text(data.title,14,y); y+=8; doc.setFontSize(10); doc.setTextColor(90); doc.text(doc.splitTextToSize(data.params,180),14,y); y+=10; doc.setTextColor(20);
-        if(data.summary){ doc.setFontSize(11); doc.text(doc.splitTextToSize(data.summary,180),14,y); y+=doc.splitTextToSize(data.summary,180).length*5+6; }
-        doc.setFontSize(11);
-        for(const it of data.items){ if(y>270){doc.addPage();y=18;} doc.setFont(undefined,'bold'); doc.text(doc.splitTextToSize(`• ${it.file} — ${it.ref}`,180),14,y); y+=6; doc.setFont(undefined,'normal'); doc.setTextColor(80); if(it.snippet){ const sn=doc.splitTextToSize('"'+it.snippet+'"',180); doc.text(sn,18,y); y+=sn.length*5; } if(it.tags){doc.text('Tags: '+it.tags,18,y);y+=6;} doc.setTextColor(20); y+=2; }
-        const blob=doc.output('blob'); await saveToExports(base+'.pdf',blob); download(blob,base+'.pdf'); }
-      else { await loadScript('vendor/docx.umd.js'); const D=window.docx; const kids=[ new D.Paragraph({text:data.title, heading:D.HeadingLevel.HEADING_1}), new D.Paragraph({text:data.params, spacing:{after:200}}) ];
-        if(data.summary) kids.push(new D.Paragraph({text:data.summary, spacing:{after:200}}));
-        for(const it of data.items){ kids.push(new D.Paragraph({children:[new D.TextRun({text:`${it.file} — ${it.ref}`, bold:true})], spacing:{before:120}})); if(it.snippet)kids.push(new D.Paragraph({children:[new D.TextRun({text:'„'+it.snippet+'"', italics:true})]})); if(it.tags)kids.push(new D.Paragraph({text:'Tags: '+it.tags})); }
-        const docx=new D.Document({sections:[{children:kids}]}); const blob=await D.Packer.toBlob(docx); await saveToExports(base+'.docx',blob); download(blob,base+'.docx'); }
-      toast((state.settings.lang==='de'?'Exportiert nach /exports und heruntergeladen.':'Exported to /exports and downloaded.'),'ok');
-    }catch(e){ console.error(e); toast('Export-Fehler: '+e.message,'err'); }
+      let def=null;
+      if(kind==='hits'){
+        if(!state.search.q){ toast(de?'Erst suchen.':'Search first.','err'); return; }
+        if(state.search.selected.size){
+          // Auswahl einzelner Treffer = bewusster Schnappschuss, wird nicht live gehalten.
+          const data=buildReportItems('hits');
+          if(!data.items.length){ toast(de?'Nichts ausgewählt.':'Nothing selected.','err'); return; }
+          data.params+=' · '+(de?'Stand: ':'As of: ')+new Date().toLocaleString(de?'de-DE':'en-GB');
+          const blob=await makeExportBlob(fmt,data);
+          const name='wissensarchiv_'+(de?'auswahl':'selection')+'_'+stamp()+'.'+fmt;
+          await writeExportFile(name, blob, true);
+          toast(de?'Auswahl exportiert (Schnappschuss).':'Selection exported (snapshot).','ok'); return;
+        }
+        def={ id:'hits-'+slug(state.search.q)+'-'+fmt, kind:'hits', fmt, search:currentSearchParams(),
+              fileBase:'wissensarchiv_'+(de?'bericht':'report')+'_'+slug(state.search.q) };
+      } else {
+        const s=state.lastSummary;
+        if(!s){ toast(de?'Erst eine Zusammenfassung erstellen.':'Generate a summary first.','err'); return; }
+        const spec=s.sourceSpec||{type:'all'};
+        const tag=spec.type==='query'?slug(spec.search&&spec.search.q):(spec.type==='all'?'archiv':'auswahl');
+        def={ id:'summary-'+tag+'-'+s.mode+'-'+fmt, kind:'summary', fmt, source:spec, mode:s.mode,
+              fileBase:'wissensarchiv_'+(de?'zusammenfassung':'summary')+'_'+tag };
+      }
+      const data=await buildReportData(def);
+      if(!data.items.length&&!data.summary){ toast(de?'Nichts zu exportieren.':'Nothing to export.','err'); return; }
+      const blob=await makeExportBlob(fmt,data);
+      await writeExportFile(defFileName(def), blob, true);
+      def.updatedAt=new Date().toISOString(); delete def.error;
+      const i=exportDefs.findIndex(d=>d.id===def.id); if(i>=0)exportDefs[i]=def; else exportDefs.push(def);
+      await saveExportDefs(); renderExportsPanel();
+      toast(de?'Exportiert – wird ab jetzt automatisch aktuell gehalten.':'Exported – will be kept up to date automatically.','ok');
+    }catch(e){ console.error(e); toast('Export: '+e.message,'err'); }
+  }
+
+  // Automatischer Refresh nach jeder Archiv-Aenderung (debounced ueber saveCatalog).
+  let _expTimer=null, _expRefreshing=false;
+  function scheduleExportRefresh(){
+    if(!state.booted)return;
+    if(state.settings.autoExports===false)return;
+    if(!exportDefs.length)return;
+    clearTimeout(_expTimer);
+    _expTimer=setTimeout(()=>{ refreshAllExports(false).catch(console.warn); },800);
+  }
+  async function refreshAllExports(manual){
+    if(_expRefreshing)return; _expRefreshing=true;
+    try{
+      for(const def of exportDefs){
+        try{
+          const data=await buildReportData(def);
+          const blob=await makeExportBlob(def.fmt,data);
+          await writeExportFile(defFileName(def), blob, false);
+          def.updatedAt=new Date().toISOString(); delete def.error;
+        }catch(e){ def.error=e.message; }
+      }
+      await saveExportDefs(); renderExportsPanel();
+      if(manual) toast(state.settings.lang==='de'?'Exporte aktualisiert.':'Exports refreshed.','ok');
+    }finally{ _expRefreshing=false; }
+  }
+
+  function renderExportsPanel(){
+    const el=$('#exports-list'); if(!el)return; const de=state.settings.lang==='de';
+    const sw=$('#sw-autoexp'); if(sw)sw.classList.toggle('on', state.settings.autoExports!==false);
+    if(!exportDefs.length){ el.innerHTML=`<p style="color:var(--text-muted);font-size:13px;margin:0">${tr('exp-none')}</p>`; return; }
+    el.innerHTML=exportDefs.map((d,i)=>{
+      const what=d.kind==='hits'
+        ? (de?'Suche: ':'Search: ')+'„'+esc(d.search&&d.search.q||'')+'"'
+        : (de?'Zusammenfassung':'Summary')+(d.source&&d.source.type==='query'?' „'+esc(d.source.search&&d.source.search.q||'')+'"':(d.source&&d.source.type==='all'?(de?' (gesamtes Archiv)':' (entire archive)'):''));
+      const st=d.error?`<span style="color:var(--danger)">⚠ ${esc(d.error)}</span>`:(d.updatedAt?tr('exp-updated')+' '+new Date(d.updatedAt).toLocaleString(de?'de-DE':'en-GB'):'—');
+      const ftCls=d.fmt==='xlsx'?'t-xlsx':d.fmt==='pdf'?'t-pdf':'t-docx';
+      return `<div class="queue-item"><span class="ftype ${ftCls}">${d.fmt.toUpperCase().slice(0,3)}</span><div class="qmain"><div class="fname">${esc(defFileName(d))}</div><div class="fmeta">${what} · ${st}</div></div><button class="btn sm ghost" data-expdl="${i}" title="${de?'Herunterladen':'Download'}">⬇</button><button class="btn sm ghost" data-exprf="${i}" title="${de?'Jetzt aktualisieren':'Refresh now'}">🔄</button><button class="btn sm ghost" data-exprm="${i}" title="${de?'Nicht mehr aktuell halten':'Stop keeping current'}">✕</button></div>`;
+    }).join('');
+    $$('#exports-list [data-expdl]').forEach(b=>b.onclick=async()=>{ const d=exportDefs[+b.dataset.expdl]; try{ const f=await (await state.dirs.exports.getFileHandle(defFileName(d))).getFile(); download(f, defFileName(d)); }catch(e){ toast((de?'Datei fehlt – erst aktualisieren.':'File missing – refresh first.'),'err'); } });
+    $$('#exports-list [data-exprf]').forEach(b=>b.onclick=async()=>{ const d=exportDefs[+b.dataset.exprf]; try{ const data=await buildReportData(d); const blob=await makeExportBlob(d.fmt,data); await writeExportFile(defFileName(d),blob,false); d.updatedAt=new Date().toISOString(); delete d.error; await saveExportDefs(); renderExportsPanel(); toast('OK','ok'); }catch(e){ d.error=e.message; await saveExportDefs(); renderExportsPanel(); } });
+    $$('#exports-list [data-exprm]').forEach(b=>b.onclick=async()=>{ exportDefs.splice(+b.dataset.exprm,1); await saveExportDefs(); renderExportsPanel(); });
   }
 
   // ---------- Backup ----------
@@ -1078,9 +1276,9 @@
       const targets={originals:state.dirs.originals, index:state.dirs.index, meta:state.dirs.meta};
       const entries=Object.keys(zip.files);
       for(const path of entries){ const zf=zip.files[path]; if(zf.dir)continue; const [folder,...rest]=path.split('/'); if(!targets[folder]||rest.length!==1)continue; const fname=rest[0]; if(!fname||fname==='..')continue; if(folder==='meta'&&fname==='catalog.json')continue; const content=await zf.async('arraybuffer'); await writeFile(targets[folder], fname, content); }
-      state.indexCache.clear(); state.catalog=await rebuildCatalog(); await saveCatalog(); await loadSettings();
+      state.indexCache.clear(); state.catalog=await rebuildCatalog(); await saveCatalog(); await loadSettings(); await loadExportDefs();
       updateCount(); applyTheme(state.settings.theme); applyLang(state.settings.lang);
-      renderLibrary(); renderFilters(); renderBackupStats();
+      renderLibrary(); renderFilters(); renderBackupStats(); renderExportsPanel(); updateStorageLabels();
       toast((state.settings.lang==='de'?'Wiederhergestellt: ':'Restored: ')+state.catalog.length+(state.settings.lang==='de'?' Dokumente.':' documents.'),'ok');
     }catch(e){ console.error(e); toast('Import-Fehler: '+e.message,'err'); }
   }
@@ -1105,15 +1303,28 @@
 
   // ---------- Navigation ----------
   function switchView(view){ $$('.view').forEach(v=>v.classList.remove('show')); const el=$('#view-'+view); if(el)el.classList.add('show'); $$('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.view===view)); $('.main').scrollTop=0;
-    if(view==='lib')renderLibrary(); if(view==='search'){renderFilters();renderSearchResults();} if(view==='summary')renderSumPicklist(); if(view==='backup')renderBackupStats(); }
+    if(view==='lib')renderLibrary(); if(view==='search'){renderFilters();renderSearchResults();} if(view==='summary')renderSumPicklist(); if(view==='backup'){renderBackupStats();renderExportsPanel();} }
 
   // ---------- Boot ----------
+  function updateStorageLabels(){
+    if(!state.rootHandle)return;
+    const de=state.settings.lang==='de'; const isOpfs=state.storageMode==='opfs';
+    const label=isOpfs?(de?'App-Speicher (dieses Gerät)':'App storage (this device)'):state.rootHandle.name;
+    const fp=$('#foot-path'); if(fp)fp.textContent=label;
+    const sp=$('#set-path'); if(sp)sp.textContent=label;
+    const oh=$('#opfs-hint'); if(oh)oh.style.display=isOpfs?'':'none';
+    const bc=$('#btn-change-folder'); if(bc)bc.style.display=isOpfs?'none':'';
+    const bd=$('#btn-disconnect'); if(bd)bd.style.display=isOpfs?'none':'';
+    const pf=$('#pick-folder'); if(pf)pf.style.display=('showDirectoryPicker' in window)?'':'none';
+  }
   async function bootApp(){
-    await ensureStructure(); await loadSettings(); await loadCatalog();
+    await ensureStructure(); await loadSettings(); await loadCatalog(); await loadExportDefs();
     applyTheme(state.settings.theme); applyLang(state.settings.lang);
-    const path=state.rootHandle.name; $('#foot-path').textContent=path; $('#set-path').textContent=path; $('#api-key').value=state.apiKey||'';
-    updateCount(); renderLibrary(); renderFilters(); renderBackupStats();
-    showScreen('app'); toast(state.settings.lang==='de'?'Ordner verbunden.':'Folder connected.','ok');
+    updateStorageLabels(); $('#api-key').value=state.apiKey||'';
+    updateCount(); renderLibrary(); renderFilters(); renderBackupStats(); renderExportsPanel();
+    state.booted=true;
+    showScreen('app');
+    toast(state.storageMode==='opfs'?(state.settings.lang==='de'?'Archiv bereit (App-Speicher).':'Archive ready (app storage).'):(state.settings.lang==='de'?'Ordner verbunden.':'Folder connected.'),'ok');
   }
   async function pickFolder(){
     try{ const handle=window.__WA_MOCK_ROOT__ || await window.showDirectoryPicker({id:'wissensarchiv',mode:'readwrite'}); if(!(await ensurePermission(handle))){toast(tr2('perm-denied'),'err');return;} state.rootHandle=handle; await IDB.set('rootHandle',handle); await bootApp(); }
@@ -1125,7 +1336,9 @@
 
   // ---------- Events ----------
   function wire(){
-    $('#btn-pick').onclick=pickFolder;
+    $('#btn-pick').onclick=()=>{ if(state.storageMode==='opfs'){ try{localStorage.setItem('wa.opfsSeen','1');}catch(e){} bootApp(); } else pickFolder(); };
+    $('#exp-refresh-all').onclick=()=>refreshAllExports(true);
+    $('#sw-autoexp').onclick=()=>{ state.settings.autoExports=(state.settings.autoExports===false); persistSettings(); renderExportsPanel(); if(state.settings.autoExports!==false)scheduleExportRefresh(); };
     $('#rc-connect').onclick=reconnect;
     $('#rc-other').onclick=()=>{ $('#dlg-reconnect').classList.remove('show'); pickFolder(); };
     $('#theme-btn').onclick=cycleTheme;
@@ -1154,7 +1367,7 @@
     ['dragover','dragenter'].forEach(ev=>dz.addEventListener(ev,(e)=>{e.preventDefault();dz.classList.add('drag');}));
     ['dragleave','dragend'].forEach(ev=>dz.addEventListener(ev,()=>dz.classList.remove('drag')));
     dz.addEventListener('drop',async(e)=>{ e.preventDefault(); dz.classList.remove('drag'); const files=await filesFromDataTransfer(e.dataTransfer); importFiles(files); });
-    $('#pick-files').onclick=async()=>{ if(window.showOpenFilePicker){ try{ const handles=await window.showOpenFilePicker({multiple:true}); const files=await Promise.all(handles.map(h=>h.getFile())); importFiles(files); }catch(err){ if(err.name!=='AbortError')console.error(err); } } else { const inp=document.createElement('input'); inp.type='file'; inp.multiple=true; inp.onchange=()=>importFiles(Array.from(inp.files)); inp.click(); } };
+    $('#pick-files').onclick=async()=>{ if(window.showOpenFilePicker){ try{ const handles=await window.showOpenFilePicker({multiple:true}); const files=await Promise.all(handles.map(h=>h.getFile())); importFiles(files); }catch(err){ if(err.name!=='AbortError')console.error(err); } } else { const inp=document.createElement('input'); inp.type='file'; inp.multiple=true; inp.accept='.pdf,.docx,.xlsx,.xls,.csv,.txt,.md'; inp.onchange=()=>importFiles(Array.from(inp.files)); inp.click(); } };
     $('#pick-folder').onclick=async()=>{ try{ const dir=await window.showDirectoryPicker(); const files=[]; const walk=async(d)=>{ for await(const [n,h] of d.entries()){ if(h.kind==='file')files.push(await h.getFile()); else await walk(h); } }; await walk(dir); importFiles(files); }catch(err){ if(err.name!=='AbortError')console.error(err); } };
 
     // Summary
@@ -1187,13 +1400,34 @@
     applyTheme(state.settings.theme); applyLang(state.settings.lang);
     pdfjsLib.GlobalWorkerOptions.workerSrc='vendor/pdf.worker.min.js';
     registerSW();
-    if(!fsSupported()){ showScreen('unsupported'); return; }
-    let handle=null; try{ handle=await IDB.get('rootHandle'); }catch(e){}
-    if(window.__WA_MOCK_ROOT__){
-      // Test-Brücke – nur aktiv, wenn ein Mock-Ordner injiziert wurde (automatisierte Prüfung).
-      window.WA={ importFiles, runSearch, generateSummary, exportBackup, importBackup, exportReport, openDoc, openHit, switchView, getIndex, state, setMode:(m)=>{state.sumMode=m;} };
-      state.rootHandle=window.__WA_MOCK_ROOT__; await bootApp(); return;
+
+    if(window.__WA_MOCK_ROOT__||window.__WA_TEST__){
+      // Test-Brücke – nur aktiv, wenn explizit injiziert (automatisierte Prüfung).
+      window.WA={ importFiles, runSearch, generateSummary, exportBackup, importBackup, exportReport, refreshAllExports, getExportDefs:()=>exportDefs, openDoc, openHit, switchView, getIndex, state, setMode:(m)=>{state.sumMode=m;} };
     }
+
+    const mode=storageSupport();
+    if(!mode){ showScreen('unsupported'); return; }
+    state.storageMode=mode;
+
+    if(window.__WA_MOCK_ROOT__){ state.rootHandle=window.__WA_MOCK_ROOT__; await bootApp(); return; }
+
+    if(mode==='opfs'){
+      // iPhone/iPad & Browser ohne Ordnerzugriff: App-Speicher (OPFS), kein Picker noetig.
+      try{ if(navigator.storage.persist) navigator.storage.persist().catch(()=>{}); }catch(e){}
+      state.rootHandle=await navigator.storage.getDirectory();
+      let seen=false; try{ seen=localStorage.getItem('wa.opfsSeen')==='1'; }catch(e){}
+      if(seen){ await bootApp(); return; }
+      const i=state.settings.lang==='de'?0:1;
+      const sub=$('#screen-onboard [data-i18n="ob-sub"]'); if(sub)sub.innerHTML=I18N['ob-sub-opfs'][i];
+      const btn=$('#btn-pick'); if(btn)btn.innerHTML='🚀 '+I18N['ob-start'][i];
+      const note=$('#screen-onboard [data-i18n="ob-browser"]'); if(note)note.innerHTML=I18N['ob-note-opfs'][i];
+      showScreen('onboard');
+      return;
+    }
+
+    // Desktop Chrome/Edge: echter Ordner via File System Access API
+    let handle=null; try{ handle=await IDB.get('rootHandle'); }catch(e){}
     if(!handle){ showScreen('onboard'); return; }
     try{
       if((await handle.queryPermission({mode:'readwrite'}))==='granted'){ state.rootHandle=handle; await bootApp(); }

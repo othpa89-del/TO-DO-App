@@ -6,8 +6,16 @@ Einstellungen) werden über die **File System Access API** als echte Dateien in
 einem von dir gewählten Ordner auf der Festplatte gespeichert. Das übersteht auch
 das Löschen von Browser-Cache, Verlauf und Websitedaten.
 
-> **Zielbrowser:** Google Chrome oder Microsoft Edge (Desktop).
-> Firefox/Safari unterstützen die benötigte API derzeit nicht.
+## Unterstützte Geräte
+
+| Gerät | Speicher-Modus | Hinweise |
+|---|---|---|
+| **Desktop** Chrome/Edge | Echter Ordner auf der Festplatte (File System Access API) | Voller Funktionsumfang; Daten überstehen das Löschen von Browser-Daten |
+| **iPhone / iPad** (Safari, iOS 18.4+) | App-Speicher (OPFS) – iOS erlaubt keinen direkten Ordnerzugriff | Automatischer Fallback; regelmäßige Backup-ZIPs empfohlen; „Teilen → Zum Home-Bildschirm" installiert die App |
+| Andere Browser (Firefox, Safari macOS) | App-Speicher (OPFS) | wie iPhone/iPad |
+
+Die App erkennt den Modus automatisch. Daten zwischen Geräten überträgst du per
+**Backup-ZIP** (Backup → exportieren, am anderen Gerät wiederherstellen).
 
 Dieses Projekt liegt bewusst in einem **eigenen Unterordner** (`wissensarchiv/`)
 und ist vollständig von der übrigen Repo-App getrennt – es lässt sich später 1:1
@@ -117,6 +125,12 @@ wissensarchiv/
   handling offline). Jede Zusammenfassung endet mit vollständigem Quellenverzeichnis.
 - **Export:** Suchtreffer und Zusammenfassungen als DOCX (docx.js), PDF (jsPDF)
   oder XLSX (SheetJS) – gespeichert in `/exports` und als Download.
+- **Live-Exporte:** Jeder Export wird registriert und bei jeder Änderung am
+  Archiv (Import, Löschen, Tags, Umbenennen, Wiederherstellung) automatisch neu
+  erzeugt – die Dateien in `/exports` sind dadurch **immer aktuell**. Verwaltung
+  unter *Backup → Live-Exporte* (herunterladen, manuell aktualisieren, entfernen,
+  Automatik abschaltbar). Exporte einzelner ausgewählter Treffer sind bewusste
+  Schnappschüsse und werden nicht automatisch aktualisiert.
 - **Oberfläche:** Seitenleiste + Hauptbereich, Farbwelt exakt nach Vorgabe, Arial,
   Dark/Light/Auto-Theme, Sprache Deutsch/Englisch umschaltbar.
 
