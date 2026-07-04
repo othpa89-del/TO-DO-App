@@ -96,7 +96,9 @@ wissensarchiv/
 ├─ service-worker.js   – Offline-Cache der App-Shell und der Bibliotheken
 ├─ manifest.json       – PWA-Manifest (Installierbarkeit)
 ├─ icons/              – App-Icons
-├─ vendor/             – lokal mitgelieferte Bibliotheken (PDF.js, mammoth, SheetJS, JSZip, docx, jsPDF)
+├─ vendor/             – lokal mitgelieferte Bibliotheken (PDF.js, mammoth, SheetJS,
+│                        JSZip, docx, jsPDF) inkl. vendor/tesseract/ (OCR + Sprachdaten DE/EN)
+├─ tests/              – End-to-End-Testsuite (Playwright); siehe Abschnitt „Tests"
 ├─ start.py / .bat / .command – lokaler Start
 └─ README.md
 ```
@@ -160,9 +162,10 @@ npm test
 ```
 
 Der GitHub-Actions-Workflow `.github/workflows/wissensarchiv-tests.yml` führt die
-Suite bei jedem Push automatisch aus. **Beim Umzug in ein eigenes Repository die
-Workflow-Datei mitnehmen** (sie liegt repo-weit unter `.github/`, nicht in diesem
-Ordner).
+Suite bei jedem Push automatisch aus, der Dateien unter `wissensarchiv/**` ändert
+(paths-Filter). **Beim Umzug in ein eigenes Repository die Workflow-Datei mitnehmen**
+(sie liegt repo-weit unter `.github/`, nicht in diesem Ordner) und ggf. den
+paths-Filter an die neue Struktur anpassen.
 
 ---
 

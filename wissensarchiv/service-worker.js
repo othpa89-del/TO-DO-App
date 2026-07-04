@@ -1,10 +1,11 @@
 /* Wissensarchiv – Service Worker
  * Cacht die App-Shell und die lokal mitgelieferten Bibliotheken (/vendor),
  * damit die App nach dem ersten Start vollständig offline läuft.
- * Strategie: cache-first für gleiche Origin, mit Laufzeit-Caching neuer Dateien
- * (z. B. vendor-Libs, die in späteren Etappen dazukommen). */
+ * Strategie: network-first für den App-Code (index.html, parse-worker.js) –
+ * damit Updates sofort ankommen – und cache-first für die (unveränderlichen)
+ * Bibliotheken und Icons, mit Offline-Fallback auf den Cache. */
 
-const VERSION = 'wa-v5';
+const VERSION = 'wa-v6';
 const CACHE = `wissensarchiv-${VERSION}`;
 
 // Kern der App-Shell, der beim Installieren fest vorgeladen wird.

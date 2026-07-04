@@ -562,7 +562,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '1.3';
+  const APP_VERSION = '1.4';
   const SUPPORTED = ['pdf','docx','xlsx','xls','csv','txt','md','markdown'];
   const typeOf = (ext) => ({pdf:'pdf',docx:'docx',xlsx:'xlsx',xls:'xlsx',csv:'csv',txt:'txt',md:'md',markdown:'md'}[ext] || ext);
   const $ = (s, r=document) => r.querySelector(s);
@@ -735,8 +735,15 @@
     // stoesst den Live-Refresh der registrierten Exporte an.
     scheduleExportRefresh();
   }
-  function summaryOf(doc){ return {id:doc.id,name:doc.name,ext:doc.ext,type:doc.type,size:doc.size,importedAt:doc.importedAt,scanned:!!doc.scanned,ocr:!!doc.ocr,pageCount:doc.pageCount||null,tags:doc.tags||[],note:doc.note||'',unitCount:(doc.units||[]).length,hash:doc.hash||''}; }
-  async function rebuildCatalog(){ const cat=[]; try{ for await(const [name,h] of state.dirs.index.entries()){ if(h.kind==='file'&&name.endsWith('.json')){ try{ const d=JSON.parse(await (await h.getFile()).text()); cat.push(summaryOf(d)); }catch(e){} } } }catch(e){} cat.sort((a,b)=>(b.importedAt||'').localeCompare(a.importedAt||'')); return cat; }
+  // type wird auf bekannte Werte begrenzt – sonst koennte ein manipuliertes
+  // Restore-Index-JSON ueber die CSS-Klasse t-${type} HTML einschleusen.
+  const TYPE_SET=new Set(['pdf','docx','xlsx','csv','txt','md']);
+  function safeType(doc){ if(TYPE_SET.has(doc.type))return doc.type; const t=typeOf((doc.ext||'').toLowerCase()); return TYPE_SET.has(t)?t:'txt'; }
+  // id nur aus sicheren Zeichen – ist zugleich Dateiname (id+'.json'). Beim
+  // Restore garantiert das: kein Path-/Attribut-Ausbruch, Datei ist auffindbar.
+  const SAFE_ID=/^[A-Za-z0-9_-]{1,120}$/;
+  function summaryOf(doc){ return {id:doc.id,name:String(doc.name==null?'':doc.name),ext:doc.ext,type:safeType(doc),size:doc.size,importedAt:doc.importedAt,scanned:!!doc.scanned,ocr:!!doc.ocr,pageCount:doc.pageCount||null,tags:Array.isArray(doc.tags)?doc.tags.map(String):[],note:String(doc.note||''),unitCount:(doc.units||[]).length,hash:doc.hash||''}; }
+  async function rebuildCatalog(){ const cat=[]; try{ for await(const [name,h] of state.dirs.index.entries()){ if(h.kind==='file'&&name.endsWith('.json')){ const stem=name.slice(0,-5); if(!SAFE_ID.test(stem))continue; try{ const d=JSON.parse(await (await h.getFile()).text()); d.id=stem; cat.push(summaryOf(d)); }catch(e){} } } }catch(e){} cat.sort((a,b)=>(b.importedAt||'').localeCompare(a.importedAt||'')); return cat; }
   async function getIndex(id){ if(state.indexCache.has(id))return state.indexCache.get(id); const d=JSON.parse(await readFileText(state.dirs.index,id+'.json')); state.indexCache.set(id,d); return d; }
   async function writeIndex(doc){ await writeFile(state.dirs.index,doc.id+'.json',JSON.stringify(doc)); state.indexCache.set(doc.id,doc); }
   async function loadAllIndexes(){ for(const c of state.catalog){ if(!state.indexCache.has(c.id)){ try{ await getIndex(c.id); }catch(e){} } } }
@@ -778,14 +785,22 @@
     });
   }
 
+  let _importBusy=false; const _importQueue=[];
   async function importFiles(fileList){
+    const de=()=>state.settings.lang==='de';
     const files=fileList.filter(f=>SUPPORTED.includes((f.name.split('.').pop()||'').toLowerCase()));
-    if(!files.length){ toast(state.settings.lang==='de'?'Keine unterstützten Dateien.':'No supported files.','err'); return; }
-    dupChoice=null;
+    if(!files.length){ toast(de()?'Keine unterstützten Dateien.':'No supported files.','err'); return; }
+    // Reentrancy: laeuft schon ein Import, wird angehaengt statt parallel zu starten
+    // (parallele Laeufe wuerden den Duplikat-Dialog und den Katalog verschraenken).
+    _importQueue.push(...files);
+    if(_importBusy){ toast(de()?`${files.length} zur Warteschlange hinzugefügt`:`${files.length} added to the queue`); return; }
+    _importBusy=true; dupChoice=null;
     switchView('import');
     const wrap=$('#import-queue-wrap'), q=$('#import-queue'); wrap.style.display=''; q.innerHTML='';
     let done=0, skipped=0, failed=0;
-    for(const file of files){
+    try{
+    while(_importQueue.length){
+      const file=_importQueue.shift();
       const ext=(file.name.split('.').pop()||'').toLowerCase();
       const row=document.createElement('div'); row.className='queue-item';
       row.innerHTML=`<span class="ftype t-${typeOf(ext)}">${typeOf(ext).toUpperCase().slice(0,3)}</span><div class="qmain"><div class="fname">${esc(file.name)}</div><div class="fmeta st">…</div><div class="progress" style="margin-top:6px;display:none"><span></span></div></div><span class="stat-icon">⏳</span>`;
@@ -797,25 +812,30 @@
         const hash=await sha256(buffer);
         // Duplikat: gleicher Name ODER gleicher Inhalt
         const existing=state.catalog.find(c=>c.name===file.name || (c.hash&&c.hash===hash));
-        if(existing){ const mode=await askDuplicate(file.name, existing); if(mode==='skip'){ setSt(state.settings.lang==='de'?'übersprungen (Duplikat)':'skipped (duplicate)'); icon.textContent='⏭'; skipped++; continue; } await deleteDoc(existing.id, true); }
+        let replaceId=null;
+        if(existing){ const mode=await askDuplicate(file.name, existing); if(mode==='skip'){ setSt(de()?'übersprungen (Duplikat)':'skipped (duplicate)'); icon.textContent='⏭'; skipped++; continue; } replaceId=existing.id; }
         // Parsen
         if(ext==='pdf'){ bar.style.display=''; }
-        setSt(state.settings.lang==='de'?'wird verarbeitet…':'processing…');
-        const res=await parseFile(hash.slice(0,8)+'-'+Date.now(), ext, buffer, (p,t)=>{ bar.style.display=''; fill.style.width=(p/t*100)+'%'; setSt((state.settings.lang==='de'?'Seite ':'Page ')+p+' / '+t); });
-        // Original speichern
+        setSt(de()?'wird verarbeitet…':'processing…');
+        const res=await parseFile(hash.slice(0,8)+'-'+Date.now(), ext, buffer, (p,t)=>{ bar.style.display=''; fill.style.width=(p/t*100)+'%'; setSt((de()?'Seite ':'Page ')+p+' / '+t); });
+        // Erst das NEUE Dokument vollstaendig schreiben …
         const id=crypto.randomUUID();
         const origName=id+'__'+file.name;
         await writeFile(state.dirs.originals, origName, buffer);
-        const doc={ id, name:file.name, storedAs:origName, ext, type:typeOf(ext), size:file.size, importedAt:new Date().toISOString(), hash, scanned:!!res.scanned, pageCount:res.pageCount||null, tags:[], note:'', units:res.units||[] };
+        const doc={ id, name:file.name, storedAs:origName, ext, type:typeOf(ext), size:file.size, importedAt:new Date().toISOString(), hash, scanned:!!res.scanned, ocr:false, pageCount:res.pageCount||null, tags:[], note:'', units:res.units||[] };
         await writeIndex(doc);
+        // … dann erst das alte ersetzen (so gehen bei Parse-Fehler nie beide verloren)
+        if(replaceId) await deleteDoc(replaceId, true);
         state.catalog.unshift(summaryOf(doc)); await saveCatalog();
         updateCount();
-        if(res.scanned){ setSt(state.settings.lang==='de'?'importiert · gescannt (kein Text)':'imported · scanned (no text)'); icon.innerHTML='<span class="badge-scan">⚠</span>'; }
-        else { setSt((state.settings.lang==='de'?'importiert · ':'imported · ')+(res.units?res.units.length:0)+(state.settings.lang==='de'?' Fundstellen':' units')); icon.textContent='✓'; }
+        const trunc=res.truncated?(de()?' · gekürzt (sehr große Tabelle)':' · truncated (very large sheet)'):'';
+        if(res.scanned){ setSt(de()?'importiert · gescannt (kein Text)':'imported · scanned (no text)'); icon.innerHTML='<span class="badge-scan">⚠</span>'; }
+        else { setSt((de()?'importiert · ':'imported · ')+(res.units?res.units.length:0)+(de()?' Fundstellen':' units')+trunc); icon.textContent='✓'; }
         done++;
-      }catch(err){ console.error(err); setSt((state.settings.lang==='de'?'Fehler: ':'Error: ')+err.message); icon.textContent='⚠'; failed++; }
-      $('#import-summary').textContent=`${done} ${state.settings.lang==='de'?'importiert':'imported'} · ${skipped} ${state.settings.lang==='de'?'übersprungen':'skipped'}${failed?` · ${failed} ${state.settings.lang==='de'?'Fehler':'errors'}`:''}`;
+      }catch(err){ console.error(err); setSt((de()?'Fehler: ':'Error: ')+err.message); icon.textContent='⚠'; failed++; }
+      $('#import-summary').textContent=`${done} ${de()?'importiert':'imported'} · ${skipped} ${de()?'übersprungen':'skipped'}${failed?` · ${failed} ${de()?'Fehler':'errors'}`:''}`;
     }
+    }finally{ _importBusy=false; }
     renderLibrary(); renderFilters(); renderBackupStats();
     toast(`${done} ${state.settings.lang==='de'?'importiert':'imported'}`+(skipped?`, ${skipped} ${state.settings.lang==='de'?'übersprungen':'skipped'}`:''), 'ok');
     if(done>0) maybeAutoBackup();
@@ -875,16 +895,16 @@
     const tags=(r.tags||[]).map(t=>`<span class="chip tag">${esc(t)}</span>`).join(' ')||'<span style="color:var(--text-muted)">—</span>';
     const status=r.scanned?`<span class="badge-scan">⚠ ${state.settings.lang==='de'?'Gescannt':'Scanned'}</span>`:(r.ocr?`<span style="color:var(--good)">● OCR</span>`:`<span style="color:var(--good)">● ${state.settings.lang==='de'?'indexiert':'indexed'}</span>`);
     const meta=r.type==='pdf'&&r.pageCount?`${r.pageCount} ${tr('page')}`:`${r.unitCount} ${state.settings.lang==='de'?'Fundstellen':'units'}`;
-    return `<tr class="${checked?'sel':''}" data-id="${r.id}">
+    return `<tr class="${checked?'sel':''}" data-id="${esc(r.id)}">
       <td><input type="checkbox" class="rowsel" ${checked?'checked':''}></td>
-      <td><span class="ftype t-${r.type}">${r.type.toUpperCase().slice(0,3)}</span></td>
+      <td><span class="ftype t-${esc(r.type)}">${esc(r.type.toUpperCase().slice(0,3))}</span></td>
       <td><div class="fname">${esc(r.name)}</div><div class="fmeta">${meta}</div></td>
       <td class="num">${fmtDate(r.importedAt)}</td><td class="num">${fmtBytes(r.size)}</td>
       <td>${tags}</td><td>${status}</td>
-      <td class="rowmenu"><button class="rowmenu-btn" data-menu="${r.id}">⋯</button>${menuHtml(r)}</td>
+      <td class="rowmenu"><button class="rowmenu-btn" data-menu="${esc(r.id)}">⋯</button>${menuHtml(r)}</td>
     </tr>`;
   }
-  function menuHtml(r){ return `<div class="menu" id="menu-${r.id}">
+  function menuHtml(r){ return `<div class="menu" id="menu-${esc(r.id)}">`+`
     <button data-act="open">📂 ${tr('act-open')}</button>
     <button data-act="download">⬇ ${tr('act-download')}</button>
     <div class="sep"></div>
@@ -915,7 +935,7 @@
 
   async function docAction(act, id){
     const doc=await getIndex(id).catch(()=>null); if(!doc)return;
-    if(act==='open'||act==='download'){ const f=await state.dirs.originals.getFileHandle(doc.storedAs).then(h=>h.getFile()); const url=URL.createObjectURL(f); if(act==='open'){ const w=window.open(url,'_blank'); if(!w)download(f, doc.name); /* iOS/Popup-Blocker: dann herunterladen */ } else download(f, doc.name); setTimeout(()=>URL.revokeObjectURL(url),20000); }
+    if(act==='open'||act==='download'){ try{ const f=await state.dirs.originals.getFileHandle(doc.storedAs).then(h=>h.getFile()); const url=URL.createObjectURL(f); if(act==='open'){ const w=window.open(url,'_blank'); if(!w)download(f, doc.name); /* iOS/Popup-Blocker: dann herunterladen */ } else download(f, doc.name); setTimeout(()=>URL.revokeObjectURL(url),20000); }catch(e){ toast(state.settings.lang==='de'?'Originaldatei nicht gefunden.':'Original file not found.','err'); } }
     else if(act==='rename'){ promptDlg('rename', doc.name, async(v)=>{ if(!v||v===doc.name)return; doc.name=v; await writeIndex(doc); updateCatalogEntry(doc); await saveCatalog(); renderLibrary(); toast('OK','ok'); }); }
     else if(act==='tag'){ promptDlg('tag','', async(v)=>{ v=(v||'').trim(); if(!v)return; doc.tags=doc.tags||[]; if(!doc.tags.includes(v))doc.tags.push(v); await writeIndex(doc); updateCatalogEntry(doc); await saveCatalog(); renderLibrary(); renderFilters(); }); }
     else if(act==='note'){ promptDlg('note', doc.note||'', async(v)=>{ doc.note=v||''; await writeIndex(doc); updateCatalogEntry(doc); await saveCatalog(); renderLibrary(); }); }
@@ -974,6 +994,9 @@
         ocrProgress(doc.name,p,pdf.numPages);
       }
       await pdf.destroy();
+      // Wurde das Dokument waehrend der (langen) OCR geloescht, nichts zurueckschreiben –
+      // sonst entstuende eine verwaiste Index-Datei ohne Original.
+      if(!state.catalog.some(c=>c.id===doc.id)){ toast(de?'Dokument wurde inzwischen gelöscht.':'Document was deleted in the meantime.','err'); return; }
       doc.units=units; doc.ocr=units.length>0; doc.scanned=units.length===0;
       await writeIndex(doc); updateCatalogEntry(doc); await saveCatalog();
       renderLibrary(); renderFilters();
@@ -994,7 +1017,8 @@
     return String(s).toLowerCase()
       .replace(/ß/g,'ss')
       .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-      .replace(/ae/g,'a').replace(/oe/g,'o').replace(/ue/g,'u');
+      .replace(/ae/g,'a').replace(/oe/g,'o').replace(/ue/g,'u')
+      .replace(/\s+/g,' ').trim();  // Whitespace angleichen (Phrasen mit Mehrfach-Leerzeichen)
   }
   // "Anführungszeichen" = Phrase (muss am Stueck vorkommen); alle uebrigen
   // Woerter muessen ALLE vorkommen (UND-Suche).
@@ -1021,13 +1045,24 @@
     for(const t of terms){ for(const v of highlightVariants(t)){ parts.push(v.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')); } }
     return parts.length?new RegExp('('+parts.join('|')+')','gi'):null;
   }
+  // Markiert die Treffer auf dem ROHTEXT und escapt segmentweise – so kann ein
+  // Suchbegriff nie eine HTML-Entity (z.B. &amp;) zerschneiden.
+  function highlightEscape(text, terms){
+    const re=markRegex(terms); if(!re) return esc(text);
+    let out='', last=0, m; re.lastIndex=0;
+    while((m=re.exec(text))){
+      out+=esc(text.slice(last,m.index))+'<mark>'+esc(m[0])+'</mark>';
+      last=m.index+m[0].length;
+      if(m.index===re.lastIndex) re.lastIndex++;  // Null-Length-Schutz
+    }
+    return out+esc(text.slice(last));
+  }
   function snippet(text, terms){
     const lower=text.toLowerCase(); let pos=-1;
     for(const t of terms){ for(const v of highlightVariants(t)){ const i=lower.indexOf(v); if(i>=0&&(pos<0||i<pos))pos=i; } }
     if(pos<0)pos=0; const start=Math.max(0,pos-60), end=Math.min(text.length,pos+120);
-    let out=esc((start>0?'…':'')+text.slice(start,end)+(end<text.length?'…':''));
-    const re=markRegex(terms); if(re)out=out.replace(re,'<mark>$1</mark>');
-    return out;
+    const win=(start>0?'…':'')+text.slice(start,end)+(end<text.length?'…':'');
+    return highlightEscape(win, terms);
   }
   // Kern der Suche – arbeitet mit expliziten Parametern, damit auch Live-Exporte
   // dieselbe Suche jederzeit reproduzieren koennen.
@@ -1074,7 +1109,7 @@
     if(!hits.length){ resEl.innerHTML=`<div class="empty"><p>${tr('no-hits')}</p></div>`; return; }
     resEl.innerHTML=hits.slice(0,300).map((h,i)=>`
       <div class="result" data-i="${i}">
-        <div class="r-top"><input type="checkbox" class="hitsel" ${state.search.selected.has(i)?'checked':''}><span class="ftype t-${h.type}">${h.type.toUpperCase().slice(0,3)}</span><span class="r-title">${esc(h.name)}</span><span class="src">${esc(refLabel(h.ref))}</span></div>
+        <div class="r-top"><input type="checkbox" class="hitsel" ${state.search.selected.has(i)?'checked':''}><span class="ftype t-${esc(h.type)}">${esc(h.type.toUpperCase().slice(0,3))}</span><span class="r-title">${esc(h.name)}</span><span class="src">${esc(refLabel(h.ref))}</span></div>
         <div class="snippet">${snippet(h.text, terms)}</div>
         <div class="r-foot">${(h.tags||[]).map(t=>`<span class="chip tag">${esc(t)}</span>`).join(' ')}<button class="btn sm ghost openhit">${tr('open-hit')}</button></div>
       </div>`).join('') + (hits.length>300?`<p style="color:var(--text-muted);text-align:center">… ${hits.length-300} ${state.settings.lang==='de'?'weitere Treffer (verfeinere die Suche)':'more results (refine your search)'}</p>`:'');
@@ -1098,7 +1133,7 @@
     // Info-Panel
     const tags=(doc.tags||[]).map(t=>`<span class="chip tag">${esc(t)}</span>`).join(' ')||'—';
     info.innerHTML=`<h4 style="margin-bottom:10px">${tr('doc-info')}</h4>
-      <div class="fmeta" style="margin-bottom:8px">${doc.type.toUpperCase()} · ${fmtBytes(doc.size)} · ${fmtDate(doc.importedAt)}${doc.pageCount?` · ${doc.pageCount} ${tr('page')}`:''}</div>
+      <div class="fmeta" style="margin-bottom:8px">${esc(String(doc.type||'').toUpperCase())} · ${fmtBytes(doc.size)} · ${fmtDate(doc.importedAt)}${doc.pageCount?` · ${doc.pageCount} ${tr('page')}`:''}</div>
       <div style="margin-bottom:8px"><b>Tags:</b> ${tags}</div>
       ${doc.note?`<div class="notice info" style="margin-top:8px"><span>📝</span><span>${esc(doc.note)}</span></div>`:''}
       ${doc.scanned?`<div class="notice warn" style="margin-top:8px"><span>⚠</span><span>${tr('scan-warn')}</span></div><button class="btn sm" id="doc-ocr" style="margin-top:10px">🔍 ${tr('act-ocr')}</button>`:''}`;
@@ -1129,21 +1164,27 @@
     $('#doc-download').onclick=()=>docAction('download',doc.id);
     $('#doc-reindex').onclick=async()=>{ await reindexDoc(doc); await renderDoc(); };
   }
-  function snippetFull(text, terms){ let out=esc(text); const re=markRegex(terms); if(re)out=out.replace(re,'<mark>$1</mark>'); return out; }
+  function snippetFull(text, terms){ return highlightEscape(text, terms); }
   async function closePdfView(){
     if(state._renderTask){ try{state._renderTask.cancel();}catch(e){} state._renderTask=null; }
     if(state.pdfView.pdf){ try{await state.pdfView.pdf.destroy();}catch(e){} }
     state.pdfView={docId:null,pdf:null};
   }
-  async function getPdfForDoc(doc){
+  let _pdfLock=Promise.resolve();
+  function getPdfForDoc(doc){
     // Dokument einmal laden und fuer die Blaetter-Navigation cachen –
     // sonst wuerde ein 60-MB-PDF bei jedem Seitenwechsel neu gelesen.
-    if(state.pdfView.pdf&&state.pdfView.docId===doc.id) return state.pdfView.pdf;
-    await closePdfView();
-    const f=await (await state.dirs.originals.getFileHandle(doc.storedAs)).getFile();
-    const pdf=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;
-    state.pdfView={docId:doc.id,pdf};
-    return pdf;
+    // Serialisiert, damit zwei schnelle Wechsel nicht zwei PDF.js-Dokumente
+    // gleichzeitig oeffnen (Leck + inkonsistenter Cache).
+    const run=async()=>{
+      if(state.pdfView.pdf&&state.pdfView.docId===doc.id) return state.pdfView.pdf;
+      await closePdfView();
+      const f=await (await state.dirs.originals.getFileHandle(doc.storedAs)).getFile();
+      const pdf=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;
+      state.pdfView={docId:doc.id,pdf};
+      return pdf;
+    };
+    const p=_pdfLock.then(run,run); _pdfLock=p.catch(()=>{}); return p;
   }
   async function renderPdfPage(){
     const doc=state.curDoc.doc; const seq=++state._renderSeq;
@@ -1298,6 +1339,9 @@
   // in /exports sind dadurch immer aktuell.
   let exportDefs=[];
   const slug=(s)=>String(s||'').toLowerCase().replace(/[^a-z0-9äöüß]+/gi,'-').replace(/^-+|-+$/g,'').slice(0,40)||'export';
+  // kurzer, stabiler Hash der Spezifikation – verhindert ID-/Dateinamen-Kollisionen
+  // zwischen Exporten, deren Slug nur in Sonderzeichen/Auswahl differiert.
+  function shortHash(s){ let h=5381; s=String(s); for(let i=0;i<s.length;i++)h=(((h<<5)+h)^s.charCodeAt(i))>>>0; return h.toString(36).slice(0,6); }
   const defFileName=(def)=>def.fileBase+'.'+def.fmt;
   async function loadExportDefs(){ try{ exportDefs=JSON.parse(await readFileText(state.dirs.meta,'exports.json')); if(!Array.isArray(exportDefs))exportDefs=[]; }catch(e){ exportDefs=[]; } }
   async function saveExportDefs(){ try{ await writeFile(state.dirs.meta,'exports.json',JSON.stringify(exportDefs,null,2)); }catch(e){ console.warn(e); } }
@@ -1344,15 +1388,17 @@
           await writeExportFile(name, blob, true);
           toast(de?'Auswahl exportiert (Schnappschuss).':'Selection exported (snapshot).','ok'); return;
         }
-        def={ id:'hits-'+slug(state.search.q)+'-'+fmt, kind:'hits', fmt, search:currentSearchParams(),
-              fileBase:'wissensarchiv_'+(de?'bericht':'report')+'_'+slug(state.search.q) };
+        const sp=currentSearchParams(); const h=shortHash(JSON.stringify(sp));
+        def={ id:'hits-'+h+'-'+fmt, kind:'hits', fmt, search:sp,
+              fileBase:'wissensarchiv_'+(de?'bericht':'report')+'_'+slug(state.search.q)+'-'+h };
       } else {
         const s=state.lastSummary;
         if(!s){ toast(de?'Erst eine Zusammenfassung erstellen.':'Generate a summary first.','err'); return; }
         const spec=s.sourceSpec||{type:'all'};
-        const tag=spec.type==='query'?slug(spec.search&&spec.search.q):(spec.type==='all'?'archiv':'auswahl');
-        def={ id:'summary-'+tag+'-'+s.mode+'-'+fmt, kind:'summary', fmt, source:spec, mode:s.mode,
-              fileBase:'wissensarchiv_'+(de?'zusammenfassung':'summary')+'_'+tag };
+        const h=shortHash(JSON.stringify(spec)+'|'+s.mode);
+        const tag=spec.type==='query'?slug(spec.search&&spec.search.q):(spec.type==='all'?(de?'archiv':'archive'):(de?'auswahl':'selection'));
+        def={ id:'summary-'+h+'-'+fmt, kind:'summary', fmt, source:spec, mode:s.mode,
+              fileBase:'wissensarchiv_'+(de?'zusammenfassung':'summary')+'_'+tag+'-'+h };
       }
       const data=await buildReportData(def);
       if(!data.items.length&&!data.summary){ toast(de?'Nichts zu exportieren.':'Nothing to export.','err'); return; }
@@ -1366,7 +1412,7 @@
   }
 
   // Automatischer Refresh nach jeder Archiv-Aenderung (debounced ueber saveCatalog).
-  let _expTimer=null, _expRefreshing=false;
+  let _expTimer=null, _expRefreshing=false, _expAgain=false;
   function scheduleExportRefresh(){
     if(!state.booted)return;
     if(state.settings.autoExports===false)return;
@@ -1375,17 +1421,23 @@
     _expTimer=setTimeout(()=>{ refreshAllExports(false).catch(console.warn); },800);
   }
   async function refreshAllExports(manual){
-    if(_expRefreshing)return; _expRefreshing=true;
+    // Kommt waehrend eines laufenden Refreshs eine weitere Aenderung, wird am
+    // Ende einmal nachgezogen – sonst blieben Exporte trotz Aenderung veraltet.
+    if(_expRefreshing){ _expAgain=true; return; }
+    _expRefreshing=true;
     try{
-      for(const def of exportDefs){
-        try{
-          const data=await buildReportData(def);
-          const blob=await makeExportBlob(def.fmt,data);
-          await writeExportFile(defFileName(def), blob, false);
-          def.updatedAt=new Date().toISOString(); delete def.error;
-        }catch(e){ def.error=e.message; }
-      }
-      await saveExportDefs(); renderExportsPanel();
+      do{
+        _expAgain=false;
+        for(const def of exportDefs){
+          try{
+            const data=await buildReportData(def);
+            const blob=await makeExportBlob(def.fmt,data);
+            await writeExportFile(defFileName(def), blob, false);
+            def.updatedAt=new Date().toISOString(); delete def.error;
+          }catch(e){ def.error=e.message; }
+        }
+        await saveExportDefs(); renderExportsPanel();
+      }while(_expAgain);
       if(manual) toast(state.settings.lang==='de'?'Exporte aktualisiert.':'Exports refreshed.','ok');
     }finally{ _expRefreshing=false; }
   }
@@ -1447,12 +1499,15 @@
     names.sort();
     while(names.length>keep){ await removeFile(state.dirs.exports, names.shift()); }
   }
+  let _abBusy=false;
   async function maybeAutoBackup(){
+    if(_abBusy)return;
     if(!state.booted||!state.catalog.length)return;
     const mode=state.settings.autoBackup||'weekly'; if(mode==='off')return;
     const last=state.settings.autoBackupLast?Date.parse(state.settings.autoBackupLast):0;
     const iv=mode==='daily'?86400e3:604800e3;
     if(Date.now()-last<iv)return;
+    _abBusy=true;
     try{
       const blob=await buildBackupBlob();
       await saveToExports('wissensarchiv_autobackup_'+stamp()+'.zip', blob);
@@ -1461,6 +1516,7 @@
       await persistSettings();
       renderBackupStats();
     }catch(e){ console.warn('Auto-Backup fehlgeschlagen', e); }
+    finally{ _abBusy=false; }
   }
   async function importBackup(file){
     try{
@@ -1468,7 +1524,25 @@
       await loadScript('vendor/jszip.min.js'); const zip=await window.JSZip.loadAsync(await file.arrayBuffer());
       const targets={originals:state.dirs.originals, index:state.dirs.index, meta:state.dirs.meta};
       const entries=Object.keys(zip.files);
-      for(const path of entries){ const zf=zip.files[path]; if(zf.dir)continue; const [folder,...rest]=path.split('/'); if(!targets[folder]||rest.length!==1)continue; const fname=rest[0]; if(!fname||fname==='..')continue; if(folder==='meta'&&fname==='catalog.json')continue; const content=await zf.async('arraybuffer'); await writeFile(targets[folder], fname, content); }
+      const de=state.settings.lang==='de';
+      // Nur meta-Dateien aus einer festen Whitelist zulassen; apikey.txt und
+      // catalog.json werden NIE aus einem fremden ZIP uebernommen.
+      const META_ALLOW=new Set(['settings.json','exports.json']);
+      // Grenzen gegen ZIP-Bomben / Speicher-DoS
+      const MAX_FILES=20000, MAX_TOTAL=2*1024*1024*1024; let n=0, total=0, skipped=0;
+      for(const path of entries){
+        const zf=zip.files[path]; if(zf.dir)continue;
+        const parts=path.split('/'); if(parts.length!==2)continue;         // genau folder/datei
+        const [folder,fname]=parts;
+        if(!targets[folder]||!fname)continue;
+        if(/[\\/]|^\.+$/.test(fname)){ skipped++; continue; }               // keine Traversal-/Sonderpfade
+        if(folder==='meta'&&!META_ALLOW.has(fname)){ skipped++; continue; } // meta streng begrenzt
+        if(folder==='index'&&!/^[A-Za-z0-9_-]+\.json$/.test(fname)){ skipped++; continue; }
+        if(++n>MAX_FILES){ throw new Error(de?'Zu viele Dateien im Backup.':'Too many files in backup.'); }
+        const content=await zf.async('arraybuffer');
+        total+=content.byteLength; if(total>MAX_TOTAL){ throw new Error(de?'Backup ist zu groß.':'Backup too large.'); }
+        await writeFile(targets[folder], fname, content);
+      }
       state.indexCache.clear(); state.catalog=await rebuildCatalog(); await saveCatalog(); await loadSettings(); await loadExportDefs();
       updateCount(); applyTheme(state.settings.theme); applyLang(state.settings.lang);
       renderLibrary(); renderFilters(); renderBackupStats(); renderExportsPanel(); updateStorageLabels();
@@ -1598,7 +1672,8 @@
 
     if(window.__WA_MOCK_ROOT__||window.__WA_TEST__){
       // Test-Brücke – nur aktiv, wenn explizit injiziert (automatisierte Prüfung).
-      window.WA={ importFiles, runSearch, searchArchive, generateSummary, exportBackup, importBackup, exportReport, refreshAllExports, getExportDefs:()=>exportDefs, maybeAutoBackup, ocrDoc, openDoc, openHit, switchView, getIndex, state, setMode:(m)=>{state.sumMode=m;} };
+      window.WA={ importFiles, runSearch, searchArchive, generateSummary, exportBackup, importBackup, exportReport, refreshAllExports, getExportDefs:()=>exportDefs, maybeAutoBackup, ocrDoc, openDoc, openHit, switchView, getIndex, state, setMode:(m)=>{state.sumMode=m;},
+        rebuildCatalog: async()=>{ state.indexCache.clear(); state.catalog=await rebuildCatalog(); renderLibrary(); return state.catalog; } };
     }
 
     if(!(await acquireTabLock())){ showScreen('locked'); return; }

@@ -31,10 +31,13 @@ const MIME = {
 export async function startServer(root) {
   root = path.resolve(root);
   const srv = http.createServer((req, res) => {
-    let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+    let p;
+    try { p = decodeURIComponent(new URL(req.url, 'http://x').pathname); }
+    catch (e) { res.writeHead(400); res.end('bad request'); return; }
     if (p.endsWith('/')) p += 'index.html';
     const f = path.join(root, p);
-    if (!f.startsWith(root) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); res.end('not found'); return; }
+    // Traversal-sicher: Ziel muss echt unterhalb von root liegen (mit Pfadtrenner).
+    if ((f !== root && !f.startsWith(root + path.sep)) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); res.end('not found'); return; }
     res.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream', 'cache-control': 'no-cache' });
     fs.createReadStream(f).pipe(res);
   });

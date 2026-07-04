@@ -13,7 +13,9 @@ await generate();
 const srv = await startServer(appRoot);
 console.log('Server:', srv.url);
 
-const suites = ['01-core', '02-library', '03-regressions', '04-platform', '05-ocr'];
+let suites = ['01-core', '02-library', '03-regressions', '04-platform', '05-ocr', '06-hardening'];
+// Optionaler Filter: node run.mjs 06  -> nur passende Suiten
+if (process.argv[2]) suites = suites.filter((s) => s.includes(process.argv[2]));
 let failed = 0;
 for (const name of suites) {
   const mod = await import(`./${name}.mjs`);

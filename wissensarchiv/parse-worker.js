@@ -37,13 +37,19 @@ function parseSheet(buffer, ext) {
     wb = XLSX.read(new Uint8Array(buffer), { type: 'array' });
   }
   const units = [];
-  const CAP = 200000; // Sicherheitslimit gegen extrem grosse Tabellen
+  const CAP = 200000;      // max. erfasste (nicht-leere) Zellen
+  const SCAN_CAP = 5000000; // max. besuchte Zellen – begrenzt auch aufgeblaehte !ref-Bereiche
+  let scanned = 0;
   for (const sheetName of wb.SheetNames) {
     const ws = wb.Sheets[sheetName];
     if (!ws || !ws['!ref']) continue;
     const range = XLSX.utils.decode_range(ws['!ref']);
     for (let R = range.s.r; R <= range.e.r; R++) {
       for (let C = range.s.c; C <= range.e.c; C++) {
+        // Auch die reine Iteration deckeln: eine kaputte/boesartige Datei kann
+        // ein riesiges !ref (z.B. A1:XFD1048576) deklarieren und wuerde sonst
+        // den Worker praktisch endlos blockieren.
+        if (++scanned > SCAN_CAP) return { kind: 'sheet', scanned: false, units, truncated: true };
         const addr = XLSX.utils.encode_cell({ r: R, c: C });
         const cell = ws[addr];
         if (!cell) continue;
