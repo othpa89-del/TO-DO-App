@@ -696,13 +696,15 @@ export default function App() {
   function openTaskCount(name) {
     return merged.filter((t) => !isDone(t) && t.contact && t.contact.toLowerCase() === (name || "").toLowerCase()).length;
   }
+  // Personen-Exporte: immer alphabetisch, unabhängig von der Eingabe-Reihenfolge
+  const sortPersonsAZ = (items) => items.slice().sort((a, b) => (a.name || "").localeCompare(b.name || "", "de"));
   function doPrintPersons(items) {
     if (!items.length) { flash(L("Keine Personen zum Export.", "No persons to export.")); return; }
-    setPrintKind("persons"); setPrintPersons(items); setPrintNonce((n) => n + 1);
+    setPrintKind("persons"); setPrintPersons(sortPersonsAZ(items)); setPrintNonce((n) => n + 1);
   }
   async function doExcelPersons(items) {
     if (!items.length) { flash(L("Keine Personen zum Export.", "No persons to export.")); return; }
-    const rows = items.map((p) => ({
+    const rows = sortPersonsAZ(items).map((p) => ({
       [L("Name", "Name")]: p.name, [L("Funktion / Rolle", "Function / role")]: p.role || "", [L("Company", "Company")]: p.company || "",
       [L("E-Mail", "Email")]: p.email || "", [L("Telefon", "Phone")]: p.phone || "", [L("Themen", "Topics")]: (p.topics || []).join(", "),
       [L("Notiz", "Note")]: p.notes || "", [L("Offene Aufgaben", "Open tasks")]: openTaskCount(p.name),
