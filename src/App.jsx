@@ -76,6 +76,8 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 const keyOf = (t) => t._scope + ":" + t.id;
 const leadLabel = (v) => (LEADS.find((l) => l.v === Number(v)) || {}).label || "";
 const sortCats = (arr) => [...arr].sort((a, b) => a.localeCompare(b, "de", { sensitivity: "base" }));
+// Gemeinsamer Namens-Vergleicher (deutsche Sortierung) für Personenlisten/-exporte
+const byName = (a, b) => (a.name || "").localeCompare(b.name || "", "de");
 const isDone = (t) => (t.status ? t.status === "erledigt" : !!t.done);
 const normalizeUrl = (u) => (!u ? "#" : /^https?:\/\//i.test(u) ? u : "https://" + u);
 function normalizeTask(t) {
@@ -697,7 +699,7 @@ export default function App() {
     return merged.filter((t) => !isDone(t) && t.contact && t.contact.toLowerCase() === (name || "").toLowerCase()).length;
   }
   // Personen-Exporte: immer alphabetisch, unabhängig von der Eingabe-Reihenfolge
-  const sortPersonsAZ = (items) => items.slice().sort((a, b) => (a.name || "").localeCompare(b.name || "", "de"));
+  const sortPersonsAZ = (items) => items.slice().sort(byName);
   function doPrintPersons(items) {
     if (!items.length) { flash(L("Keine Personen zum Export.", "No persons to export.")); return; }
     setPrintKind("persons"); setPrintPersons(sortPersonsAZ(items)); setPrintNonce((n) => n + 1);
@@ -859,7 +861,7 @@ export default function App() {
       const q = pSearch.toLowerCase();
       return [p.name, p.company, p.role, (p.topics || []).join(" ")].join(" ").toLowerCase().includes(q);
     })
-    .sort((a, b) => a.name.localeCompare(b.name, "de"));
+    .sort(byName);
 
   // Globale Suche: über Aufgaben, Meetings und Personen
   const gq = gSearch.trim().toLowerCase();
@@ -1227,7 +1229,7 @@ export default function App() {
                 <div className="row2">
                   <div className="field"><label>{L("Ansprechperson", "Contact")}</label>
                     <input list="personnames" value={form.contact} onChange={(e) => onContactChange(e.target.value)} placeholder={L("Name / Funktion", "Name / function")} />
-                    <datalist id="personnames">{persons.slice().sort((a, b) => (a.name || "").localeCompare(b.name || "", "de")).map((p) => <option key={p.id} value={p.name} />)}</datalist></div>
+                    <datalist id="personnames">{persons.slice().sort(byName).map((p) => <option key={p.id} value={p.name} />)}</datalist></div>
                   <div className="field">
                     <div className="label-row"><label>{L("Company", "Company")}</label>
                       <button className="link sm" onClick={() => setCmgrOpen(true)}><Settings size={13} /> {L("Verwalten", "Manage")}</button></div>
