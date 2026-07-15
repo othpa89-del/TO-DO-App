@@ -1451,7 +1451,7 @@ export default function App() {
             <button className="ub-x" onClick={() => setSwUpdate(false)} title={L("Später", "Later")}><X size={15} /></button>
           </div>
         )}
-        <footer className="app-foot">© Copyright by Patrick Thorn<span className="app-ver">Version {__APP_VERSION__.split(".").slice(0, 2).join(".")} · {fmtDay(__BUILD_DATE__)}</span></footer>
+        <footer className="app-foot">© Copyright by Patrick Thorn<span className="app-ver">Version {__APP_VERSION__} · {fmtDay(__BUILD_DATE__)}</span></footer>
       </div>
 
       {/* Globale Suche */}
