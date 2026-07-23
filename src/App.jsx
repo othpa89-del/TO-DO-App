@@ -863,14 +863,12 @@ export default function App() {
     })
     .sort(byName);
 
-  // Personen-Statistik (immer über ALLE Personen, unabhängig von Suche/Filter)
+  // Personen-Übersicht (immer über ALLE Personen, unabhängig von Suche/Filter)
   const isEurowings = (p) => (p.company || "").toLowerCase().includes("eurowings");
   const pStats = {
     total: persons.length,
     eurowings: persons.filter(isEurowings).length,
     extern: persons.filter((p) => !isEurowings(p)).length,
-    companies: new Set(persons.map((p) => (p.company || "").trim()).filter(Boolean)).size,
-    withOpen: persons.filter((p) => openTaskCount(p.name) > 0).length,
   };
   // Gefilterte Ansicht nach Company gruppieren (Firmen alphabetisch, „Ohne Firma“ zuletzt)
   const NO_FIRM = L("Ohne Firma", "No company");
@@ -1101,11 +1099,9 @@ export default function App() {
 
             <main className="panel">
               <div className="pstats">
-                <div className="pstat"><b>{pStats.total}</b><span>{L("Personen", "Persons")}</span></div>
+                <div className="pstat"><b>{pStats.total}</b><span>{L("Personen gesamt", "Persons total")}</span></div>
                 <div className="pstat"><b style={{ color: companyColor("Eurowings") }}>{pStats.eurowings}</b><span>Eurowings</span></div>
-                <div className="pstat"><b>{pStats.extern}</b><span>{L("Extern", "External")}</span></div>
-                <div className="pstat"><b>{pStats.companies}</b><span>{L("Firmen", "Companies")}</span></div>
-                <div className="pstat"><b>{pStats.withOpen}</b><span>{L("mit offenen Aufgaben", "with open tasks")}</span></div>
+                <div className="pstat"><b>{pStats.extern}</b><span>{L("Nicht Eurowings", "Non-Eurowings")}</span></div>
               </div>
               <div className="toolbar">
                 <div className="search"><Search size={15} />
