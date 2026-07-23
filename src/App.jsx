@@ -863,6 +863,99 @@ export default function App() {
     })
     .sort(byName);
 
+  // Personen-Statistik (immer über ALLE Personen, unabhängig von Suche/Filter)
+  const isEurowings = (p) => (p.company || "").toLowerCase().includes("eurowings");
+  const pStats = {
+    total: persons.length,
+    eurowings: persons.filter(isEurowings).length,
+    extern: persons.filter((p) => !isEurowings(p)).length,
+    companies: new Set(persons.map((p) => (p.company || "").trim()).filter(Boolean)).size,
+    withOpen: persons.filter((p) => openTaskCount(p.name) > 0).length,
+  };
+  // Gefilterte Ansicht nach Company gruppieren (Firmen alphabetisch, „Ohne Firma“ zuletzt)
+  const NO_FIRM = L("Ohne Firma", "No company");
+  const personGroups = (() => {
+    const m = new Map();
+    personsView.forEach((p) => {
+      const key = (p.company || "").trim() || NO_FIRM;
+      if (!m.has(key)) m.set(key, []);
+      m.get(key).push(p);
+    });
+    return [...m.entries()].sort((a, b) =>
+      a[0] === NO_FIRM ? 1 : b[0] === NO_FIRM ? -1 : a[0].localeCompare(b[0], "de"));
+  })();
+
+  // Wiederverwendbare Person-Darstellung (Liste bzw. Karte), damit die Gruppen
+  // beide Layouts nutzen können.
+  function renderPersonRow(p) {
+    const openP = merged.filter((t) => t.contact && t.contact.toLowerCase() === p.name.toLowerCase() && !isDone(t)).length;
+    return (
+      <div key={p.id} className="prow">
+        <span className="prow-name" onClick={() => editPerson(p)}>{p.name}</span>
+        <div className="prow-fields">
+          {p.company && <span className="pf"><b>{L("Company:", "Company:")}</b> {p.company}</span>}
+          {p.role && <span className="pf"><b>{L("Funktion:", "Function:")}</b> {p.role}</span>}
+          {p.email && <span className="pf"><b>{L("E-Mail:", "Email:")}</b> <a href={"mailto:" + p.email}>{p.email}</a></span>}
+          {p.phone && <span className="pf"><b>{L("Telefon:", "Phone:")}</b> <a href={"tel:" + p.phone}>{p.phone}</a></span>}
+          {p.notes && <span className="pf"><b>{L("Notizen:", "Notes:")}</b> {p.notes}</span>}
+        </div>
+        <div className="prow-topics">{(p.topics || []).map((c) => <span key={c} className="badge" style={{ color: catColor(c), borderColor: catColor(c) }}>{c}</span>)}</div>
+        <span className="prow-count">{openP} {L("offen", "open")}</span>
+        <div className="task-actions">
+          <button className="icon" onClick={() => editPerson(p)} title={L("Bearbeiten", "Edit")}><Pencil size={15} /></button>
+          <button className="icon" onClick={() => deletePerson(p.id)} title={L("Löschen", "Delete")}><X size={16} /></button>
+        </div>
+      </div>
+    );
+  }
+  function renderPersonCard(p) {
+    const pTasks = merged.filter((t) => t.contact && t.contact.toLowerCase() === p.name.toLowerCase());
+    const openTasks = pTasks.filter((t) => !isDone(t));
+    const open = expandedPerson === p.id;
+    return (
+      <div key={p.id} className={"pcard" + (open ? " open" : "")}>
+        <div className="pcard-head clickable" onClick={() => setExpandedPerson(open ? null : p.id)}>
+          <div>
+            <div className="pcard-name">{p.name}</div>
+            <div className="pcard-role">{[p.role, p.company].filter(Boolean).join(" · ")}</div>
+          </div>
+          <div className="task-actions" onClick={(e) => e.stopPropagation()}>
+            <button className="icon" onClick={() => editPerson(p)} title={L("Bearbeiten", "Edit")}><Pencil size={15} /></button>
+            <button className="icon" onClick={() => deletePerson(p.id)} title={L("Löschen", "Delete")}><X size={16} /></button>
+          </div>
+        </div>
+        {(p.topics || []).length > 0 && (
+          <div className="ptopics">
+            {(p.topics || []).map((c) => <span key={c} className="badge" style={{ color: catColor(c), borderColor: catColor(c) }}>{c}</span>)}
+          </div>
+        )}
+        <div className="pcontact">
+          {p.email && <a href={"mailto:" + p.email}><Mail size={13} /> {p.email}</a>}
+          {p.phone && <a href={"tel:" + p.phone}><Phone size={13} /> {p.phone}</a>}
+        </div>
+        {p.notes && <div className="pnotes">{p.notes}</div>}
+        <button className="pcount-btn" onClick={() => setExpandedPerson(open ? null : p.id)}>
+          {openTasks.length} {L("offene Aufgabe(n)", "open task(s)")} {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+        </button>
+        {open && (
+          <div className="pdrill">
+            {pTasks.length === 0 && <div className="pdrill-empty">{L("Keine Aufgaben zugeordnet.", "No tasks assigned.")}</div>}
+            {pTasks.sort((a, b) => (isDone(a) === isDone(b) ? 0 : isDone(a) ? 1 : -1)).map((t) => (
+              <div key={keyOf(t)} className={"pdrill-row" + (isDone(t) ? " done" : "")} style={{ borderLeftColor: companyColor(t.company) }}
+                onClick={() => startEdit(t._scope, t)} title={L("Zur Aufgabe", "Go to task")}>
+                <span className="pdrill-title">{t.title}</span>
+                <span className="pdrill-meta">
+                  <span style={{ color: (STATUS[t.status] || STATUS.offen).color, fontWeight: 800 }}>{(STATUS[t.status] || STATUS.offen).label || "—"}</span>
+                  {t.due && <span className="due">{fmtDate(t.due)}</span>}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // Globale Suche: über Aufgaben, Meetings und Personen
   const gq = gSearch.trim().toLowerCase();
   const gTasks = gq ? merged.filter((t) => [t.title, t.notes, t.contact, t.company, catDisplay(t.category)].join(" ").toLowerCase().includes(gq)).slice(0, 8) : [];
@@ -1007,6 +1100,13 @@ export default function App() {
             </aside>
 
             <main className="panel">
+              <div className="pstats">
+                <div className="pstat"><b>{pStats.total}</b><span>{L("Personen", "Persons")}</span></div>
+                <div className="pstat"><b style={{ color: companyColor("Eurowings") }}>{pStats.eurowings}</b><span>Eurowings</span></div>
+                <div className="pstat"><b>{pStats.extern}</b><span>{L("Extern", "External")}</span></div>
+                <div className="pstat"><b>{pStats.companies}</b><span>{L("Firmen", "Companies")}</span></div>
+                <div className="pstat"><b>{pStats.withOpen}</b><span>{L("mit offenen Aufgaben", "with open tasks")}</span></div>
+              </div>
               <div className="toolbar">
                 <div className="search"><Search size={15} />
                   <input value={pSearch} onChange={(e) => setPSearch(e.target.value)} placeholder={L("Person, Company, Thema suchen …", "Search person, company, topic …")} /></div>
@@ -1023,81 +1123,18 @@ export default function App() {
               </div>
               {persons.length === 0 && <div className="empty">{L("Noch keine Ansprechpersonen. Links die erste anlegen.", "No contacts yet. Create the first one on the left.")}</div>}
               {persons.length > 0 && personsView.length === 0 && <div className="empty">{L("Keine Treffer.", "No matches.")}</div>}
-              {pLayout === "list" ? (
-                <div className="plist">
-                  {personsView.map((p) => {
-                    const openP = merged.filter((t) => t.contact && t.contact.toLowerCase() === p.name.toLowerCase() && !isDone(t)).length;
-                    return (
-                      <div key={p.id} className="prow">
-                        <span className="prow-name" onClick={() => editPerson(p)}>{p.name}</span>
-                        <div className="prow-fields">
-                          {p.company && <span className="pf"><b>{L("Company:", "Company:")}</b> {p.company}</span>}
-                          {p.role && <span className="pf"><b>{L("Funktion:", "Function:")}</b> {p.role}</span>}
-                          {p.email && <span className="pf"><b>{L("E-Mail:", "Email:")}</b> <a href={"mailto:" + p.email}>{p.email}</a></span>}
-                          {p.phone && <span className="pf"><b>{L("Telefon:", "Phone:")}</b> <a href={"tel:" + p.phone}>{p.phone}</a></span>}
-                          {p.notes && <span className="pf"><b>{L("Notizen:", "Notes:")}</b> {p.notes}</span>}
-                        </div>
-                        <div className="prow-topics">{(p.topics || []).map((c) => <span key={c} className="badge" style={{ color: catColor(c), borderColor: catColor(c) }}>{c}</span>)}</div>
-                        <span className="prow-count">{openP} {L("offen", "open")}</span>
-                        <div className="task-actions">
-                          <button className="icon" onClick={() => editPerson(p)} title={L("Bearbeiten", "Edit")}><Pencil size={15} /></button>
-                          <button className="icon" onClick={() => deletePerson(p.id)} title={L("Löschen", "Delete")}><X size={16} /></button>
-                        </div>
-                      </div>
-                    );
-                  })}
+              {personGroups.map(([company, members]) => (
+                <div key={company} className="pgroup">
+                  <div className="pgroup-head">
+                    <span className="pgroup-dot" style={{ background: companyColor(company) }} />
+                    <span className="pgroup-name">{company}</span>
+                    <em>{members.length}</em>
+                  </div>
+                  {pLayout === "list"
+                    ? <div className="plist">{members.map(renderPersonRow)}</div>
+                    : <div className="pgrid">{members.map(renderPersonCard)}</div>}
                 </div>
-              ) : (
-              <div className="pgrid">
-                {personsView.map((p) => {
-                  const pTasks = merged.filter((t) => t.contact && t.contact.toLowerCase() === p.name.toLowerCase());
-                  const openTasks = pTasks.filter((t) => !isDone(t));
-                  const open = expandedPerson === p.id;
-                  return (
-                    <div key={p.id} className={"pcard" + (open ? " open" : "")}>
-                      <div className="pcard-head clickable" onClick={() => setExpandedPerson(open ? null : p.id)}>
-                        <div>
-                          <div className="pcard-name">{p.name}</div>
-                          <div className="pcard-role">{[p.role, p.company].filter(Boolean).join(" · ")}</div>
-                        </div>
-                        <div className="task-actions" onClick={(e) => e.stopPropagation()}>
-                          <button className="icon" onClick={() => editPerson(p)} title={L("Bearbeiten", "Edit")}><Pencil size={15} /></button>
-                          <button className="icon" onClick={() => deletePerson(p.id)} title={L("Löschen", "Delete")}><X size={16} /></button>
-                        </div>
-                      </div>
-                      {(p.topics || []).length > 0 && (
-                        <div className="ptopics">
-                          {(p.topics || []).map((c) => <span key={c} className="badge" style={{ color: catColor(c), borderColor: catColor(c) }}>{c}</span>)}
-                        </div>
-                      )}
-                      <div className="pcontact">
-                        {p.email && <a href={"mailto:" + p.email}><Mail size={13} /> {p.email}</a>}
-                        {p.phone && <a href={"tel:" + p.phone}><Phone size={13} /> {p.phone}</a>}
-                      </div>
-                      {p.notes && <div className="pnotes">{p.notes}</div>}
-                      <button className="pcount-btn" onClick={() => setExpandedPerson(open ? null : p.id)}>
-                        {openTasks.length} {L("offene Aufgabe(n)", "open task(s)")} {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                      </button>
-                      {open && (
-                        <div className="pdrill">
-                          {pTasks.length === 0 && <div className="pdrill-empty">{L("Keine Aufgaben zugeordnet.", "No tasks assigned.")}</div>}
-                          {pTasks.sort((a, b) => (isDone(a) === isDone(b) ? 0 : isDone(a) ? 1 : -1)).map((t) => (
-                            <div key={keyOf(t)} className={"pdrill-row" + (isDone(t) ? " done" : "")} style={{ borderLeftColor: companyColor(t.company) }}
-                              onClick={() => startEdit(t._scope, t)} title={L("Zur Aufgabe", "Go to task")}>
-                              <span className="pdrill-title">{t.title}</span>
-                              <span className="pdrill-meta">
-                                <span style={{ color: (STATUS[t.status] || STATUS.offen).color, fontWeight: 800 }}>{(STATUS[t.status] || STATUS.offen).label || "—"}</span>
-                                {t.due && <span className="due">{fmtDate(t.due)}</span>}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              )}
+              ))}
             </main>
           </div>
         ) : view === "export" ? (
@@ -1824,6 +1861,15 @@ aside.panel .card{position:sticky;top:16px;}
 .icon:hover{background:${C.fill};color:${C.burgundy};}
 .icon.del-confirm{width:auto;padding:0 10px;font-size:12px;font-weight:800;color:${C.white};background:${C.burgundyDarker};}
 
+.pstats{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;}
+.pstat{flex:1;min-width:120px;background:${C.white};border:1px solid ${C.line};border-radius:10px;padding:11px 13px;display:flex;flex-direction:column;gap:2px;}
+.pstat b{font-size:24px;font-weight:900;color:${C.ink};line-height:1;}
+.pstat span{font-size:11.5px;color:${C.cool};font-weight:700;}
+.pgroup{margin-bottom:20px;}
+.pgroup-head{display:flex;align-items:center;gap:9px;margin:0 0 9px;padding-bottom:6px;border-bottom:2px solid ${C.fill};}
+.pgroup-dot{width:11px;height:11px;border-radius:50%;flex:none;}
+.pgroup-name{font-size:15px;font-weight:900;color:${C.ink};letter-spacing:-.01em;}
+.pgroup-head em{font-style:normal;font-size:12px;font-weight:800;color:${C.cool};background:${C.fill};border-radius:20px;padding:2px 9px;}
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;}
 .pcard{background:${C.white};border:1px solid ${C.line};border-radius:12px;padding:15px;}
 .pcard-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
