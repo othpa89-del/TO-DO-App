@@ -879,8 +879,12 @@ export default function App() {
       if (!m.has(key)) m.set(key, []);
       m.get(key).push(p);
     });
-    return [...m.entries()].sort((a, b) =>
-      a[0] === NO_FIRM ? 1 : b[0] === NO_FIRM ? -1 : a[0].localeCompare(b[0], "de"));
+    // Eurowings immer oben (Rang 0), „Ohne Firma“ immer unten (Rang 2), Rest alphabetisch
+    const rank = (name) => (name.toLowerCase().includes("eurowings") ? 0 : name === NO_FIRM ? 2 : 1);
+    return [...m.entries()].sort((a, b) => {
+      const ra = rank(a[0]), rb = rank(b[0]);
+      return ra !== rb ? ra - rb : a[0].localeCompare(b[0], "de");
+    });
   })();
 
   // Wiederverwendbare Person-Darstellung (Liste bzw. Karte), damit die Gruppen
