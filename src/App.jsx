@@ -8,6 +8,7 @@ import {
 import Sortable from "sortablejs";
 import { meetingToMarkdown, meetingToText, exportWord, printMeeting, copyMeetingToClipboard, emailMeeting, enrichMeeting } from "./meetingExport.js";
 import { loadTasks, saveTasks, loadMeetingsData, saveMeetingsData } from "./store.js";
+import { isoDay } from "./dates.js";
 import { L, useLang, getLang, setLang } from "./i18n.js";
 
 // Meetings-Modul lazy laden (hält das Start-Bundle klein)
@@ -24,8 +25,9 @@ const DEFAULT_CATEGORIES = [
   "Simulator Special Airport Training", "Simulator TRI/TRE", "LAT / GAT",
   "Ground Training General", "Ground Training OCC", "WBT", "Safety", "FDM", "HR",
 ];
-const CAT_COLORS = [C.burgundy, C.burgundyDark, C.sky, C.burgundyDarker, C.cool];
-function catColor() { return "#787878"; }
+// Bereiche werden bewusst einheitlich neutral dargestellt – die farbliche
+// Unterscheidung übernimmt die Company (companyColor).
+const catColor = () => C.cool;
 const OLD_MAP = { training: "Trainingsinhalte", standard: "Standardisierung", quality: "Qualität", safety: "Safety", other: "" };
 const catDisplay = (c) => (c ? (OLD_MAP[c] !== undefined ? OLD_MAP[c] : c) : "");
 
@@ -57,9 +59,6 @@ const LEADS = [
   { v: 7, get label() { return L("1 Woche vorher", "1 week before"); } },
   { v: 14, get label() { return L("2 Wochen vorher", "2 weeks before"); } },
 ];
-const SCOPES = {
-  personal: { key: "tasks-personal", shared: false, get label() { return L("Aufgaben", "Tasks"); } },
-};
 const COMPANY_SUGGESTIONS = ["Eurowings", "Aviation Academy Austria", "Lufthansa Group", "Austro Control"];
 const DEFAULT_COMPANIES = [...COMPANY_SUGGESTIONS, "Privat"];
 // Kontext-/Firmenfarben (für die optische Unterscheidung, v. a. in „Persönlich")
@@ -110,6 +109,7 @@ function compressImage(file, maxDim = 1280, quality = 0.72) {
       img.onerror = () => res(null);
       img.src = fr.result;
     };
+    fr.onerror = () => res(null); // unlesbare Datei darf den Import nicht blockieren
     fr.readAsDataURL(file);
   });
 }
@@ -143,7 +143,7 @@ function shiftDate(iso, rec) {
   else if (rec === "quarterly") d.setMonth(d.getMonth() + 3);
   else if (rec === "yearly") d.setFullYear(d.getFullYear() + 1);
   else return null;
-  return d.toISOString().slice(0, 10);
+  return isoDay(d);
 }
 const dt = (iso) => (iso ? new Date(iso).toLocaleDateString(getLang() === "en" ? "en-GB" : "de-DE") : "");
 const fmtDay = (d) => (d ? new Date(d + "T00:00:00").toLocaleDateString(getLang() === "en" ? "en-GB" : "de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "");
@@ -151,14 +151,17 @@ function downloadBlob(data, filename, type) {
   const blob = new Blob([data], { type });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  // Erst nach dem Tick freigeben: sonst kann der Browser den Download
+  // abbrechen, bevor er den Blob gelesen hat (v. a. große Dateien).
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 // Aufgaben liegen jetzt als Einzelzeilen im Speicher (siehe store.js);
 // die Signaturen bleiben erhalten, damit die Aufrufer unverändert funktionieren.
 async function loadScope() {
   try { return await loadTasks(); } catch { return []; }
 }
-async function saveScope(scope, arr) {
+async function saveScope(arr) {
   await saveTasks(arr);
 }
 
@@ -219,13 +222,13 @@ export default function App() {
   const [pFilterTopic, setPFilterTopic] = useState("all");
   const [expandedPerson, setExpandedPerson] = useState(null);
 
-  const formRef = useRef(null);
+  const toastTimer = useRef(null);  // Timer der Kurzmeldung (Toast)
   const tasksUlRef = useRef(null);  // <ul> für Drag&Drop
   const listRef = useRef([]);       // aktuelle sichtbare Liste (manuelle Reihenfolge)
   const tasksRef = useRef(tasks);   // aktuelle Aufgaben
   const kcolRefs = useRef({});      // Kanban-Spalten-Container
 
-  const blank = { title: "", notes: "", category: "", priority: "", status: "offen", start: "", due: "", remindLead: 3, contact: "", company: "", link: "", recurrence: "none", escalation: "", updatedAt: new Date().toISOString().slice(0, 10), scope: "personal", checklist: [], attachments: [], images: [] };
+  const blank = { title: "", notes: "", category: "", priority: "", status: "offen", start: "", due: "", remindLead: 3, contact: "", company: "", link: "", recurrence: "none", escalation: "", updatedAt: isoDay(), scope: "personal", checklist: [], attachments: [], images: [] };
   const [form, setForm] = useState(blank);
   const sortedCats = sortCats(categories);
   const sortedCompanies = sortCats(companies);
@@ -234,7 +237,7 @@ export default function App() {
     let on = true;
     (async () => {
       const [p, tRaw] = await Promise.all([
-        loadScope("personal"),
+        loadScope(),
         window.storage.get("tasks-team", true).then((r) => (r && r.value ? JSON.parse(r.value) : [])).catch(() => []),
       ]);
       if (!on) return;
@@ -243,7 +246,7 @@ export default function App() {
       if (teamTasks.length) {
         // Einmalige Migration: frühere "Team"-Aufgaben in die normale Liste übernehmen, alten Speicher leeren
         personal = [...personal, ...teamTasks];
-        try { await saveScope("personal", personal); await window.storage.set("tasks-team", JSON.stringify([]), true); } catch {}
+        try { await saveScope(personal); await window.storage.set("tasks-team", JSON.stringify([]), true); } catch {}
       }
       setTasks({ personal });
       let cats = null;
@@ -347,10 +350,10 @@ export default function App() {
     }
   }, [printNonce]);
 
-  function flash(msg) { setToast(msg); clearTimeout(flash._t); flash._t = setTimeout(() => setToast(null), 2600); }
+  function flash(msg) { setToast(msg); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(null), 2600); }
   async function persist(scope, arr) {
     setTasks((prev) => ({ ...prev, [scope]: arr }));
-    try { await saveScope(scope, arr); } catch { flash(L("Speichern fehlgeschlagen – bitte erneut versuchen.", "Saving failed – please try again.")); }
+    try { await saveScope(arr); } catch { flash(L("Speichern fehlgeschlagen – bitte erneut versuchen.", "Saving failed – please try again.")); }
   }
   // Manuelle Reihenfolge per Drag&Drop: sichtbare Liste neu anordnen, Reihenfolge
   // in tasks.personal übernehmen (versteckte/gefilterte Aufgaben behalten ihre Plätze).
@@ -374,7 +377,7 @@ export default function App() {
       category: partial.category || "", priority: "", status: "offen",
       start: "", due: partial.due || "", remindLead: 3, contact: partial.contact || "",
       company: partial.company || "", link: partial.link || "", recurrence: "none", escalation: "",
-      updatedAt: new Date().toISOString().slice(0, 10), createdAt: new Date().toISOString(), createdBy: "", completedAt: null,
+      updatedAt: isoDay(), createdAt: new Date().toISOString(), createdBy: "", completedAt: null,
     });
     persist("personal", [task, ...tasks.personal]);
     flash(L("Aufgabe aus Meeting erstellt.", "Task created from meeting."));
@@ -423,7 +426,7 @@ export default function App() {
       const arr = tasks[scope].map((x) => x.id === editId ? {
         ...x, title, notes: form.notes.trim(), category: form.category, priority: form.priority, status: form.status,
         start: form.start, due: form.due, remindLead: Number(form.remindLead), contact: form.contact.trim(), company: form.company.trim(),
-        link: form.link.trim(), recurrence: form.recurrence, escalation: form.escalation, updatedAt: new Date().toISOString().slice(0, 10),
+        link: form.link.trim(), recurrence: form.recurrence, escalation: form.escalation, updatedAt: isoDay(),
         checklist: form.checklist || [], attachments: form.attachments || [], images: form.images || [],
         completedAt: form.status === "erledigt" ? (x.completedAt || new Date().toISOString()) : null,
       } : x);
@@ -433,7 +436,7 @@ export default function App() {
       const task = normalizeTask({
         id: uid(), title, notes: form.notes.trim(), category: form.category, priority: form.priority, status: form.status,
         start: form.start, due: form.due, remindLead: Number(form.remindLead), contact: form.contact.trim(), company: form.company.trim(),
-        link: form.link.trim(), recurrence: form.recurrence, escalation: form.escalation, updatedAt: new Date().toISOString().slice(0, 10),
+        link: form.link.trim(), recurrence: form.recurrence, escalation: form.escalation, updatedAt: isoDay(),
         checklist: form.checklist || [], attachments: form.attachments || [], images: form.images || [],
         createdAt: new Date().toISOString(),
         createdBy: "", completedAt: form.status === "erledigt" ? new Date().toISOString() : null,
@@ -451,7 +454,7 @@ export default function App() {
   // --- Checkliste direkt in der Aufgabenkarte abhaken ---
   function toggleChecklistItem(scope, taskId, itemId) {
     persist(scope, tasks[scope].map((t) => (t.id === taskId
-      ? { ...t, checklist: (t.checklist || []).map((c) => (c.id === itemId ? { ...c, done: !c.done } : c)), updatedAt: new Date().toISOString().slice(0, 10) }
+      ? { ...t, checklist: (t.checklist || []).map((c) => (c.id === itemId ? { ...c, done: !c.done } : c)), updatedAt: isoDay() }
       : t)));
   }
   // --- Anhänge/Bilder im Formular ---
@@ -476,14 +479,14 @@ export default function App() {
     if (!t) return;
     const willDone = newStatus === "erledigt";
     let arr = cur.map((x) => x.id === id ? {
-      ...x, status: newStatus, updatedAt: new Date().toISOString().slice(0, 10),
+      ...x, status: newStatus, updatedAt: isoDay(),
       completedAt: willDone ? (x.completedAt || new Date().toISOString()) : null,
       completedBy: willDone ? profile || "" : "",
     } : x);
     if (willDone && !isDone(t) && t.recurrence && t.recurrence !== "none" && t.due) {
       const nd = shiftDate(t.due, t.recurrence);
       if (nd) {
-        const next = normalizeTask({ ...t, id: uid(), status: "offen", due: nd, completedAt: null, completedBy: "", log: [], updatedAt: new Date().toISOString().slice(0, 10), createdAt: new Date().toISOString() });
+        const next = normalizeTask({ ...t, id: uid(), status: "offen", due: nd, completedAt: null, completedBy: "", log: [], updatedAt: isoDay(), createdAt: new Date().toISOString() });
         arr = [next, ...arr]; flash(L("Folgetermin angelegt: ", "Follow-up created: ") + fmtDate(nd));
       }
     }
@@ -549,7 +552,7 @@ export default function App() {
       profile, categories, companies, persons,
       tasks: { personal: tasks.personal }, meetings: allMeetings, meetingTypes,
     };
-    downloadBlob(JSON.stringify(payload, null, 2), `${new Date().toISOString().slice(0, 10).replace(/-/g, "")}_TODO_${L("Sicherung", "Backup")}.json`, "application/json");
+    downloadBlob(JSON.stringify(payload, null, 2), `${isoDay().replace(/-/g, "")}_TODO_${L("Sicherung", "Backup")}.json`, "application/json");
     flash(L("Sicherung erstellt (inkl. Meetings).", "Backup created (incl. meetings)."));
   }
   function onRestoreFile(e) {
@@ -565,7 +568,7 @@ export default function App() {
     const cats = obj.categories || categories; const pers = obj.persons || persons; const comps = obj.companies || companies;
     setTasks({ personal: np }); setCategories(cats); setPersons(pers); setCompanies(comps);
     try {
-      await saveScope("personal", np); await window.storage.set("tasks-team", JSON.stringify([]), true);
+      await saveScope(np); await window.storage.set("tasks-team", JSON.stringify([]), true);
       await window.storage.set("categories", JSON.stringify(cats), true);
       await window.storage.set("companies", JSON.stringify(comps), true);
       await window.storage.set("persons", JSON.stringify(pers), true);
@@ -691,7 +694,7 @@ export default function App() {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "TO DO");
       const out = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-      downloadBlob(out, `${new Date().toISOString().slice(0, 10).replace(/-/g, "")}_TODO.xlsx`, "application/octet-stream");
+      downloadBlob(out, `${isoDay().replace(/-/g, "")}_TODO.xlsx`, "application/octet-stream");
       flash(L("Excel-Datei erstellt.", "Excel file created."));
     } catch { flash(L("Excel-Export fehlgeschlagen.", "Excel export failed.")); }
   }
@@ -718,7 +721,7 @@ export default function App() {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, L("Personen", "Persons"));
       const out = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-      downloadBlob(out, `${new Date().toISOString().slice(0, 10).replace(/-/g, "")}_${L("Personen", "Persons")}.xlsx`, "application/octet-stream");
+      downloadBlob(out, `${isoDay().replace(/-/g, "")}_${L("Personen", "Persons")}.xlsx`, "application/octet-stream");
       flash(L("Excel-Datei erstellt.", "Excel file created."));
     } catch { flash(L("Excel-Export fehlgeschlagen.", "Excel export failed.")); }
   }
@@ -727,7 +730,7 @@ export default function App() {
     const text = (logDrafts[k] || "").trim();
     if (!text) return;
     const entry = { id: uid(), date: new Date().toISOString(), text, by: profile || "" };
-    persist(scope, tasks[scope].map((x) => x.id === id ? { ...x, log: [...(x.log || []), entry], updatedAt: new Date().toISOString().slice(0, 10) } : x));
+    persist(scope, tasks[scope].map((x) => x.id === id ? { ...x, log: [...(x.log || []), entry], updatedAt: isoDay() } : x));
     setLogDrafts((d) => ({ ...d, [k]: "" }));
   }
   function delLog(scope, id, entryId) {
@@ -1037,7 +1040,7 @@ export default function App() {
               <div className="dash-card">
                 <div className="dash-card-h" style={{ color: C.burgundyDark }}>{L("Nächste Meetings", "Upcoming meetings")}</div>
                 {(() => {
-                  const ts = new Date().toISOString().slice(0, 10);
+                  const ts = isoDay();
                   const up = meetings.filter((m) => !m.archived && (m.date || "") >= ts).sort((a, b) => (a.date || "").localeCompare(b.date || "")).slice(0, 6);
                   if (!up.length) return <div className="dash-empty">{L("Keine anstehenden Meetings.", "No upcoming meetings.")}</div>;
                   return up.map((m) => (
@@ -1207,8 +1210,8 @@ export default function App() {
                         <button className="btn out" onClick={() => emailMeeting(me)}><Mail size={14} /> {L("E-Mail", "Email")}</button>
                         <button className="btn out" onClick={() => printMeeting(me)}><Printer size={14} /> {L("PDF", "PDF")}</button>
                         <button className="btn out" onClick={() => exportWord(me)}><FileText size={14} /> {L("Word", "Word")}</button>
-                        <button className="btn out" onClick={() => downloadBlob(meetingToMarkdown(me), `${(mt.date || new Date().toISOString().slice(0, 10)).replace(/-/g, "")}_${L("Protokoll", "Minutes")}_${(mt.title || "Meeting").replace(/\s+/g, "_")}.md`, "text/markdown")}>MD</button>
-                        <button className="btn out" onClick={() => downloadBlob(meetingToText(me), `${(mt.date || new Date().toISOString().slice(0, 10)).replace(/-/g, "")}_${L("Protokoll", "Minutes")}_${(mt.title || "Meeting").replace(/\s+/g, "_")}.txt`, "text/plain")}>TXT</button>
+                        <button className="btn out" onClick={() => downloadBlob(meetingToMarkdown(me), `${(mt.date || isoDay()).replace(/-/g, "")}_${L("Protokoll", "Minutes")}_${(mt.title || "Meeting").replace(/\s+/g, "_")}.md`, "text/markdown")}>MD</button>
+                        <button className="btn out" onClick={() => downloadBlob(meetingToText(me), `${(mt.date || isoDay()).replace(/-/g, "")}_${L("Protokoll", "Minutes")}_${(mt.title || "Meeting").replace(/\s+/g, "_")}.txt`, "text/plain")}>TXT</button>
                       </div>
                     </li>
                     );
@@ -1237,7 +1240,7 @@ export default function App() {
           </div>
         ) : view === "new" ? (
           /* ============ NEUE AUFGABE / BEARBEITEN ============ */
-          <div className="formwrap" ref={formRef}>
+          <div className="formwrap">
               <div className="card">
                 <h2>{editId ? L("Aufgabe bearbeiten", "Edit task") : L("Neue Aufgabe", "New task")}</h2>
                 <div className="field"><label>{L("Titel", "Title")}</label>
@@ -1300,7 +1303,7 @@ export default function App() {
                         <option value=""></option><option value="ja">{L("Ja", "Yes")}</option><option value="nein">{L("Nein", "No")}</option>
                       </select></div>
                     <div className="field"><label>{L("Letztes Update", "Last update")}</label>
-                      <div className="ro-field">{form.updatedAt ? fmtDay(form.updatedAt) : fmtDay(new Date().toISOString().slice(0, 10))}<span className="ro-hint">{L("automatisch", "automatic")}</span></div></div>
+                      <div className="ro-field">{form.updatedAt ? fmtDay(form.updatedAt) : fmtDay(isoDay())}<span className="ro-hint">{L("automatisch", "automatic")}</span></div></div>
                   </div>
                 ) : (
                   <div className="field"><label>{L("Eskalationsbedarf", "Escalation needed")}</label>

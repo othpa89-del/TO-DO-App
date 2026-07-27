@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { L, useLang, getLang } from "./i18n.js";
 import { fmtDay, htmlToPlain, statusLabel, decisionStatusLabel } from "./meetingExport.js";
 import { loadMeetingsData, saveMeetingsData } from "./store.js";
+import { isoDay } from "./dates.js";
 import {
   Plane, Star, Archive, Search, Plus, X, Pencil, Printer, FileText, Download,
   Trash2, Check, Mic, Square as SquareIcon, Image as ImageIcon, Paperclip,
@@ -24,7 +25,7 @@ const STATUS_COLOR = { Geplant: C.sky, Laufend: C.amber, Abgeschlossen: C.green,
 const DECISION_STATUS = ["Offen", "Beschlossen", "Umgesetzt", "Verworfen"];
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-const todayISO = () => new Date().toISOString().slice(0, 10);
+const todayISO = () => isoDay();
 
 // Meetings liegen als Einzelzeilen im Speicher (siehe store.js)
 export async function loadMeetings() {
@@ -71,6 +72,7 @@ function compressImage(file, maxDim = 1280, quality = 0.72) {
       img.onerror = () => res(null);
       img.src = fr.result;
     };
+    fr.onerror = () => res(null); // unlesbare Datei darf den Import nicht blockieren
     fr.readAsDataURL(file);
   });
 }
@@ -134,6 +136,8 @@ export default function Meetings({ persons = [], categories = [], profile = "", 
     return () => { on = false; window.removeEventListener("ctc:remote", h); };
   }, []);
 
+  const toastTimer = useRef(null);  // Timer der Kurzmeldung (Toast)
+
   // Meeting aus der globalen Suche öffnen (sobald geladen)
   const handledOpen = useRef(0);
   useEffect(() => {
@@ -144,22 +148,29 @@ export default function Meetings({ persons = [], categories = [], profile = "", 
 
   function persistTypes(next) { setTypes(next); saveTypes(next); }
 
-  function flash(m) { setToast(m); clearTimeout(flash._t); flash._t = setTimeout(() => setToast(""), 2600); }
-  // Funktionaler Updater + Persistenz auf Basis des AKTUELLEN States (race-sicher);
-  // Speicher-Fehler werden gemeldet statt still verschluckt (z. B. zu große Anhänge).
+  function flash(m) { setToast(m); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(""), 2600); }
+  // Funktionaler Updater auf Basis des AKTUELLEN States (race-sicher). Der
+  // Updater bleibt NEBENWIRKUNGSFREI – React darf ihn mehrfach aufrufen und er
+  // läuft während des Renderns. Speichern und die Meldung an die App passieren
+  // deshalb in einem Effekt, sobald der neue Stand übernommen wurde.
+  const pendingSave = useRef(null);
   function mutate(fn) {
-    setMeetings((prev) => {
-      const next = fn(prev);
-      saveMeetings(next).then((ok) => { if (!ok) flash(L("Speichern fehlgeschlagen – evtl. zu große Anhänge.", "Save failed – attachments may be too large.")); });
-      if (onMeetingsChange) onMeetingsChange(next); // Export-Tab (App) live aktuell halten
-      return next;
-    });
+    setMeetings((prev) => { const next = fn(prev); pendingSave.current = next; return next; });
   }
+  useEffect(() => {
+    const next = pendingSave.current;
+    if (!next) return;
+    pendingSave.current = null;
+    saveMeetings(next).then((ok) => { if (!ok) flash(L("Speichern fehlgeschlagen – evtl. zu große Anhänge.", "Save failed – attachments may be too large.")); });
+    if (onMeetingsChange) onMeetingsChange(next); // Export-Tab (App) live aktuell halten
+  }, [meetings]);
   function saveMeeting(m) {
     const now = new Date().toISOString();
     mutate((prev) => {
       const exists = prev.some((x) => x.id === m.id);
-      const updated = { ...m, archived: m.status === "Archiviert" ? true : m.archived, updatedAt: now };
+      // Archiv-Kennzeichen folgt dem Status: wird der Status zurückgesetzt,
+      // taucht das Meeting wieder in der aktiven Liste auf.
+      const updated = { ...m, archived: m.status === "Archiviert", updatedAt: now };
       return exists ? prev.map((x) => (x.id === m.id ? updated : x)) : [{ ...updated, createdAt: now }, ...prev];
     });
     setEditing(null); flash(L("Meeting gespeichert.", "Meeting saved."));
@@ -188,7 +199,7 @@ export default function Meetings({ persons = [], categories = [], profile = "", 
       <style>{css}</style>
       {mgrOpen && <TypeManager types={types} onChange={persistTypes} onClose={() => setMgrOpen(false)} />}
       {editing ? (
-        <MeetingEditor meeting={editing} persons={persons} categories={categories} profile={profile}
+        <MeetingEditor key={editing.id} meeting={editing} persons={persons} categories={categories} profile={profile}
           types={types} onManageTypes={() => setMgrOpen(true)}
           companyColor={companyColor} onCreateTask={onCreateTask} flash={flash}
           onSave={saveMeeting} onCancel={() => setEditing(null)} />
@@ -368,7 +379,13 @@ function MeetingEditor({ meeting, persons, categories, profile, types = MEETING_
       mr.start(); recRef.current = mr; setRecording(true);
     } catch { flash(L("Mikrofon nicht verfügbar.", "Microphone not available.")); }
   }
-  function stopRec() { if (recRef.current) { recRef.current.stop(); setRecording(false); } }
+  function stopRec() { if (recRef.current) { recRef.current.stop(); recRef.current = null; setRecording(false); } }
+  // Editor verlassen, während noch aufgenommen wird: Aufnahme sauber beenden,
+  // sonst bliebe das Mikrofon aktiv (Aufnahme-Anzeige des Browsers).
+  useEffect(() => () => {
+    const mr = recRef.current;
+    if (mr && mr.state !== "inactive") { try { mr.stop(); } catch {} }
+  }, []);
 
   const sortedPersons = persons.slice().sort((a, b) => (a.name || "").localeCompare(b.name || "", "de"));
 

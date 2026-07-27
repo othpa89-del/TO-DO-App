@@ -1,4 +1,5 @@
 import { L, getLang } from "./i18n.js";
+import { isoDay } from "./dates.js";
 
 // ===========================================================================
 //  Export-/Format-Schicht für Meeting Minutes (aus Meetings.jsx ausgelagert)
@@ -29,7 +30,9 @@ export function downloadFile(content, name, type) {
   const blob = content instanceof Blob ? content : new Blob([content], { type });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a"); a.href = url; a.download = name;
-  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  document.body.appendChild(a); a.click(); a.remove();
+  // Erst später freigeben, sonst bricht der Download großer Dateien ab.
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 export function htmlToPlain(html) {
   if (!html) return "";
@@ -42,14 +45,55 @@ export function htmlToPlain(html) {
   const ta = document.createElement("textarea"); ta.innerHTML = s;
   return ta.value.replace(/\n{3,}/g, "\n\n").trim();
 }
-// Entfernt potenziell gefährliches HTML vor dem Export/Druck (Self-XSS vermeiden)
+// Entfernt potenziell gefährliches HTML vor dem Export/Druck (Self-XSS vermeiden).
+// Bewusst eine ALLOWLIST über den geparsten DOM statt Regex-Ersetzungen: Muster
+// wie <svg/onload=…> oder href=javascript:… (ohne Anführungszeichen) rutschen
+// durch jede Regex-Denylist, landen sonst aber via document.write im Druckfenster.
+const ALLOWED_TAGS = new Set([
+  "B", "STRONG", "I", "EM", "U", "S", "STRIKE", "SPAN", "DIV", "P", "BR", "HR",
+  "UL", "OL", "LI", "H1", "H2", "H3", "H4", "H5", "H6", "BLOCKQUOTE", "PRE", "CODE",
+  "TABLE", "THEAD", "TBODY", "TFOOT", "TR", "TD", "TH", "A", "LABEL", "INPUT", "FONT", "IMG",
+]);
+// Elemente, deren INHALT ebenfalls weg muss (sonst stünde z. B. Skript-Quelltext
+// als sichtbarer Text im Protokoll).
+const DROP_WITH_CONTENT = new Set([
+  "SCRIPT", "STYLE", "IFRAME", "OBJECT", "EMBED", "TEMPLATE", "NOSCRIPT",
+  "SVG", "MATH", "LINK", "META", "BASE", "FORM", "BUTTON", "SELECT", "TEXTAREA",
+  "AUDIO", "VIDEO", "CANVAS",
+]);
+const ALLOWED_ATTR = new Set(["href", "src", "alt", "colspan", "rowspan", "type", "checked", "align", "start", "width", "height"]);
+const SAFE_URL = /^(https?:|mailto:|tel:|#|\/|\.)/i;
+const SAFE_IMG = /^(https?:|data:image\/)/i;
+
 export function sanitizeHtml(html) {
   if (!html) return "";
-  return String(html)
-    .replace(/<\s*script[\s\S]*?<\s*\/\s*script\s*>/gi, "")
-    .replace(/<\s*(iframe|object|embed|link|meta|style)[\s\S]*?>/gi, "")
-    .replace(/\son\w+\s*=\s*"[^"]*"/gi, "").replace(/\son\w+\s*=\s*'[^']*'/gi, "").replace(/\son\w+\s*=\s*[^\s>]+/gi, "")
-    .replace(/(href|src)\s*=\s*("|')\s*javascript:[^"']*\2/gi, '$1="#"');
+  let doc;
+  try { doc = new DOMParser().parseFromString(String(html), "text/html"); }
+  catch { return ""; }
+  const clean = (node) => {
+    [...node.childNodes].forEach((child) => {
+      if (child.nodeType === 3) return;                     // Text ist unbedenklich
+      if (child.nodeType !== 1) { child.remove(); return; } // Kommentare o. Ä. raus
+      const tag = child.tagName;
+      if (DROP_WITH_CONTENT.has(tag)) { child.remove(); return; }
+      if (!ALLOWED_TAGS.has(tag)) {
+        // Unbekanntes Element auflösen, den (bereinigten) Inhalt behalten
+        clean(child);
+        child.replaceWith(...child.childNodes);
+        return;
+      }
+      [...child.attributes].forEach((a) => {
+        const name = a.name.toLowerCase();
+        if (!ALLOWED_ATTR.has(name)) { child.removeAttribute(a.name); return; } // schließt on*-Handler ein
+        if (name === "href" && !SAFE_URL.test(a.value.trim())) child.setAttribute("href", "#");
+        if (name === "src" && !SAFE_IMG.test(a.value.trim())) child.removeAttribute("src");
+      });
+      if (tag === "INPUT" && (child.getAttribute("type") || "").toLowerCase() !== "checkbox") { child.remove(); return; }
+      clean(child);
+    });
+  };
+  clean(doc.body);
+  return doc.body.innerHTML;
 }
 
 // ===========================================================================
@@ -200,7 +244,7 @@ export function printMeeting(m) {
 }
 export function exportWord(m) {
   const html = meetingHTML(m, true);
-  downloadFile("﻿" + html, `${(m.date || new Date().toISOString().slice(0, 10)).replace(/-/g, "")}_${L("Protokoll", "Minutes")}_${(m.title || "Meeting").replace(/\s+/g, "_")}.doc`, "application/msword");
+  downloadFile("﻿" + html, `${(m.date || isoDay()).replace(/-/g, "")}_${L("Protokoll", "Minutes")}_${(m.title || "Meeting").replace(/\s+/g, "_")}.doc`, "application/msword");
 }
 
 // Kompaktes, inline-formatiertes HTML-Fragment fürs Einfügen in E-Mails

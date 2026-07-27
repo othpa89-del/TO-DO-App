@@ -79,37 +79,61 @@ const cacheSyncPrefix = (prefix, map) => {
 };
 
 // Zeitstempel des letzten EIGENEN Schreibvorgangs. Eigene Cloud-Writes erzeugen
-// ebenfalls ein Realtime-Event (Self-Echo); innerhalb dieses Fensters ignorieren
-// wir es, damit nicht nach jeder lokalen Änderung alle Daten neu geladen werden
-// (vermeidet Mehrfach-Reloads und das Überschreiben frischer lokaler Änderungen).
+// ebenfalls ein Realtime-Event (Self-Echo). Statt ein Zeitfenster pauschal zu
+// verwerfen (dabei gingen echte Änderungen anderer Geräte verloren), zählen wir
+// die erwarteten Echos: jedes eigene Write verbraucht genau ein Echo, alles
+// darüber hinaus stammt von einem anderen Gerät und löst ein Neuladen aus.
+const SELF_ECHO_MS = 8000;
 let lastSelfWrite = 0;
-const markSelfWrite = () => { lastSelfWrite = Date.now(); };
+let pendingSelfEchoes = 0;
+const markSelfWrite = () => {
+  lastSelfWrite = Date.now();
+  pendingSelfEchoes++;
+  setTimeout(() => { if (pendingSelfEchoes > 0) pendingSelfEchoes--; }, SELF_ECHO_MS);
+};
 
 function emitSync(state) {
   const pending = lsGet(LS_QUEUE, []).length;
   window.dispatchEvent(new CustomEvent("ctc:sync", { detail: { state, pending, online: !isOffline() } }));
 }
+const qid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+const qKey = (x) => x.id || `${x.op}:${x.userId}:${x.key}`;
 function enqueue(op, key, value) {
   const q = lsGet(LS_QUEUE, []).filter((x) => !(x.userId === currentUserId && x.key === key));
-  q.push({ op, key, value, userId: currentUserId });
+  q.push({ id: qid(), op, key, value, userId: currentUserId });
   const ok = lsSet(LS_QUEUE, q);
   emitSync("pending");
   return ok;
 }
+// Entfernt GENAU den verarbeiteten Eintrag aus der aktuellen Queue. Wichtig:
+// Die Queue wird dabei frisch gelesen, damit parallel eingereihte Änderungen
+// nicht durch einen veralteten Schnappschuss überschrieben werden.
+function removeQueueItem(item) {
+  const q = lsGet(LS_QUEUE, []);
+  const i = q.findIndex((x) => qKey(x) === qKey(item));
+  if (i >= 0) { q.splice(i, 1); lsSet(LS_QUEUE, q); }
+}
 let syncing = false;
 let rerunQueued = false;
+const MAX_TRIES = 3;
+const tryCount = new Map();   // wie oft ein Eintrag in dieser Sitzung scheiterte
+const stuckIds = new Set();   // wiederholt gescheitert -> überspringen (bleibt gespeichert)
 async function flushQueue() {
   // Läuft bereits ein Flush, nicht abbrechen und vergessen, sondern danach
   // einmal nachfeuern (z. B. wenn "online"-Event oder Login während eines
   // laufenden Uploads erneut flushen will).
   if (syncing) { rerunQueued = true; return; }
   if (isOffline()) { emitSync("offline"); return; }
-  let q = lsGet(LS_QUEUE, []);
-  if (!q.length) { emitSync("synced"); return; }
+  if (!lsGet(LS_QUEUE, []).length) { emitSync("synced"); return; }
   syncing = true; emitSync("syncing");
   try {
-    while (q.length) {
-      const item = q[0];
+    for (let guard = 0; guard < 1000; guard++) {
+      const q = lsGet(LS_QUEUE, []); // immer frisch lesen (s. removeQueueItem)
+      // Nur eigene Einträge synchronisieren. Einträge eines anderen Kontos
+      // (z. B. nach Nutzerwechsel) könnten wegen der Zugriffsregeln nie
+      // gelingen und würden sonst die ganze Queue dauerhaft blockieren.
+      const item = q.find((x) => x && x.userId === currentUserId && !stuckIds.has(qKey(x)));
+      if (!item) break;
       try {
         if (item.op === "set") {
           const { error } = await supabase.from("kv").upsert(
@@ -120,8 +144,17 @@ async function flushQueue() {
           if (error) throw error;
         }
         markSelfWrite();
-        q.shift(); lsSet(LS_QUEUE, q);
-      } catch { break; } // weiter offline -> später erneut
+        removeQueueItem(item);
+        tryCount.delete(qKey(item));
+      } catch {
+        // Mehrfach gescheitert? Eintrag überspringen (bleibt erhalten und wird
+        // in einer neuen Sitzung erneut versucht), sonst später erneut probieren.
+        const k = qKey(item);
+        const n = (tryCount.get(k) || 0) + 1;
+        tryCount.set(k, n);
+        if (n >= MAX_TRIES) { stuckIds.add(k); continue; }
+        break; // vermutlich temporär (Netz) -> später erneut
+      }
     }
   } finally {
     syncing = false;
@@ -158,11 +191,12 @@ window.storage = {
       markSelfWrite();
       return { key, value };
     } catch {
-      // Offline/Fehler: in Queue legen. Konnten WEDER Cache NOCH Queue gespeichert
-      // werden (z. B. localStorage voll wegen großer Base64-Anhänge), ist die
-      // Änderung NICHT gesichert -> Fehler werfen, statt Erfolg vorzutäuschen.
+      // Offline/Fehler: in Queue legen. Scheitert das Einreihen (z. B.
+      // localStorage voll wegen großer Base64-Anhänge), erreicht die Änderung
+      // die Cloud NIE -> Fehler werfen, statt Erfolg vorzutäuschen. Sonst würde
+      // der Aufrufer den Stand als synchronisiert verbuchen und nie erneut senden.
       const queued = enqueue("set", key, value);
-      if (!cached && !queued) throw new Error("Lokaler Speicher voll – Änderung nicht gesichert. Bitte Anhänge verkleinern oder online speichern.");
+      if (!queued) throw new Error("Lokaler Speicher voll – Änderung nicht gesichert. Bitte Anhänge verkleinern oder online speichern.");
       return { key, value }; // optimistischer Erfolg
     }
   },
@@ -214,10 +248,10 @@ window.storage = {
 let channel = null;
 let debounce = null;
 function notifyRemote() {
-  // Self-Echo unterdrücken: kommt das Realtime-Event direkt nach einem eigenen
-  // Schreibvorgang, ist es nur das Echo der eigenen Änderung – kein Reload nötig.
-  // Änderungen von ANDEREN Geräten liegen außerhalb dieses Fensters und laden neu.
-  if (Date.now() - lastSelfWrite < 4000) return;
+  // Self-Echo unterdrücken: Jedes eigene Write erwartet genau EIN Echo. Nur
+  // solange noch eigene Echos ausstehen, wird das Event verworfen – dadurch
+  // gehen Änderungen ANDERER Geräte auch kurz nach eigenen Writes nicht verloren.
+  if (pendingSelfEchoes > 0 && Date.now() - lastSelfWrite < SELF_ECHO_MS) { pendingSelfEchoes--; return; }
   clearTimeout(debounce);
   debounce = setTimeout(() => window.dispatchEvent(new CustomEvent("ctc:remote")), 150);
 }
