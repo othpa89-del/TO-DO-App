@@ -25,9 +25,17 @@ const DEFAULT_CATEGORIES = [
   "Simulator Special Airport Training", "Simulator TRI/TRE", "LAT / GAT",
   "Ground Training General", "Ground Training OCC", "WBT", "Safety", "FDM", "HR",
 ];
-// Bereiche werden bewusst einheitlich neutral dargestellt – die farbliche
-// Unterscheidung übernimmt die Company (companyColor).
-const catColor = () => C.cool;
+// Dezente, gedeckte Farbe je Bereich: gleicher Name -> immer gleiche Farbe.
+// Bewusst zurückhaltende Töne, damit die Liste ruhig bleibt und die Marke
+// (Burgund) weiterhin führt. Alle Werte erfüllen den Kontrast auf Weiß.
+const CAT_COLORS = ["#8E5AA8", "#2C7A7B", "#B5651D", "#3B6FB6", "#6E7B2A", "#A03A5B", "#4E6E5D", "#8A6D2F"];
+function catColor(name) {
+  const s = (name || "").trim();
+  if (!s) return C.cool;
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return CAT_COLORS[h % CAT_COLORS.length];
+}
 const OLD_MAP = { training: "Trainingsinhalte", standard: "Standardisierung", quality: "Qualität", safety: "Safety", other: "" };
 const catDisplay = (c) => (c ? (OLD_MAP[c] !== undefined ? OLD_MAP[c] : c) : "");
 
@@ -165,6 +173,12 @@ async function saveScope(arr) {
   await saveTasks(arr);
 }
 
+// Macht ein klickbares Element auch per Tastatur bedienbar (Tab + Enter/Leertaste)
+const pressable = (fn) => ({
+  role: "button", tabIndex: 0, onClick: fn,
+  onKeyDown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fn(); } },
+});
+
 // Ansichts-Einstellungen (Filter/Sortierung/Layout) pro Gerät merken.
 const PREFS_KEY = "ctc_prefs_v1";
 const loadPrefs = () => { try { return JSON.parse(localStorage.getItem(PREFS_KEY)) || {}; } catch { return {}; } };
@@ -223,7 +237,9 @@ export default function App() {
   const [expandedPerson, setExpandedPerson] = useState(null);
 
   const [confirmPDel, setConfirmPDel] = useState(null); // Personen: „Löschen?“-Rückfrage
+  const [pFormOpen, setPFormOpen] = useState(false);    // mobil: Formular statt Liste zeigen
   const toastTimer = useRef(null);  // Timer der Kurzmeldung (Toast)
+  const formSnap = useRef("");      // Formularstand beim Öffnen (Datenverlust-Schutz)
   const tasksUlRef = useRef(null);  // <ul> für Drag&Drop
   const listRef = useRef([]);       // aktuelle sichtbare Liste (manuelle Reihenfolge)
   const tasksRef = useRef(tasks);   // aktuelle Aufgaben
@@ -279,6 +295,18 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem(PREFS_KEY, JSON.stringify({ filterStatus, sortBy, groupByCat, pLayout, taskLayout })); } catch {}
   }, [filterStatus, sortBy, groupByCat, pLayout, taskLayout]);
+
+  // Formularstand beim Öffnen merken + Warnung beim Schließen/Neuladen des Browsers
+  useEffect(() => {
+    if (view === "new") { formSnap.current = JSON.stringify(form); }
+    else formSnap.current = "";
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, editId]);
+  useEffect(() => {
+    const h = (e) => { if (formDirty()) { e.preventDefault(); e.returnValue = ""; } };
+    window.addEventListener("beforeunload", h);
+    return () => window.removeEventListener("beforeunload", h);
+  });
 
   // PWA: neue Version verfügbar -> Banner anzeigen
   useEffect(() => {
@@ -351,6 +379,13 @@ export default function App() {
     }
   }, [printNonce]);
 
+  // Ungespeicherte Formulareingaben erkennen (Vergleich mit dem Stand beim Öffnen)
+  const formDirty = () => view === "new" && formSnap.current !== "" && JSON.stringify(form) !== formSnap.current;
+  function confirmLeave() {
+    if (!formDirty()) return true;
+    return window.confirm(L("Ungespeicherte Eingaben gehen verloren. Trotzdem verlassen?", "Unsaved changes will be lost. Leave anyway?"));
+  }
+  function goView(v) { if (v === view) return; if (!confirmLeave()) return; setView(v); }
   function flash(msg) { setToast(msg); clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(null), 2600); }
   async function persist(scope, arr) {
     setTasks((prev) => ({ ...prev, [scope]: arr }));
@@ -511,6 +546,7 @@ export default function App() {
     setAtOpen(((t.attachments || []).length + (t.images || []).length) > 0);
     setReturnView(isTaskView ? view : "all"); // aktuelle Liste merken
     setView("new");                            // ins Formular wechseln
+    formSnap.current = "";                     // wird im Effekt unten gesetzt
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
   function cancelEdit() { setEditId(null); setEditScope(null); setForm(blank); setClOpen(false); setAtOpen(false); setView(returnView); }
@@ -537,11 +573,12 @@ export default function App() {
   function editPerson(p) {
     setPEditId(p.id);
     setPForm({ name: p.name, company: p.company || "", role: p.role || "", email: p.email || "", phone: p.phone || "", topics: p.topics || [], notes: p.notes || "" });
-    // Das Formular steht mobil oben – ohne Scrollen wirkt der Klick wie ohne Wirkung.
+    setPFormOpen(true); // mobil: Formularansicht einblenden
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
   function deletePerson(id) { persistPersons(persons.filter((p) => p.id !== id)); if (pEditId === id) cancelPerson(); setConfirmPDel(null); flash(L("Person gelöscht.", "Person deleted.")); }
-  function cancelPerson() { setPEditId(null); setPForm({ name: "", company: "", role: "", email: "", phone: "", topics: [], notes: "" }); }
+  function cancelPerson() { setPEditId(null); setPFormOpen(false); setPForm({ name: "", company: "", role: "", email: "", phone: "", topics: [], notes: "" }); }
+  function openNewPerson() { setPEditId(null); setPForm({ name: "", company: "", role: "", email: "", phone: "", topics: [], notes: "" }); setPFormOpen(true); window.scrollTo({ top: 0, behavior: "smooth" }); }
   function togglePTopic(c) { setPForm((f) => ({ ...f, topics: f.topics.includes(c) ? f.topics.filter((x) => x !== c) : [...f.topics, c] })); }
 
   // Daten – vollständige Sicherung (inkl. Meetings & Meeting-Typen)
@@ -899,7 +936,7 @@ export default function App() {
     const openP = merged.filter((t) => t.contact && t.contact.toLowerCase() === p.name.toLowerCase() && !isDone(t)).length;
     return (
       <div key={p.id} className="prow">
-        <span className="prow-name" onClick={() => editPerson(p)}>{p.name}</span>
+        <span className="prow-name" {...pressable(() => editPerson(p))}>{p.name}</span>
         <div className="prow-fields">
           {p.company && <span className="pf"><b>{L("Company:", "Company:")}</b> {p.company}</span>}
           {p.role && <span className="pf"><b>{L("Funktion:", "Function:")}</b> {p.role}</span>}
@@ -924,7 +961,7 @@ export default function App() {
     const open = expandedPerson === p.id;
     return (
       <div key={p.id} className={"pcard" + (open ? " open" : "")}>
-        <div className="pcard-head clickable" onClick={() => setExpandedPerson(open ? null : p.id)}>
+        <div className="pcard-head clickable" {...pressable(() => setExpandedPerson(open ? null : p.id))}>
           <div>
             <div className="pcard-name">{p.name}</div>
             <div className="pcard-role">{[p.role, p.company].filter(Boolean).join(" · ")}</div>
@@ -954,7 +991,7 @@ export default function App() {
             {pTasks.length === 0 && <div className="pdrill-empty">{L("Keine Aufgaben zugeordnet.", "No tasks assigned.")}</div>}
             {pTasks.sort((a, b) => (isDone(a) === isDone(b) ? 0 : isDone(a) ? 1 : -1)).map((t) => (
               <div key={keyOf(t)} className={"pdrill-row" + (isDone(t) ? " done" : "")} style={{ borderLeftColor: companyColor(t.company) }}
-                onClick={() => startEdit(t._scope, t)} title={L("Zur Aufgabe", "Go to task")}>
+                {...pressable(() => startEdit(t._scope, t))} title={L("Zur Aufgabe", "Go to task")}>
                 <span className="pdrill-title">{t.title}</span>
                 <span className="pdrill-meta">
                   <span style={{ color: (STATUS[t.status] || STATUS.offen).color, fontWeight: 800 }}>{(STATUS[t.status] || STATUS.offen).label || "—"}</span>
@@ -975,9 +1012,9 @@ export default function App() {
   const gPersons = gq ? persons.filter((p) => [p.name, p.company, p.role, p.email, (p.topics || []).join(" ")].join(" ").toLowerCase().includes(gq)).slice(0, 8) : [];
   const gTotal = gTasks.length + gMeetings.length + gPersons.length;
   function closeGlobal() { setGOpen(false); setGSearch(""); }
-  function gotoTask(t) { closeGlobal(); startEdit(t._scope || "personal", t); }
-  function gotoPerson(p) { closeGlobal(); setView("persons"); editPerson(p); }
-  function gotoMeeting(m) { closeGlobal(); setView("meetings"); setOpenMeetingReq({ id: m.id, n: (openMeetingReq?.n || 0) + 1 }); }
+  function gotoTask(t) { if (!confirmLeave()) return; closeGlobal(); startEdit(t._scope || "personal", t); }
+  function gotoPerson(p) { if (!confirmLeave()) return; closeGlobal(); setView("persons"); editPerson(p); }
+  function gotoMeeting(m) { if (!confirmLeave()) return; closeGlobal(); setView("meetings"); setOpenMeetingReq({ id: m.id, n: (openMeetingReq?.n || 0) + 1 }); }
 
   return (
     <div className="ctc-root">
@@ -989,7 +1026,7 @@ export default function App() {
             <Plane className="hd-mark" strokeWidth={2.2} />
             <div><h1>TO DO APP</h1></div>
             <div className="hd-right">
-              <button className="hd-search" onClick={() => { try { if (window.__ctcUpdateSW) window.__ctcUpdateSW(true); } catch {} setTimeout(() => location.reload(), 60); }} title={L("Neu laden", "Reload")}><RefreshCw size={17} /></button>
+              <button className="hd-search" onClick={() => { if (!confirmLeave()) return; try { if (window.__ctcUpdateSW) window.__ctcUpdateSW(true); } catch {} setTimeout(() => location.reload(), 60); }} title={L("Neu laden", "Reload")}><RefreshCw size={17} /></button>
               <button className="hd-search" onClick={() => setGOpen(true)} title={L("Suche", "Search")}><Search size={18} /></button>
               <div className="lang-switch" title={L("Sprache", "Language")}>
                 <button className={"lang-b" + (lang === "de" ? " on" : "")} onClick={() => setLang("de")}>DE</button>
@@ -997,13 +1034,13 @@ export default function App() {
               </div>
               <div className="hd-profile">
                 <label>{L("Dein Name", "Your name")}</label>
-                <input value={profile} onChange={(e) => saveProfile(e.target.value)} placeholder={L("z. B. Patrick Thorn", "e.g. Patrick Thorn")} maxLength={60} />
+                <input aria-label={L("Dein Name", "Your name")} value={profile} onChange={(e) => saveProfile(e.target.value)} placeholder={L("z. B. Patrick Thorn", "e.g. Patrick Thorn")} maxLength={60} />
               </div>
             </div>
           </div>
           <nav className="tabs">
             {["dash", "all", "meetings", "persons", "export"].map((v) => (
-              <button key={v} className={"tab" + (view === v ? " on" : "")} onClick={() => setView(v)}>
+              <button key={v} className={"tab" + ((view === v || (view === "new" && v === "all")) ? " on" : "")} onClick={() => goView(v)}>
                 {v === "dash" ? L("Dashboard", "Dashboard") : v === "all" ? L("Aufgaben", "Tasks") : v === "meetings" ? L("Meeting Minutes", "Meeting Minutes") : v === "persons" ? L("Persons", "Persons") : L("Druck & Export", "Print & Export")}
               </button>
             ))}
@@ -1067,14 +1104,14 @@ export default function App() {
           </Suspense>
         ) : view === "persons" ? (
           <div className="grid">
-            <aside className="panel">
+            <aside className={"panel pform" + (pFormOpen ? " open" : "")}>
               <div className="card">
                 <h2>{pEditId ? L("Person bearbeiten", "Edit person") : L("Neue Ansprechperson", "New contact")}</h2>
                 <div className="field"><label>{L("Name", "Name")}</label>
-                  <input value={pForm.name} onChange={(e) => setPForm({ ...pForm, name: e.target.value })} placeholder={L("Vor- und Nachname", "First and last name")} /></div>
+                  <input aria-label={L("Name", "Name")} value={pForm.name} onChange={(e) => setPForm({ ...pForm, name: e.target.value })} placeholder={L("Vor- und Nachname", "First and last name")} /></div>
                 <div className="row2">
                   <div className="field"><label>{L("Funktion / Rolle", "Function / role")}</label>
-                    <input value={pForm.role} onChange={(e) => setPForm({ ...pForm, role: e.target.value })} placeholder={L("z. B. NPCT", "e.g. NPCT")} /></div>
+                    <input aria-label={L("Funktion / Rolle", "Function / role")} value={pForm.role} onChange={(e) => setPForm({ ...pForm, role: e.target.value })} placeholder={L("z. B. NPCT", "e.g. NPCT")} /></div>
                   <div className="field">
                     <div className="label-row"><label>{L("Company", "Company")}</label>
                       <button className="link sm" onClick={() => setCmgrOpen(true)}><Settings size={13} /> {L("Verwalten", "Manage")}</button></div>
@@ -1085,9 +1122,9 @@ export default function App() {
                 </div>
                 <div className="row2">
                   <div className="field"><label>{L("E-Mail", "Email")}</label>
-                    <input value={pForm.email} onChange={(e) => setPForm({ ...pForm, email: e.target.value })} placeholder="name@firma.com" /></div>
+                    <input aria-label={L("E-Mail", "Email")} value={pForm.email} onChange={(e) => setPForm({ ...pForm, email: e.target.value })} placeholder="name@firma.com" /></div>
                   <div className="field"><label>{L("Telefon", "Phone")}</label>
-                    <input value={pForm.phone} onChange={(e) => setPForm({ ...pForm, phone: e.target.value })} placeholder="+43 …" /></div>
+                    <input aria-label={L("Telefon", "Phone")} value={pForm.phone} onChange={(e) => setPForm({ ...pForm, phone: e.target.value })} placeholder="+43 …" /></div>
                 </div>
                 <div className="field">
                   <div className="label-row"><label>{L("Zuständige Themen / Bereiche", "Responsible topics / areas")}</label>
@@ -1102,7 +1139,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="field"><label>{L("Notiz (optional)", "Note (optional)")}</label>
-                  <textarea rows={2} value={pForm.notes} onChange={(e) => setPForm({ ...pForm, notes: e.target.value })} placeholder={L("Erreichbarkeit, Vertretung …", "Availability, deputy …")} /></div>
+                  <textarea aria-label={L("Notiz (optional)", "Note (optional)")} rows={2} value={pForm.notes} onChange={(e) => setPForm({ ...pForm, notes: e.target.value })} placeholder={L("Erreichbarkeit, Vertretung …", "Availability, deputy …")} /></div>
                 <div className="actions">
                   <button className="btn primary" onClick={submitPerson}>{pEditId ? L("Aktualisieren", "Update") : L("Hinzufügen", "Add")}</button>
                   {pEditId && <button className="btn ghost" onClick={cancelPerson}>{L("Abbrechen", "Cancel")}</button>}
@@ -1111,7 +1148,11 @@ export default function App() {
               </div>
             </aside>
 
-            <main className="panel">
+            <main className="panel plistmain">
+              <div className="list-head">
+                <h2>{L("Ansprechpersonen", "Contacts")}</h2>
+                <button className="btn primary" onClick={openNewPerson}><Plus size={16} /> {L("Neue Person", "New contact")}</button>
+              </div>
               <div className="pstats">
                 <div className="pstat"><b>{pStats.total}</b><span>{L("Personen gesamt", "Persons total")}</span></div>
                 <div className="pstat"><b style={{ color: companyColor("Eurowings") }}>{pStats.eurowings}</b><span>Eurowings</span></div>
@@ -1174,7 +1215,9 @@ export default function App() {
                     const col = catColor(t.category);
                     const st = STATUS[t.status] || STATUS.offen;
                     return (
-                      <li key={keyOf(t)} className={"exp-row" + (picked ? " picked" : "")} onClick={() => togglePick(t)}>
+                      <li key={keyOf(t)} className={"exp-row" + (picked ? " picked" : "")} role="checkbox" aria-checked={picked} tabIndex={0}
+                        onClick={() => togglePick(t)}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); togglePick(t); } }}>
                         <span className="exp-check">{picked ? <CheckSquare size={18} /> : <Square size={18} />}</span>
                         <span className="exp-title" style={{ borderLeftColor: companyColor(t.company) }}>{t.title}</span>
                         <span className="exp-meta">
@@ -1251,10 +1294,10 @@ export default function App() {
               <div className="card">
                 <h2>{editId ? L("Aufgabe bearbeiten", "Edit task") : L("Neue Aufgabe", "New task")}</h2>
                 <div className="field"><label>{L("Titel", "Title")}</label>
-                  <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  <input aria-label={L("Titel", "Title")} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
                     onKeyDown={(e) => e.key === "Enter" && submit()} placeholder={L("Was ist zu tun?", "What needs to be done?")} /></div>
                 <div className="field"><label>{L("Notiz (optional)", "Note (optional)")}</label>
-                  <textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder={L("Kontext, Referenz, nächster Schritt …", "Context, reference, next step …")} /></div>
+                  <textarea aria-label={L("Notiz (optional)", "Note (optional)")} rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder={L("Kontext, Referenz, nächster Schritt …", "Context, reference, next step …")} /></div>
                 <div className="field">
                   <div className="label-row"><label>{L("Bereich", "Area")}</label>
                     <button className="link sm" onClick={() => setMgrOpen(true)}><Settings size={13} /> {L("Verwalten", "Manage")}</button></div>
@@ -1265,17 +1308,17 @@ export default function App() {
                 </div>
                 <div className="row2">
                   <div className="field"><label>{L("Priorität", "Priority")}</label>
-                    <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
+                    <select aria-label={L("Priorität", "Priority")} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
                       {Object.entries(PRIORITIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                     </select></div>
                   <div className="field"><label>{L("Status", "Status")}</label>
-                    <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                    <select aria-label={L("Status", "Status")} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
                       {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                     </select></div>
                 </div>
                 <div className="row2">
                   <div className="field"><label>{L("Ansprechperson", "Contact")}</label>
-                    <input list="personnames" value={form.contact} onChange={(e) => onContactChange(e.target.value)} placeholder={L("Name / Funktion", "Name / function")} />
+                    <input aria-label={L("Ansprechperson", "Contact")} list="personnames" value={form.contact} onChange={(e) => onContactChange(e.target.value)} placeholder={L("Name / Funktion", "Name / function")} />
                     <datalist id="personnames">{persons.slice().sort(byName).map((p) => <option key={p.id} value={p.name} />)}</datalist></div>
                   <div className="field">
                     <div className="label-row"><label>{L("Company", "Company")}</label>
@@ -1295,18 +1338,18 @@ export default function App() {
                       {form.due && <button type="button" className="link sm" onClick={() => setForm({ ...form, due: "" })}>{L("Löschen", "Clear")}</button>}</div>
                     <input type="date" value={form.due} onChange={(e) => setForm({ ...form, due: e.target.value })} /></div>
                   <div className="field"><label>{L("Erinnerung", "Reminder")}</label>
-                    <select value={form.remindLead} onChange={(e) => setForm({ ...form, remindLead: e.target.value })} disabled={!form.due}>
+                    <select aria-label={L("Erinnerung", "Reminder")} value={form.remindLead} onChange={(e) => setForm({ ...form, remindLead: e.target.value })} disabled={!form.due}>
                       {LEADS.map((l) => <option key={l.v} value={l.v}>{l.label}</option>)}
                     </select></div>
                 </div>
                 <div className="field"><label>{L("Wiederholung", "Recurrence")}</label>
-                  <select value={form.recurrence} onChange={(e) => setForm({ ...form, recurrence: e.target.value })}>
+                  <select aria-label={L("Wiederholung", "Recurrence")} value={form.recurrence} onChange={(e) => setForm({ ...form, recurrence: e.target.value })}>
                     {Object.entries(RECUR).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select></div>
                 {editId ? (
                   <div className="row2">
                     <div className="field"><label>{L("Eskalationsbedarf", "Escalation needed")}</label>
-                      <select value={form.escalation} onChange={(e) => setForm({ ...form, escalation: e.target.value })}>
+                      <select aria-label={L("Eskalationsbedarf", "Escalation needed")} value={form.escalation} onChange={(e) => setForm({ ...form, escalation: e.target.value })}>
                         <option value=""></option><option value="ja">{L("Ja", "Yes")}</option><option value="nein">{L("Nein", "No")}</option>
                       </select></div>
                     <div className="field"><label>{L("Letztes Update", "Last update")}</label>
@@ -1314,12 +1357,12 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="field"><label>{L("Eskalationsbedarf", "Escalation needed")}</label>
-                    <select value={form.escalation} onChange={(e) => setForm({ ...form, escalation: e.target.value })}>
+                    <select aria-label={L("Eskalationsbedarf", "Escalation needed")} value={form.escalation} onChange={(e) => setForm({ ...form, escalation: e.target.value })}>
                       <option value=""></option><option value="ja">{L("Ja", "Yes")}</option><option value="nein">{L("Nein", "No")}</option>
                     </select></div>
                 )}
                 <div className="field"><label>{L("Referenz-Link (optional)", "Reference link (optional)")}</label>
-                  <input value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} placeholder={L("https:// … (Reg, Drive-Dokument)", "https:// … (reg, Drive document)")} /></div>
+                  <input aria-label={L("Referenz-Link (optional)", "Reference link (optional)")} value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} placeholder={L("https:// … (Reg, Drive-Dokument)", "https:// … (reg, Drive document)")} /></div>
 
                 {/* Optional: Unteraufgaben / Checkliste */}
                 {(clOpen || (form.checklist || []).length > 0) ? (
@@ -1446,7 +1489,7 @@ export default function App() {
                         <div className="kcol-h" style={{ borderTopColor: (STATUS[col.key] || {}).color || C.cool }}>{col.label} <em>{items.length}</em></div>
                         <div className="kcol-body" data-col={col.key} ref={(el) => { kcolRefs.current[col.key] = el; }}>
                           {items.map((t) => (
-                            <div key={keyOf(t)} className={"kcard" + (isDone(t) ? " done" : "")} data-id={t.id} onClick={() => startEdit(t._scope, t)} style={{ borderLeftColor: companyColor(t.company) }}>
+                            <div key={keyOf(t)} className={"kcard" + (isDone(t) ? " done" : "")} data-id={t.id} {...pressable(() => startEdit(t._scope, t))} style={{ borderLeftColor: companyColor(t.company) }}>
                               <div className="kcard-title">{t.title}</div>
                               <div className="kcard-meta">
                                 {catDisplay(t.category) && <span className="badge" style={{ color: catColor(t.category), borderColor: catColor(t.category) }}>{catDisplay(t.category)}</span>}
@@ -2029,6 +2072,10 @@ aside.panel .card{position:sticky;top:16px;}
   .row2{grid-template-columns:1fr;}   /* zwei Felder nebeneinander sind zu schmal */
   .grid,.formwrap,.listwrap,.dash,.exportwrap{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));}
   .grid{grid-template-columns:1fr;padding-top:16px;padding-bottom:40px;}
+  /* Persons: mobil zuerst die Liste; das Formular öffnet der „+ Neue Person“-Button */
+  .pform{display:none;}
+  .pform.open{display:block;}
+  .pform.open ~ .plistmain{display:none;}
   .formwrap,.listwrap{padding-top:16px;padding-bottom:40px;}
   .dash{padding-top:16px;padding-bottom:48px;}
   .dash-tiles{grid-template-columns:repeat(2,1fr);}

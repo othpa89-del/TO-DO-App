@@ -14,9 +14,9 @@ import {
 // ===========================================================================
 const C = {
   burgundy: "#AF1E65", burgundyDark: "#871C54", burgundyDarker: "#6E1444",
-  ink: "#1f2937", body: "#374151", grey: "#4b5563", cool: "#787878",
-  line: "#D7D7D7", fill: "#f1f3f5", panel: "#F8F9FA", white: "#fff",
-  sky: "#2563eb", skyPale: "#eef4ff", green: "#1A7F45", amber: "#b7791f",
+  ink: "#212529", body: "#333333", grey: "#575757", cool: "#787878",
+  line: "#D7D7D7", fill: "#F1F3F5", panel: "#F8F9FA", white: "#FFFFFF",
+  sky: "#00A6CF", skyLight: "#6BCCE0", skyPale: "#E6F5F9", green: "#1A7F45", amber: "#b7791f",
 };
 
 const MEETING_TYPES = ["Weekly", "Steering Committee", "Management Meeting", "Kick-Off", "Training", "Workshop", "Kundenmeeting", "Lieferantenmeeting", "Sonstiges"];
@@ -251,7 +251,8 @@ export default function Meetings({ persons = [], categories = [], profile = "", 
           {filtered.map((m) => (
             <div key={m.id} className={"mm-item" + (layout === "cards" ? " card" : "")} style={{ borderLeftColor: STATUS_COLOR[m.status] || C.cool }}>
               <button className={"mm-star" + (m.favorite ? " on" : "")} onClick={() => toggleFav(m.id)} title={L("Favorit", "Favorite")}><Star size={16} /></button>
-              <div className="mm-item-main" onClick={() => setEditing(m)}>
+              <div className="mm-item-main" role="button" tabIndex={0} onClick={() => setEditing(m)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setEditing(m); } }}>
                 <div className="mm-item-title">{m.title || L("(ohne Titel)", "(no title)")}</div>
                 <div className="mm-item-meta">
                   <span>{fmtDay(m.date)}{m.start ? " · " + m.start : ""}</span>
@@ -291,6 +292,12 @@ export default function Meetings({ persons = [], categories = [], profile = "", 
 function MeetingEditor({ meeting, persons, categories, profile, types = MEETING_TYPES, onManageTypes, companyColor, onCreateTask, onSave, onCancel, flash }) {
   useLang();
   const [m, setM] = useState(meeting);
+  const snap = useRef(JSON.stringify(meeting));   // Stand beim Öffnen
+  const isDirty = () => JSON.stringify(m) !== snap.current;
+  function leave() {
+    if (isDirty() && !window.confirm(L("Ungespeicherte Eingaben gehen verloren. Trotzdem verlassen?", "Unsaved changes will be lost. Leave anyway?"))) return;
+    onCancel();
+  }
   const [openAgenda, setOpenAgenda] = useState({});
   const [recording, setRecording] = useState(false);
   const recRef = useRef(null);
@@ -380,6 +387,12 @@ function MeetingEditor({ meeting, persons, categories, profile, types = MEETING_
     } catch { flash(L("Mikrofon nicht verfügbar.", "Microphone not available.")); }
   }
   function stopRec() { if (recRef.current) { recRef.current.stop(); recRef.current = null; setRecording(false); } }
+  useEffect(() => {
+    const h = (e) => { if (isDirty()) { e.preventDefault(); e.returnValue = ""; } };
+    window.addEventListener("beforeunload", h);
+    return () => window.removeEventListener("beforeunload", h);
+  });
+
   // Editor verlassen, während noch aufgenommen wird: Aufnahme sauber beenden,
   // sonst bliebe das Mikrofon aktiv (Aufnahme-Anzeige des Browsers).
   useEffect(() => () => {
@@ -392,11 +405,11 @@ function MeetingEditor({ meeting, persons, categories, profile, types = MEETING_
   return (
     <div className="mm-wrap mm-editor">
       <div className="mm-ehead">
-        <button className="mm-btn ghost" onClick={onCancel}><X size={15} /> {L("Zurück", "Back")}</button>
+        <button className="mm-btn ghost" onClick={leave}><X size={15} /> {L("Zurück", "Back")}</button>
         <div className="mm-ehead-title">{meeting.title || L("Neues Meeting", "New meeting")}</div>
         <div className="mm-ehead-actions">
           <button className="mm-btn ghost" onClick={() => set("favorite", !m.favorite)}><Star size={15} style={{ color: m.favorite ? C.burgundy : C.cool, fill: m.favorite ? C.burgundy : "none" }} /></button>
-          <button className="mm-btn primary" onClick={() => onSave(m)}><Check size={15} /> {L("Speichern", "Save")}</button>
+          <button className="mm-btn primary" onClick={() => { snap.current = JSON.stringify(m); onSave(m); }}><Check size={15} /> {L("Speichern", "Save")}</button>
         </div>
       </div>
 
@@ -545,7 +558,7 @@ function MeetingEditor({ meeting, persons, categories, profile, types = MEETING_
       <p className="mm-hint">{L("Export & Druck (PDF, Word, Markdown, TXT) findest du gesammelt im Tab „Druck & Export\" – nach dem Speichern.", "Export & print (PDF, Word, Markdown, TXT) are bundled in the “Print & Export” tab – after saving.")}</p>
 
       <div className="mm-ebottom">
-        <button className="mm-btn ghost" onClick={onCancel}>{L("Abbrechen", "Cancel")}</button>
+        <button className="mm-btn ghost" onClick={leave}>{L("Abbrechen", "Cancel")}</button>
         <button className="mm-btn primary" onClick={() => onSave(m)}><Check size={15} /> {L("Speichern", "Save")}</button>
       </div>
     </div>
@@ -562,10 +575,14 @@ function Section({ title, action, children }) {
   );
 }
 function F({ label, wide, action, children }) {
+  // Beschriftung ans Eingabefeld durchreichen, damit Screenreader sie vorlesen
+  const field = React.isValidElement(children) && typeof label === "string" && !children.props["aria-label"]
+    ? React.cloneElement(children, { "aria-label": label })
+    : children;
   return (
     <div className={"mm-field" + (wide ? " wide" : "")}>
       <div className="mm-flabel"><label>{label}</label>{action}</div>
-      {children}
+      {field}
     </div>
   );
 }
@@ -638,11 +655,11 @@ const css = `
 .mm-fg{display:flex;align-items:center;gap:5px;}
 .mm-fg span{font-size:10px;font-weight:800;color:${C.cool};text-transform:uppercase;letter-spacing:.04em;}
 .mm-fg input[type="date"]{width:auto;padding:5px 7px;font-size:12px;border:1px solid ${C.line};border-radius:8px;-webkit-appearance:none;appearance:none;}
-.mm-toggle{display:inline-flex;align-items:center;gap:5px;font-family:inherit;font-size:13px;font-weight:700;color:${C.grey};background:${C.white};border:1px solid ${C.line};border-radius:8px;padding:7px 10px;cursor:pointer;}
-.mm-toggle.on{background:${C.burgundy};border-color:${C.burgundy};color:#fff;}
+.mm-toggle{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:inherit;font-size:13px;font-weight:700;color:${C.grey};background:${C.white};border:1px solid ${C.line};border-radius:8px;padding:7px 11px;cursor:pointer;}
+.mm-toggle.on{background:${C.burgundy};border-color:${C.burgundy};color:${C.white};}
 .mm-layout{display:flex;gap:6px;margin-left:auto;}
 .mm-layout button{display:flex;align-items:center;justify-content:center;gap:6px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;padding:7px 11px;border-radius:8px;border:1px solid ${C.line};background:${C.white};color:${C.grey};}
-.mm-layout button.on{background:${C.burgundy};border-color:${C.burgundy};color:#fff;}
+.mm-layout button.on{background:${C.burgundy};border-color:${C.burgundy};color:${C.white};}
 .mm-empty{background:${C.white};border:1px dashed ${C.line};border-radius:10px;padding:30px;text-align:center;color:${C.cool};font-size:14px;}
 .mm-list{display:flex;flex-direction:column;gap:7px;}
 .mm-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;}
@@ -663,10 +680,10 @@ const css = `
 .mm-ic:hover{background:${C.fill};color:${C.burgundy};}
 .mm-ic.del{color:#fff;background:${C.burgundyDarker};padding:5px 9px;}
 .mm-ic.abs{position:absolute;top:8px;right:8px;}
-.mm-btn{display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-weight:800;font-size:13px;cursor:pointer;border-radius:8px;padding:9px 13px;border:1px solid transparent;}
-.mm-btn.primary{background:${C.burgundy};color:#fff;} .mm-btn.primary:hover{background:${C.burgundyDark};}
-.mm-btn.ghost{background:${C.white};color:${C.grey};border-color:${C.line};}
-.mm-btn.out{background:${C.white};color:${C.burgundyDark};border-color:${C.line};} .mm-btn.out:hover{border-color:${C.burgundy};}
+.mm-btn{display:inline-flex;align-items:center;gap:7px;font-family:inherit;font-weight:800;font-size:14px;cursor:pointer;border-radius:8px;padding:10px 16px;border:1px solid transparent;transition:.15s;}
+.mm-btn.primary{background:${C.burgundy};color:${C.white};} .mm-btn.primary:hover{background:${C.burgundyDark};}
+.mm-btn.ghost{background:${C.white};color:${C.grey};border-color:${C.line};} .mm-btn.ghost:hover{border-color:${C.cool};}
+.mm-btn.out{background:${C.white};color:${C.burgundyDark};border-color:${C.line};padding:8px 12px;font-size:13px;} .mm-btn.out:hover{border-color:${C.burgundy};background:${C.skyPale};}
 .mm-btn.out.sm{padding:6px 10px;font-size:12px;}
 .mm-btn.rec{background:#D32F2F;color:#fff;}
 /* Editor */
@@ -676,7 +693,7 @@ const css = `
 .mm-ehead-actions{display:flex;gap:6px;}
 .mm-section{background:${C.white};border:1px solid ${C.line};border-radius:11px;padding:14px 16px;margin-bottom:12px;}
 .mm-section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
-.mm-section-head h3{font-size:14px;font-weight:900;color:${C.burgundyDark};margin:0;text-transform:uppercase;letter-spacing:.03em;}
+.mm-section-head h3{font-size:16px;font-weight:900;color:${C.ink};margin:0;letter-spacing:-.01em;}
 .mm-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .mm-grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .mm-field{display:flex;flex-direction:column;gap:4px;min-width:0;}
@@ -709,7 +726,7 @@ const css = `
 .mm-pp-head label{font-size:12px;font-weight:800;color:${C.grey};min-width:80px;}
 .mm-pp-head select{max-width:280px;}
 .mm-chips{display:flex;flex-wrap:wrap;gap:6px;}
-.mm-pchip{display:inline-flex;flex-direction:column;background:${C.skyPale};border:1px solid #cfe0ff;border-radius:8px;padding:5px 8px;position:relative;font-size:12px;color:${C.body};}
+.mm-pchip{display:inline-flex;flex-direction:column;background:${C.skyPale};border:1px solid ${C.skyLight};border-radius:8px;padding:5px 8px;position:relative;font-size:12px;color:${C.body};}
 .mm-pchip.muted{background:${C.fill};border-color:${C.line};opacity:.85;}
 .mm-pchip b{font-weight:800;padding-right:14px;}
 .mm-pchip em{font-style:normal;color:${C.grey};font-size:11px;}
