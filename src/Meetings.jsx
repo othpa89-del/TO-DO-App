@@ -14,7 +14,7 @@ import {
 // ===========================================================================
 const C = {
   burgundy: "#AF1E65", burgundyDark: "#871C54", burgundyDarker: "#6E1444",
-  ink: "#1f2937", body: "#374151", grey: "#4b5563", cool: "#9aa0a6",
+  ink: "#1f2937", body: "#374151", grey: "#4b5563", cool: "#787878",
   line: "#D7D7D7", fill: "#f1f3f5", panel: "#F8F9FA", white: "#fff",
   sky: "#2563eb", skyPale: "#eef4ff", green: "#1A7F45", amber: "#b7791f",
 };
@@ -631,6 +631,7 @@ const css = `
 .mm-head h2 svg{color:${C.burgundy};}
 .mm-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:${C.white};border:1px solid ${C.line};border-radius:10px;padding:8px 10px;margin-bottom:14px;}
 .mm-search{display:flex;align-items:center;gap:7px;border:1px solid ${C.line};border-radius:8px;padding:0 10px;flex:1;min-width:180px;color:${C.cool};}
+.mm-search:focus-within{border-color:${C.burgundy};box-shadow:0 0 0 3px rgba(175,30,101,.13);}
 .mm-search input{border:none;outline:none;padding:8px 0;font-size:14px;font-family:inherit;width:100%;background:none;}
 .mm-x{background:none;border:none;color:${C.cool};cursor:pointer;display:flex;}
 .mm-controls select{width:auto;max-width:200px;padding:6px 8px;font-size:12px;border:1px solid ${C.line};border-radius:8px;background:${C.white};font-family:inherit;}
@@ -648,7 +649,7 @@ const css = `
 .mm-item{display:flex;align-items:flex-start;gap:8px;background:${C.white};border:1px solid ${C.line};border-left-width:4px;border-radius:9px;padding:10px 12px;}
 .mm-item.card{flex-direction:column;}
 .mm-item.card .mm-item-actions{align-self:flex-end;}
-.mm-star{background:none;border:none;cursor:pointer;color:${C.line};padding:2px;display:flex;}
+.mm-star{background:none;border:none;cursor:pointer;color:${C.cool};padding:2px;display:flex;}
 .mm-star.on{color:${C.burgundy};} .mm-star.on svg{fill:${C.burgundy};}
 .mm-item-main{flex:1;min-width:0;cursor:pointer;}
 .mm-item-title{font-size:15px;font-weight:800;color:${C.ink};line-height:1.25;}
@@ -730,6 +731,9 @@ const css = `
 /* Rich text */
 .mm-rt{border:1px solid ${C.line};border-radius:8px;overflow:hidden;}
 .mm-rtbar{display:flex;gap:2px;background:${C.fill};border-bottom:1px solid ${C.line};padding:4px 6px;}
+/* Touch: unsichtbare 44px-Trefferfläche, Optik bleibt gleich */
+.mm-ic,.mm-star,.mm-x,.mm-rtb{position:relative;}
+.mm-ic::after,.mm-star::after,.mm-x::after,.mm-rtb::after{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:44px;}
 .mm-rtb{background:none;border:none;cursor:pointer;color:${C.grey};border-radius:5px;padding:4px 7px;font-size:13px;font-weight:800;display:inline-flex;align-items:center;}
 .mm-rtb:hover{background:${C.white};color:${C.burgundy};}
 .mm-rtarea{min-height:90px;padding:9px 11px;font-size:14px;line-height:1.45;outline:none;}
@@ -746,9 +750,11 @@ const css = `
 .mm-file{display:flex;align-items:center;gap:8px;font-size:13px;color:${C.body};padding:5px 0;border-bottom:1px solid ${C.fill};}
 .mm-file a{color:${C.sky};font-weight:700;text-decoration:none;}
 .mm-ebottom{display:flex;justify-content:flex-end;gap:8px;margin-top:8px;}
-.mm-toast{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);background:${C.ink};color:#fff;font-size:13px;font-weight:700;padding:9px 16px;border-radius:9px;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.2);}
+.mm-toast{position:fixed;bottom:calc(64px + env(safe-area-inset-bottom));left:12px;right:12px;width:max-content;max-width:calc(100vw - 24px);margin:0 auto;text-align:center;background:${C.ink};color:#fff;font-size:13px;font-weight:700;padding:9px 16px;border-radius:9px;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.2);}
 @media(max-width:760px){
-  .mm-wrap{padding:14px 12px 60px;}
+  /* iOS zoomt bei Feldern < 16px automatisch hinein */
+  .mm-root input,.mm-root select,.mm-root textarea{font-size:16px;}
+  .mm-wrap{padding:14px 12px 60px;padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right));}
   .mm-grid,.mm-grid2{grid-template-columns:1fr;}
   .mm-pp-head{flex-wrap:wrap;} .mm-pp-head select{max-width:none;width:100%;}
 }

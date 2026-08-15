@@ -222,6 +222,7 @@ export default function App() {
   const [pFilterTopic, setPFilterTopic] = useState("all");
   const [expandedPerson, setExpandedPerson] = useState(null);
 
+  const [confirmPDel, setConfirmPDel] = useState(null); // Personen: „Löschen?“-Rückfrage
   const toastTimer = useRef(null);  // Timer der Kurzmeldung (Toast)
   const tasksUlRef = useRef(null);  // <ul> für Drag&Drop
   const listRef = useRef([]);       // aktuelle sichtbare Liste (manuelle Reihenfolge)
@@ -325,7 +326,7 @@ export default function App() {
       const el = kcolRefs.current[key];
       if (!el) return;
       inst.push(Sortable.create(el, {
-        group: "kanban", sort: false, animation: 150, delay: 70, delayOnTouchOnly: true, forceFallback: true,
+        group: "kanban", sort: false, animation: 150, delay: 250, delayOnTouchOnly: true, touchStartThreshold: 5, forceFallback: true,
         onAdd: (evt) => {
           const id = evt.item.getAttribute("data-id");
           const toCol = evt.to.getAttribute("data-col");
@@ -536,8 +537,10 @@ export default function App() {
   function editPerson(p) {
     setPEditId(p.id);
     setPForm({ name: p.name, company: p.company || "", role: p.role || "", email: p.email || "", phone: p.phone || "", topics: p.topics || [], notes: p.notes || "" });
+    // Das Formular steht mobil oben – ohne Scrollen wirkt der Klick wie ohne Wirkung.
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
-  function deletePerson(id) { persistPersons(persons.filter((p) => p.id !== id)); if (pEditId === id) cancelPerson(); flash(L("Person gelöscht.", "Person deleted.")); }
+  function deletePerson(id) { persistPersons(persons.filter((p) => p.id !== id)); if (pEditId === id) cancelPerson(); setConfirmPDel(null); flash(L("Person gelöscht.", "Person deleted.")); }
   function cancelPerson() { setPEditId(null); setPForm({ name: "", company: "", role: "", email: "", phone: "", topics: [], notes: "" }); }
   function togglePTopic(c) { setPForm((f) => ({ ...f, topics: f.topics.includes(c) ? f.topics.filter((x) => x !== c) : [...f.topics, c] })); }
 
@@ -908,7 +911,9 @@ export default function App() {
         <span className="prow-count">{openP} {L("offen", "open")}</span>
         <div className="task-actions">
           <button className="icon" onClick={() => editPerson(p)} title={L("Bearbeiten", "Edit")}><Pencil size={15} /></button>
-          <button className="icon" onClick={() => deletePerson(p.id)} title={L("Löschen", "Delete")}><X size={16} /></button>
+          {confirmPDel === p.id
+            ? <button className="icon del-confirm" onClick={() => deletePerson(p.id)}>{L("Löschen?", "Delete?")}</button>
+            : <button className="icon" onClick={() => setConfirmPDel(p.id)} title={L("Löschen", "Delete")}><X size={16} /></button>}
         </div>
       </div>
     );
@@ -926,7 +931,9 @@ export default function App() {
           </div>
           <div className="task-actions" onClick={(e) => e.stopPropagation()}>
             <button className="icon" onClick={() => editPerson(p)} title={L("Bearbeiten", "Edit")}><Pencil size={15} /></button>
-            <button className="icon" onClick={() => deletePerson(p.id)} title={L("Löschen", "Delete")}><X size={16} /></button>
+            {confirmPDel === p.id
+            ? <button className="icon del-confirm" onClick={() => deletePerson(p.id)}>{L("Löschen?", "Delete?")}</button>
+            : <button className="icon" onClick={() => setConfirmPDel(p.id)} title={L("Löschen", "Delete")}><X size={16} /></button>}
           </div>
         </div>
         {(p.topics || []).length > 0 && (
@@ -1124,7 +1131,7 @@ export default function App() {
                   <button className={"seg-b" + (pLayout === "cards" ? " on" : "")} onClick={() => setPLayout("cards")} title={L("Karten", "Cards")}><Square size={15} /> {L("Karten", "Cards")}</button>
                 </div>
               </div>
-              {persons.length === 0 && <div className="empty">{L("Noch keine Ansprechpersonen. Links die erste anlegen.", "No contacts yet. Create the first one on the left.")}</div>}
+              {persons.length === 0 && <div className="empty">{L("Noch keine Ansprechpersonen – lege die erste an.", "No contacts yet – create the first one.")}</div>}
               {persons.length > 0 && personsView.length === 0 && <div className="empty">{L("Keine Treffer.", "No matches.")}</div>}
               {personGroups.map(([company, members]) => (
                 <div key={company} className="pgroup">
@@ -1701,7 +1708,7 @@ function PersonsPrintDoc({ items, openCount }) {
 
 // ===========================================================================
 const css = `
-.ctc-root{font-family:'Mulish',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:${C.body};background:${C.panel};min-height:100vh;max-width:1180px;margin:0 auto;-webkit-font-smoothing:antialiased;}
+.ctc-root{font-family:'Mulish',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:${C.body};background:${C.panel};min-height:100dvh;max-width:1180px;margin:0 auto;-webkit-font-smoothing:antialiased;}
 .ctc-root *{box-sizing:border-box;}
 .ctc-root h1,.ctc-root h2{margin:0;font-weight:900;color:${C.ink};letter-spacing:-.01em;}
 .ctc-root h3{margin:0;font-weight:800;color:${C.ink};}
@@ -1718,7 +1725,7 @@ const css = `
 .hd-search{display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:8px;width:34px;height:34px;cursor:pointer;flex:none;}
 .hd-search:hover{background:rgba(255,255,255,.30);}
 .hd-profile{text-align:right;}
-.update-banner{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));z-index:60;display:flex;align-items:center;gap:12px;background:${C.ink};color:#fff;border-radius:12px;padding:9px 10px 9px 16px;box-shadow:0 8px 30px rgba(0,0,0,.28);font-size:13px;font-weight:700;max-width:92vw;}
+.update-banner{position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:60;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:12px;width:max-content;max-width:calc(100vw - 24px);margin:0 auto;background:${C.ink};color:#fff;border-radius:12px;padding:9px 10px 9px 16px;box-shadow:0 8px 30px rgba(0,0,0,.28);font-size:13px;font-weight:700;max-width:92vw;}
 .update-banner .btn{padding:7px 12px;font-size:13px;}
 .update-banner .ub-x{background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;display:flex;padding:2px;}
 .gsearch-bg{align-items:flex-start;}
@@ -1787,6 +1794,7 @@ aside.panel .card{position:sticky;top:16px;}
 .search-top{margin:0 0 12px;display:flex;}
 .search-top .search{max-width:none;width:100%;flex:1;}
 .search input{border:none;padding:8px 0;box-shadow:none !important;}
+.search:focus-within{border-color:${C.burgundy};box-shadow:0 0 0 3px rgba(175,30,101,.13);}
 .search .clear{background:none;border:none;color:${C.cool};cursor:pointer;display:flex;}
 .tb-group{display:flex;align-items:center;gap:5px;}
 .tb-group span{font-size:10px;font-weight:800;color:${C.cool};text-transform:uppercase;letter-spacing:.04em;}
@@ -1812,14 +1820,14 @@ aside.panel .card{position:sticky;top:16px;}
 .task.picked{background:${C.skyPale};border-color:${C.skyLight};}
 .task.done{opacity:.62;}
 .task.done .task-title{text-decoration:line-through;color:${C.cool};}
-.pick{flex:none;background:none;border:none;cursor:pointer;color:${C.line};padding:2px;margin-top:1px;transition:.15s;}
+.pick{flex:none;background:none;border:none;cursor:pointer;color:${C.cool};padding:2px;margin-top:1px;transition:.15s;}
 .pick:hover{color:${C.sky};}
 .pick.on{color:${C.sky};}
-.drag-handle{flex:none;display:flex;align-items:center;color:${C.line};cursor:grab;margin-top:1px;touch-action:none;}
+.drag-handle{flex:none;display:flex;align-items:center;color:${C.cool};cursor:grab;margin-top:1px;touch-action:none;}
 .drag-handle:hover{color:${C.cool};}
 .sortable-ghost{opacity:.5;}
 .sortable-chosen{box-shadow:0 4px 16px rgba(33,37,41,.14);}
-.check{flex:none;width:18px;height:18px;border-radius:50%;border:2px solid ${C.line};background:${C.white};cursor:pointer;color:${C.white};display:flex;align-items:center;justify-content:center;margin-top:1px;transition:.15s;}
+.check{flex:none;width:20px;height:20px;border-radius:50%;border:2px solid ${C.cool};background:${C.white};cursor:pointer;color:${C.white};display:flex;align-items:center;justify-content:center;margin-top:1px;transition:.15s;}
 .check:hover{border-color:${C.burgundy};}
 .task-body{flex:1;min-width:0;}
 .task-title{font-size:14px;font-weight:700;color:${C.ink};line-height:1.3;display:flex;align-items:center;gap:6px;}
@@ -1859,7 +1867,10 @@ aside.panel .card{position:sticky;top:16px;}
 .log-add input{font-size:13px;padding:6px 9px;}
 .log-add .btn.out{padding:6px 9px;}
 .task-contact svg{color:${C.cool};}
-.task-actions{display:flex;gap:4px;flex:none;}
+.task-actions{display:flex;gap:8px;flex:none;}
+/* Touch: unsichtbare 44px-Trefferfläche (Apple-Empfehlung), Optik bleibt gleich */
+.icon,.check,.pick,.drag-handle,.link.sm,.log-toggle,.log-del,.lang-b,.hd-search{position:relative;}
+.icon::after,.check::after,.pick::after,.drag-handle::after,.link.sm::after,.log-toggle::after,.log-del::after{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:44px;}
 .icon{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:none;background:transparent;color:${C.cool};cursor:pointer;border-radius:7px;transition:.15s;}
 .icon:hover{background:${C.fill};color:${C.burgundy};}
 .icon.del-confirm{width:auto;padding:0 10px;font-size:12px;font-weight:800;color:${C.white};background:${C.burgundyDarker};}
@@ -1956,7 +1967,7 @@ aside.panel .card{position:sticky;top:16px;}
 .pf a{color:${C.sky};text-decoration:none;font-weight:600;}
 .prow-topics{display:flex;flex-wrap:wrap;gap:4px;max-width:260px;}
 .prow-count{font-size:12px;font-weight:700;color:${C.grey};white-space:nowrap;}
-.app-foot{text-align:center;font-size:14px;font-weight:700;color:#8b93a7;border-top:1px solid ${C.fill};margin-top:6px;padding:18px 12px calc(22px + env(safe-area-inset-bottom));}
+.app-foot{text-align:center;font-size:14px;font-weight:700;color:#6b7280;border-top:1px solid ${C.fill};margin-top:6px;padding:18px 12px calc(22px + env(safe-area-inset-bottom));}
 .app-ver{display:block;margin-top:4px;font-size:11px;font-weight:600;color:${C.cool};}
 .dash{padding:20px 24px 48px;max-width:1180px;margin:0 auto;}
 .dash-head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:16px;}
@@ -1983,7 +1994,7 @@ aside.panel .card{position:sticky;top:16px;}
 .sync-badge.off{background:${C.burgundyDarker};}
 .sync-dot{width:8px;height:8px;border-radius:50%;background:#ffd166;}
 .sync-badge.off .sync-dot{background:#ff6b6b;}
-.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:80;background:${C.ink};color:${C.white};font-size:14px;font-weight:600;padding:11px 18px;border-radius:9px;box-shadow:0 6px 24px rgba(0,0,0,.22);}
+.toast{position:fixed;bottom:calc(22px + env(safe-area-inset-bottom));left:12px;right:12px;width:max-content;max-width:calc(100vw - 24px);margin:0 auto;z-index:80;text-align:center;background:${C.ink};color:${C.white};font-size:14px;font-weight:600;padding:11px 18px;border-radius:9px;box-shadow:0 6px 24px rgba(0,0,0,.22);}
 .modal-bg{position:fixed;inset:0;background:rgba(33,37,41,.45);z-index:70;display:flex;align-items:center;justify-content:center;padding:20px;}
 .modal{background:${C.white};border-radius:14px;width:100%;max-width:480px;max-height:86vh;overflow:auto;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.3);}
 .modal-head{display:flex;align-items:center;justify-content:space-between;}
@@ -2005,26 +2016,33 @@ aside.panel .card{position:sticky;top:16px;}
 .exp-row{display:flex;align-items:center;gap:11px;padding:9px 10px;border:1px solid ${C.line};border-radius:9px;cursor:pointer;transition:.12s;}
 .exp-row:hover{border-color:${C.sky};}
 .exp-row.picked{background:${C.skyPale};border-color:${C.skyLight};}
-.exp-check{flex:none;color:${C.line};display:flex;}
+.exp-check{flex:none;color:${C.cool};display:flex;}
 .exp-row.picked .exp-check{color:${C.sky};}
 .exp-title{flex:1;min-width:0;font-size:14px;font-weight:700;color:${C.ink};padding-left:9px;border-left:3px solid ${C.cool};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .exp-meta{display:flex;align-items:center;gap:9px;flex-wrap:wrap;flex:none;}
 .exp-status{font-size:12px;font-weight:800;}
 
 @media(max-width:860px){
-  .grid{grid-template-columns:1fr;padding:16px 16px 40px;}
-  .formwrap,.listwrap{padding:16px 16px 40px;}
-  .dash{padding:16px 14px 48px;}
+  /* iOS zoomt automatisch hinein, wenn ein Eingabefeld < 16px ist – und wieder
+     heraus muss man von Hand. Daher mobil überall mindestens 16px. */
+  .ctc-root input,.ctc-root select,.ctc-root textarea{font-size:16px;}
+  .row2{grid-template-columns:1fr;}   /* zwei Felder nebeneinander sind zu schmal */
+  .grid,.formwrap,.listwrap,.dash,.exportwrap{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));}
+  .grid{grid-template-columns:1fr;padding-top:16px;padding-bottom:40px;}
+  .formwrap,.listwrap{padding-top:16px;padding-bottom:40px;}
+  .dash{padding-top:16px;padding-bottom:48px;}
   .dash-tiles{grid-template-columns:repeat(2,1fr);}
   .dash-grid{grid-template-columns:1fr;}
   .kboard{display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:6px;}
   .kcol{min-width:82%;flex:none;}
   .viewtog{margin-left:0;}
   aside.panel .card{position:static;}
-  .hd-profile{display:none;}
+  .hd-inner{flex-wrap:wrap;}
+  .hd-profile{text-align:left;flex:1 1 100%;}   /* sichtbar lassen: sonst kein Name setzbar */
+  .hd-profile input{width:100%;max-width:none;text-align:left;}
   .hd-inner{padding:16px;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));}
   .hd h1{font-size:20px;}
-  .tabs{padding:0 8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .tabs{padding-left:max(8px,env(safe-area-inset-left));padding-right:max(8px,env(safe-area-inset-right));overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
   .tabs::-webkit-scrollbar{display:none;}
   .tab{padding:12px 12px;font-size:13px;white-space:nowrap;flex:none;}
   .band{padding:14px 16px;}
