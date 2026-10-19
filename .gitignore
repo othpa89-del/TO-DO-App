@@ -3,3 +3,8 @@ dist
 dist-ssr
 *.local
 .DS_Store
+
+# Niemals echte Secrets committen (.env.example mit Platzhaltern ist erlaubt)
+.env
+.env.*
+!.env.example
