@@ -10,9 +10,11 @@ import { meetingToMarkdown, meetingToText, exportWord, printMeeting, copyMeeting
 import { loadTasks, saveTasks, loadMeetingsData, saveMeetingsData } from "./store.js";
 import { isoDay } from "./dates.js";
 import { L, useLang, getLang, setLang } from "./i18n.js";
+import { useCalendar } from "./useCalendar.js";
 
 // Meetings-Modul lazy laden (hält das Start-Bundle klein)
 const Meetings = lazy(() => import("./Meetings.jsx"));
+const CalendarView = lazy(() => import("./CalendarView.jsx"));
 
 // --- Markenfarben (Farbchapter) ---
 const C = {
@@ -199,6 +201,10 @@ export default function App() {
   const [remoteTick, setRemoteTick] = useState(0);
   const [sync, setSync] = useState({ state: "synced", pending: 0, online: true });
   const [view, setView] = useState("dash");
+  // Synchronisierte Fremdtermine (Edge Function "calendar-feed").
+  // Der Abruf läuft unabhängig vom gewählten Tab, damit das Dashboard
+  // ebenfalls den aktuellen Stand zeigt.
+  const cal = useCalendar(true);
   const [returnView, setReturnView] = useState("all"); // wohin nach dem Bearbeiten zurück
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("all");
@@ -1039,9 +1045,9 @@ export default function App() {
             </div>
           </div>
           <nav className="tabs">
-            {["dash", "all", "meetings", "persons", "export"].map((v) => (
+            {["dash", "all", "meetings", "kalender", "persons", "export"].map((v) => (
               <button key={v} className={"tab" + ((view === v || (view === "new" && v === "all")) ? " on" : "")} onClick={() => goView(v)}>
-                {v === "dash" ? L("Dashboard", "Dashboard") : v === "all" ? L("Aufgaben", "Tasks") : v === "meetings" ? L("Meeting Minutes", "Meeting Minutes") : v === "persons" ? L("Persons", "Persons") : L("Druck & Export", "Print & Export")}
+                {v === "dash" ? L("Dashboard", "Dashboard") : v === "all" ? L("Aufgaben", "Tasks") : v === "meetings" ? L("Meeting Minutes", "Meeting Minutes") : v === "kalender" ? L("Kalender", "Calendar") : v === "persons" ? L("Persons", "Persons") : L("Druck & Export", "Print & Export")}
               </button>
             ))}
           </nav>
@@ -1101,6 +1107,10 @@ export default function App() {
           <Suspense fallback={<div className="empty">{L("Meetings werden geladen …", "Loading meetings …")}</div>}>
             <Meetings persons={persons} categories={sortedCats} profile={profile}
               companyColor={companyColor} onCreateTask={addExternalTask} onMeetingsChange={setMeetings} openMeetingReq={openMeetingReq} />
+          </Suspense>
+        ) : view === "kalender" ? (
+          <Suspense fallback={<div className="empty">{L("Kalender wird geladen …", "Loading calendar …")}</div>}>
+            <CalendarView cal={cal} companyColor={companyColor} flash={flash} />
           </Suspense>
         ) : view === "persons" ? (
           <div className="grid">
@@ -2065,9 +2075,48 @@ aside.panel .card{position:sticky;top:16px;}
 .exp-meta{display:flex;align-items:center;gap:9px;flex-wrap:wrap;flex:none;}
 .exp-status{font-size:12px;font-weight:800;}
 
+/* ===================== KALENDER (synchronisierte Fremdtermine) ===================== */
+@keyframes ctc-spin{to{transform:rotate(360deg);}}
+.spin{animation:ctc-spin 900ms linear infinite;}
+.calwrap{display:flex;flex-direction:column;gap:14px;}
+.cal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.cal-head h2{margin:0;}
+.cal-head-right{display:flex;align-items:center;gap:9px;flex-wrap:wrap;}
+.cal-stand{font-size:12px;font-weight:700;color:${C.grey};font-variant-numeric:tabular-nums;}
+.cal-sources{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.cal-src{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border:1.5px solid ${C.line};border-radius:999px;background:#fff;font-size:13px;font-weight:700;color:${C.cool};cursor:pointer;}
+.cal-src em{font-style:normal;font-size:11px;font-weight:800;opacity:.72;}
+.cal-dot{width:9px;height:9px;border-radius:50%;flex:none;}
+.cal-note{display:flex;align-items:center;gap:7px;margin-top:10px;padding:9px 12px;border-radius:8px;background:${C.fill};font-size:13px;color:${C.grey};}
+.cal-note.warn{background:#FDF0F5;color:${C.burgundyDarker};}
+.cal-note.good{background:${C.skyPale};color:#0B6E86;}
+.cal-note svg{flex:none;}
+.calset .cal-field{display:block;margin-bottom:12px;}
+.cal-field > span{display:block;font-size:12px;font-weight:800;color:${C.grey};margin-bottom:5px;}
+.cal-field input{width:100%;}
+.cal-token{display:flex;align-items:center;gap:9px;}
+.cal-token input{flex:1;min-width:0;}
+.cal-list{list-style:none;margin:0;padding:0;}
+.cal-day + .cal-day{margin-top:15px;}
+.cal-dayhead{margin:0 0 7px;font-size:13px;font-weight:800;color:${C.grey};}
+.cal-dayhead.today{color:${C.burgundy};}
+.cal-events{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;}
+.cal-ev{display:flex;align-items:center;gap:11px;padding:9px 12px;border:1px solid ${C.line};border-left:3px solid ${C.cool};border-radius:8px;background:#fff;}
+.cal-ev.allday{background:${C.panel};}
+.cal-ev-time{flex:none;min-width:96px;font-size:12px;font-weight:800;color:${C.grey};font-variant-numeric:tabular-nums;}
+.cal-ev-main{flex:1;min-width:0;}
+.cal-ev-title{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:700;color:${C.ink};}
+.cal-ev-title svg{flex:none;color:${C.cool};}
+.cal-ev-loc{display:block;font-size:12px;color:${C.cool};margin-top:2px;}
+.cal-ev-src{flex:none;font-size:11px;font-weight:800;padding:3px 9px;border:1px solid ${C.cool};border-radius:999px;white-space:nowrap;}
+
 @media(max-width:860px){
   /* iOS zoomt automatisch hinein, wenn ein Eingabefeld < 16px ist – und wieder
      heraus muss man von Hand. Daher mobil überall mindestens 16px. */
+  .cal-head-right{width:100%;}
+  .cal-ev{flex-wrap:wrap;gap:6px 11px;}
+  .cal-ev-time{min-width:0;}
+  .cal-ev-main{flex-basis:100%;order:3;}
   .ctc-root input,.ctc-root select,.ctc-root textarea{font-size:16px;}
   .row2{grid-template-columns:1fr;}   /* zwei Felder nebeneinander sind zu schmal */
   .grid,.formwrap,.listwrap,.dash,.exportwrap{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));}
