@@ -11,6 +11,7 @@ import { loadTasks, saveTasks, loadMeetingsData, saveMeetingsData } from "./stor
 import { isoDay } from "./dates.js";
 import { L, useLang, getLang, setLang } from "./i18n.js";
 import { useCalendar } from "./useCalendar.js";
+import CalendarToday from "./CalendarToday.jsx";
 
 // Meetings-Modul lazy laden (hält das Start-Bundle klein)
 const Meetings = lazy(() => import("./Meetings.jsx"));
@@ -1083,6 +1084,10 @@ export default function App() {
               <button className="dtile over" onClick={() => { setFilterStatus("open"); setView("all"); }}><b style={{ color: C.burgundyDarker }}>{stat.overdue}</b><span>{L("Überfällig", "Overdue")}</span></button>
             </div>
 
+            <CalendarToday cal={cal} companyColor={companyColor}
+              tasks={tasks.personal || []} meetings={meetings}
+              onPickTask={gotoTask} onPickMeeting={gotoMeeting}
+              onOpenCalendar={() => goView("kalender")} />
             <div className="dash-grid">
               <DashList title={L("Überfällig", "Overdue")} tone={C.burgundyDarker} items={overdue} onOpen={startEdit} />
               <DashList title={L("Heute fällig", "Due today")} tone={C.burgundy} items={today} onOpen={startEdit} />
@@ -2145,10 +2150,38 @@ button.wk-e{cursor:pointer;font-family:inherit;}
 .wk-e.clash .wk-icons{color:${C.burgundy};}
 .wk-legend{margin-top:12px;}
 
+/* ---- Tagesübersicht im Dashboard ---- */
+.ct-wrap{margin-bottom:16px;}
+.ct-head{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.ct-head h2{margin:0;}
+.ct-list{display:flex;flex-direction:column;gap:6px;margin-top:10px;}
+.ct-row{display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:9px 12px;border:1px solid ${C.line};border-left:3px solid ${C.cool};border-radius:8px;background:#fff;font-family:inherit;}
+button.ct-row{cursor:pointer;}
+button.ct-row:hover{border-color:${C.sky};}
+.ct-row.clash{background:#FDF0F5;}
+.ct-time{flex:none;min-width:74px;font-size:12px;font-weight:800;color:${C.grey};font-variant-numeric:tabular-nums;}
+.ct-main{flex:1;min-width:0;}
+.ct-title{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:700;color:${C.ink};}
+.ct-title svg{flex:none;color:${C.cool};}
+.ct-title .ct-clash{color:${C.burgundy};}
+.ct-meta{display:block;font-size:12px;color:${C.cool};margin-top:2px;}
+.ct-tag{flex:none;font-size:11px;font-weight:800;padding:3px 9px;border:1px solid ${C.cool};border-radius:999px;white-space:nowrap;}
+.ct-tom{margin-top:14px;}
+.ct-tom h3{margin:0;font-size:12px;font-weight:800;color:${C.cool};text-transform:uppercase;letter-spacing:.05em;}
+.ct-clashes{margin-top:14px;padding:11px 13px;border-radius:8px;background:#FDF0F5;}
+.ct-clashes h3{display:flex;align-items:center;gap:6px;margin:0 0 7px;font-size:13px;font-weight:800;color:${C.burgundyDarker};}
+.ct-clashes ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;}
+.ct-clashes li{font-size:13px;color:${C.body};}
+.ct-clash-when{display:block;font-size:11px;font-weight:800;color:${C.burgundyDarker};font-variant-numeric:tabular-nums;}
+.ct-clash-what em{font-style:normal;color:${C.cool};font-size:12px;}
+
 @media(max-width:860px){
   /* iOS zoomt automatisch hinein, wenn ein Eingabefeld < 16px ist – und wieder
      heraus muss man von Hand. Daher mobil überall mindestens 16px. */
   .cal-head-right{width:100%;}
+  .ct-row{flex-wrap:wrap;gap:6px 11px;}
+  .ct-time{min-width:0;}
+  .ct-main{flex-basis:100%;order:3;}
   .cal-ev{flex-wrap:wrap;gap:6px 11px;}
   .cal-ev-time{min-width:0;}
   .cal-ev-main{flex-basis:100%;order:3;}
