@@ -22,6 +22,9 @@ import { DISPLAY_TZ, dayInZone, dayStartMs } from "./tz.ts";
 // deno-lint-ignore no-explicit-any
 declare const Deno: any;
 
+/** Zugriff auf die Secrets. Injiziert, damit der Handler testbar bleibt. */
+export type Env = (name: string) => string | undefined;
+
 const SOURCES: ReadonlyArray<{ key: CalSource; env: string }> = [
   { key: "ew", env: "ICS_EW" },
   { key: "aaa", env: "ICS_AAA" },
@@ -101,10 +104,15 @@ async function fetchIcs(url: string): Promise<string> {
   return text;
 }
 
-Deno.serve(async (req: Request): Promise<Response> => {
+/**
+ * Der eigentliche Handler. Nimmt die Secrets als Funktion, damit er in den
+ * Tests ohne Deno-Umgebung geprüft werden kann.
+ */
+export function createHandler(env: Env) {
+  return async function handle(req: Request): Promise<Response> {
   const origin = req.headers.get("origin");
-  const token = Deno.env.get("PLANER_TOKEN") || "";
-  const allowedOrigin = (Deno.env.get("ALLOWED_ORIGIN") || "").replace(/\/$/, "");
+  const token = env("PLANER_TOKEN") || "";
+  const allowedOrigin = (env("ALLOWED_ORIGIN") || "").replace(/\/$/, "");
 
   // Fehlende Konfiguration: kein offener Zugang, aber eine lesbare Meldung.
   if (!token || !allowedOrigin) {
@@ -152,7 +160,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   const configured = SOURCES
-    .map((s) => ({ ...s, url: (Deno.env.get(s.env) || "").trim() }))
+    .map((s) => ({ ...s, url: (env(s.env) || "").trim() }))
     .filter((s) => s.url.length > 0);
 
   const errors: SourceError[] = [];
@@ -182,4 +190,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
     events,
     errors,
   }, 200, headers);
-});
+  };
+}
+
+// Nur in der Deno-Laufzeit starten; beim Import in den Tests passiert nichts.
+if (typeof Deno !== "undefined" && typeof Deno.serve === "function") {
+  Deno.serve(createHandler((name: string) => Deno.env.get(name)));
+}
