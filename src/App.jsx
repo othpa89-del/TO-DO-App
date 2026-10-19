@@ -1110,7 +1110,9 @@ export default function App() {
           </Suspense>
         ) : view === "kalender" ? (
           <Suspense fallback={<div className="empty">{L("Kalender wird geladen …", "Loading calendar …")}</div>}>
-            <CalendarView cal={cal} companyColor={companyColor} flash={flash} />
+            <CalendarView cal={cal} companyColor={companyColor} flash={flash}
+              tasks={tasks.personal || []} meetings={meetings}
+              onPickTask={gotoTask} onPickMeeting={gotoMeeting} />
           </Suspense>
         ) : view === "persons" ? (
           <div className="grid">
@@ -2109,6 +2111,39 @@ aside.panel .card{position:sticky;top:16px;}
 .cal-ev-title svg{flex:none;color:${C.cool};}
 .cal-ev-loc{display:block;font-size:12px;color:${C.cool};margin-top:2px;}
 .cal-ev-src{flex:none;font-size:11px;font-weight:800;padding:3px 9px;border:1px solid ${C.cool};border-radius:999px;white-space:nowrap;}
+
+/* ---- Wochenansicht: erst ab Tablet-Breite sinnvoll, mobil zeigt die Liste darunter ---- */
+.calweek{display:none;}
+@media(min-width:900px){.calweek{display:block;}}
+.wk-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.wk-label{font-size:13px;font-weight:800;color:${C.grey};margin-left:4px;}
+.wk-grid{display:grid;grid-template-columns:58px repeat(7,minmax(0,1fr));gap:0 3px;}
+.wk-head{padding:6px 4px 5px;text-align:center;border-bottom:2px solid ${C.line};}
+.wk-head.today{border-bottom-color:${C.burgundy};}
+.wk-dow{display:block;font-size:10px;font-weight:800;color:${C.cool};text-transform:uppercase;letter-spacing:.05em;}
+.wk-num{display:block;font-size:14px;font-weight:800;color:${C.ink};font-variant-numeric:tabular-nums;}
+.wk-head.today .wk-num{color:${C.burgundy};}
+.wk-allday-lbl{font-size:9px;font-weight:800;color:${C.cool};text-align:right;padding:6px 7px 0 0;text-transform:uppercase;letter-spacing:.04em;}
+.wk-allday{display:flex;flex-direction:column;gap:3px;padding:5px 0;border-bottom:1px solid ${C.line};min-height:26px;}
+.wk-allday.today{background:#FFF7FB;}
+.wk-hours{position:relative;}
+.wk-hour{position:absolute;right:7px;transform:translateY(-50%);font-size:10px;font-weight:700;color:${C.cool};font-variant-numeric:tabular-nums;}
+.wk-col{position:relative;border-left:1px solid ${C.line};}
+.wk-col.today{background:#FFF7FB;}
+.wk-line{position:absolute;left:0;right:0;height:1px;background:${C.line};}
+.wk-now{position:absolute;left:0;right:0;height:2px;background:${C.burgundy};z-index:3;}
+.wk-e{position:relative;display:block;width:100%;text-align:left;border:1px solid ${C.cool};border-left-width:3px;border-radius:5px;background:#fff;padding:2px 18px 2px 5px;font-size:11px;line-height:1.3;color:${C.ink};overflow:hidden;}
+.wk-e.sync{background:color-mix(in srgb, var(--ec) 9%, #fff);}
+.wk-e.own{border-style:dashed;}
+.wk-e.clash{box-shadow:inset 0 0 0 2px #F6C9D8;}
+.wk-block{position:absolute;z-index:2;}
+button.wk-e{cursor:pointer;font-family:inherit;}
+.wk-time{font-weight:800;color:${C.grey};margin-right:4px;font-variant-numeric:tabular-nums;}
+.wk-title{font-weight:700;}
+.wk-loc{display:block;color:${C.cool};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.wk-icons{position:absolute;top:2px;right:3px;display:flex;gap:2px;color:${C.cool};}
+.wk-e.clash .wk-icons{color:${C.burgundy};}
+.wk-legend{margin-top:12px;}
 
 @media(max-width:860px){
   /* iOS zoomt automatisch hinein, wenn ein Eingabefeld < 16px ist – und wieder

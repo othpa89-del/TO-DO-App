@@ -7,7 +7,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Check, Lock, RefreshCw, Settings, X } from "lucide-react";
 import { L, getLang, useLang } from "./i18n.js";
-import { SOURCE_COMPANY, dayKey, groupByDay } from "./calendar.js";
+import { SOURCE_COMPANY, dayKey, findConflicts, groupByDay, hhmmToMin, shiftDay, weekDays } from "./calendar.js";
+import CalendarWeek from "./CalendarWeek.jsx";
 import { SOURCE_KEYS, normalizeSettings } from "./calendarSync.js";
 
 const sourceLabel = (s) => SOURCE_COMPANY[s] || s;
@@ -40,7 +41,7 @@ function fmtStand(iso) {
   return `${fmtDayLong(dayKey(d.getTime()))}, ${time}`;
 }
 
-export default function CalendarView({ cal, companyColor, flash }) {
+export default function CalendarView({ cal, companyColor, flash, tasks = [], meetings = [], onPickTask, onPickMeeting }) {
   useLang();
   const { settings, settingsLoaded, configured, events, sourceErrors, generatedAt, loading, error } = cal;
 
@@ -49,6 +50,7 @@ export default function CalendarView({ cal, companyColor, flash }) {
   const [showToken, setShowToken] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
+  const [anchor, setAnchor] = useState(() => dayKey(Date.now()));
 
   // Gespeicherte Werte übernehmen, sobald sie geladen sind oder sich auf
   // einem anderen Gerät geändert haben.
@@ -62,6 +64,59 @@ export default function CalendarView({ cal, companyColor, flash }) {
   }, [settingsLoaded, configured]);
 
   const today = dayKey(Date.now());
+
+  // Konflikte nur zwischen den synchronisierten Quellen (Abschnitt 4.5).
+  const conflictIds = useMemo(() => findConflicts(events).ids, [events]);
+
+  // Fremdtermine, eigene Aufgaben und eigene Meetings auf eine gemeinsame
+  // Form bringen. Eigene Einträge bleiben bearbeitbar und sind als solche
+  // gekennzeichnet; Fremdtermine sind schreibgeschützt.
+  const items = useMemo(() => {
+    const out = events.map((ev) => ({
+      key: ev.id, kind: "sync", title: ev.title, location: ev.location,
+      start: ev.start, end: ev.end, allDay: !!ev.allDay,
+      source: ev.source, sourceLabel: sourceLabel(ev.source),
+      color: companyColor(SOURCE_COMPANY[ev.source]),
+      editable: false, conflict: conflictIds.has(ev.id), ref: ev,
+    }));
+    for (const t of tasks) {
+      if (!t?.due) continue;
+      out.push({
+        key: "task:" + t.id, kind: "task", title: t.title, location: "",
+        day: t.due, allDay: true, sourceLabel: L("Aufgabe", "Task"),
+        color: companyColor(t.company), editable: true, ref: t,
+      });
+    }
+    for (const m of meetings) {
+      if (!m?.date) continue;
+      const sMin = hhmmToMin(m.start);
+      const eMin = hhmmToMin(m.end);
+      const timed = sMin !== null;
+      out.push({
+        key: "meeting:" + m.id, kind: "meeting",
+        title: m.title || L("Meeting", "Meeting"), location: m.location || "",
+        sourceLabel: L("Meeting", "Meeting"), color: companyColor("Eurowings"),
+        editable: true, ref: m,
+        // Die gespeicherte Uhrzeit gilt wörtlich; kein Umweg über Date, damit
+        // die Anzeige auch auf einem Gerät in anderer Zeitzone stimmt.
+        ...(timed
+          ? {
+              day: m.date, startMin: sMin, endMin: eMin ?? sMin + 60, allDay: false,
+              timeLabel: eMin !== null ? `${m.start}–${m.end}` : m.start,
+            }
+          : { day: m.date, allDay: true }),
+      });
+    }
+    return out;
+  }, [events, tasks, meetings, companyColor, conflictIds]);
+
+  const week = useMemo(() => weekDays(anchor), [anchor]);
+
+  function pick(item) {
+    if (item.kind === "task") onPickTask?.(item.ref);
+    else if (item.kind === "meeting") onPickMeeting?.(item.ref);
+  }
+
   const upcoming = useMemo(
     () => events.filter((e) => (e.end || e.start) >= today),
     [events, today],
@@ -215,7 +270,18 @@ export default function CalendarView({ cal, companyColor, flash }) {
         </div>
       )}
 
-      {/* ---------------- Termine ---------------- */}
+      {/* ---------------- Wochenansicht (ab Tablet-Breite) ---------------- */}
+      <div className="card calweek">
+        <CalendarWeek days={week} items={items} today={today} onPick={pick}
+          onShift={(n) => setAnchor((a) => shiftDay(a, n))}
+          onToday={() => setAnchor(dayKey(Date.now()))} />
+        <p className="hint wk-legend">
+          {L("Gestrichelt und mit Stift: eigene Aufgaben und Meetings, antippen zum Bearbeiten. Mit Schloss: synchronisierte Termine, nur zur Ansicht.",
+             "Dashed with a pencil: your own tasks and meetings, tap to edit. With a lock: synced appointments, view only.")}
+        </p>
+      </div>
+
+      {/* ---------------- Termine als Liste ---------------- */}
       {configured && (
         <div className="card">
           <h2>{L("Nächste Termine", "Upcoming appointments")}</h2>

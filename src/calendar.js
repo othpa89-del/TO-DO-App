@@ -150,3 +150,132 @@ export function conflictsInDays(events, days = 14, now = Date.now()) {
   const until = now + days * DAY_MS;
   return findConflicts(events).pairs.filter((p) => p.to > now && p.from <= until);
 }
+
+// ---------------------------------------------------------------------------
+//  Wochenansicht
+// ---------------------------------------------------------------------------
+
+/** Montag der Woche, in der der Tag liegt. */
+export function weekStart(day) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day || "");
+  if (!m) return "";
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  const dow = (d.getUTCDay() + 6) % 7; // Montag = 0
+  return shiftDay(day, -dow);
+}
+
+/** Die sieben Tage der Woche, Montag bis Sonntag. */
+export function weekDays(day) {
+  const s = weekStart(day);
+  return s ? Array.from({ length: 7 }, (_, i) => shiftDay(s, i)) : [];
+}
+
+/** ISO-Kalenderwoche (Woche 1 enthält den 4. Januar). */
+export function isoWeek(day) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day || "");
+  if (!m) return 0;
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7) + 3); // Donnerstag dieser Woche
+  const thu = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+  thu.setUTCDate(thu.getUTCDate() - ((thu.getUTCDay() + 6) % 7) + 3);
+  return 1 + Math.round((d - thu) / 604800000);
+}
+
+const timeFmtCache = new Map();
+function timeFmt(tz) {
+  let f = timeFmtCache.get(tz);
+  if (!f) {
+    f = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz, hour12: false, hour: "2-digit", minute: "2-digit",
+    });
+    timeFmtCache.set(tz, f);
+  }
+  return f;
+}
+
+/**
+ * Wanduhrzeit "HH:MM" in Minuten seit Mitternacht. Für eigene Einträge, deren
+ * Uhrzeit ohne Zeitzone gespeichert ist und genau so gelten soll – egal, in
+ * welcher Zeitzone das Gerät gerade steht.
+ */
+export function hhmmToMin(v) {
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(v || "").trim());
+  if (!m) return null;
+  const h = Number(m[1]), mi = Number(m[2]);
+  if (h > 23 || mi > 59) return null;
+  return h * 60 + mi;
+}
+
+/** Minuten seit Mitternacht in der Anzeigezone. */
+export function minutesOfDay(v, tz = DISPLAY_TZ) {
+  const ms = msOf(v);
+  if (!Number.isFinite(ms)) return 0;
+  const parts = timeFmt(tz).formatToParts(new Date(ms));
+  const num = (t) => Number(parts.find((p) => p.type === t)?.value ?? "0");
+  return (num("hour") % 24) * 60 + num("minute");
+}
+
+/**
+ * Lage eines Termins innerhalb eines Tages, in Minuten. Mehrtägige Termine
+ * werden auf den Tag beschnitten; null, wenn der Termin den Tag nicht berührt.
+ */
+export function daySpanOf(ev, day, tz = DISPLAY_TZ) {
+  // Eigene Einträge bringen Tag und Minuten schon mit.
+  if (ev?.day && Number.isFinite(ev.startMin)) {
+    if (ev.day !== day) return null;
+    const startMin = Math.max(0, Math.min(1439, ev.startMin));
+    let endMin = Number.isFinite(ev.endMin) ? Math.min(1440, ev.endMin) : startMin;
+    if (endMin <= startMin) endMin = Math.min(1440, startMin + 30);
+    return { startMin, endMin };
+  }
+  const startMs = msOf(ev?.start);
+  if (!Number.isFinite(startMs)) return null;
+  const endMs = msOf(ev?.end);
+  const lastMs = (Number.isFinite(endMs) && endMs > startMs ? endMs : startMs + 1) - 1;
+  const firstKey = dayKey(startMs, tz);
+  const lastKey = dayKey(lastMs, tz);
+  if (day < firstKey || day > lastKey) return null;
+
+  const startMin = day === firstKey ? minutesOfDay(startMs, tz) : 0;
+  let endMin = 1440;
+  if (day === lastKey) {
+    endMin = Number.isFinite(endMs) ? minutesOfDay(endMs, tz) : startMin;
+    if (endMin === 0) endMin = 1440; // Ende genau um Mitternacht
+  }
+  if (endMin <= startMin) endMin = Math.min(1440, startMin + 30); // Mindesthöhe
+  return { startMin, endMin };
+}
+
+/**
+ * Überschneidende Blöcke nebeneinander legen. Vergibt je Block eine Spur und
+ * die Gesamtzahl der Spuren des Tages.
+ */
+export function assignLanes(blocks) {
+  const sorted = [...blocks].sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
+  const laneEnd = [];
+  for (const b of sorted) {
+    let lane = laneEnd.findIndex((end) => end <= b.startMin);
+    if (lane === -1) {
+      lane = laneEnd.length;
+      laneEnd.push(b.endMin);
+    } else {
+      laneEnd[lane] = b.endMin;
+    }
+    b.lane = lane;
+  }
+  const lanes = Math.max(1, laneEnd.length);
+  for (const b of sorted) b.lanes = lanes;
+  return sorted;
+}
+
+/** Stundenbereich, der alle Blöcke zeigt; mindestens 8 bis 18 Uhr. */
+export function hourRange(blocks, minFrom = 8, minTo = 18) {
+  let lo = minFrom, hi = minTo;
+  for (const b of blocks || []) {
+    lo = Math.min(lo, Math.floor(b.startMin / 60));
+    hi = Math.max(hi, Math.ceil(b.endMin / 60));
+  }
+  lo = Math.max(0, lo);
+  hi = Math.min(24, Math.max(hi, lo + 4));
+  return { from: lo, to: hi };
+}

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  conflictsInDays, dayKey, dayKeysOf, eventsOnDay, findConflicts,
-  groupByDay, nextDay, shiftDay, sortEvents,
+  assignLanes, conflictsInDays, dayKey, dayKeysOf, daySpanOf, eventsOnDay,
+  findConflicts, groupByDay, hourRange, isoWeek, minutesOfDay, nextDay,
+  shiftDay, sortEvents, weekDays, weekStart,
 } from "../calendar.js";
 
 const ev = (o) => ({
@@ -130,5 +131,60 @@ describe("Konflikterkennung", () => {
       ev({ id: "aaa5", source: "aaa", start: "2026-10-20T09:30:00+02:00", end: "2026-10-20T10:30:00+02:00" }),
     ];
     expect(conflictsInDays(events, 14, now)).toHaveLength(0);
+  });
+});
+
+describe("Wochenansicht", () => {
+  it("findet den Montag der Woche", () => {
+    expect(weekStart("2026-10-21")).toBe("2026-10-19"); // Mittwoch -> Montag
+    expect(weekStart("2026-10-19")).toBe("2026-10-19"); // Montag bleibt
+    expect(weekStart("2026-10-18")).toBe("2026-10-12"); // Sonntag gehört zur Vorwoche
+  });
+
+  it("liefert sieben Tage von Montag bis Sonntag", () => {
+    const d = weekDays("2026-10-21");
+    expect(d).toHaveLength(7);
+    expect(d[0]).toBe("2026-10-19");
+    expect(d[6]).toBe("2026-10-25");
+  });
+
+  it("zählt die ISO-Kalenderwoche", () => {
+    expect(isoWeek("2026-01-01")).toBe(1);
+    expect(isoWeek("2026-01-05")).toBe(2);
+    expect(isoWeek("2026-10-19")).toBe(43);
+    expect(isoWeek("2026-12-31")).toBe(53); // 2026 hat 53 Wochen
+  });
+
+  it("rechnet die Uhrzeit in Minuten seit Mitternacht", () => {
+    expect(minutesOfDay("2026-10-20T09:00:00+02:00")).toBe(540);
+    expect(minutesOfDay("2026-10-20T07:00:00Z")).toBe(540); // Anzeige in Wien
+  });
+
+  it("beschneidet einen Termin über Mitternacht auf beide Tage", () => {
+    const ev = { start: "2026-10-20T23:00:00+02:00", end: "2026-10-21T01:00:00+02:00" };
+    expect(daySpanOf(ev, "2026-10-20")).toEqual({ startMin: 1380, endMin: 1440 });
+    expect(daySpanOf(ev, "2026-10-21")).toEqual({ startMin: 0, endMin: 60 });
+    expect(daySpanOf(ev, "2026-10-22")).toBe(null);
+  });
+
+  it("gibt Terminen ohne Dauer eine Mindesthöhe", () => {
+    const ev = { start: "2026-10-20T09:00:00+02:00", end: "2026-10-20T09:00:00+02:00" };
+    expect(daySpanOf(ev, "2026-10-20")).toEqual({ startMin: 540, endMin: 570 });
+  });
+
+  it("legt überschneidende Blöcke nebeneinander", () => {
+    const laid = assignLanes([
+      { id: "a", startMin: 540, endMin: 600 },
+      { id: "b", startMin: 560, endMin: 620 },
+      { id: "c", startMin: 700, endMin: 730 },
+    ]);
+    expect(laid.map((b) => `${b.id}:${b.lane}`)).toEqual(["a:0", "b:1", "c:0"]);
+    expect(laid.every((b) => b.lanes === 2)).toBe(true);
+  });
+
+  it("erweitert den Stundenbereich auf die vorhandenen Termine", () => {
+    expect(hourRange([])).toEqual({ from: 8, to: 18 });
+    expect(hourRange([{ startMin: 360, endMin: 1300 }])).toEqual({ from: 6, to: 22 });
+    expect(hourRange([{ startMin: 0, endMin: 1440 }])).toEqual({ from: 0, to: 24 });
   });
 });
